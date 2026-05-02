@@ -1,5 +1,5 @@
 -- =========================================================================
--- NutriCloud — Initial schema
+-- NutriClaude — Initial schema
 -- =========================================================================
 -- Bounded contexts:
 --   1. Household & Profiles  (sharing unit + individual nutritional profiles)

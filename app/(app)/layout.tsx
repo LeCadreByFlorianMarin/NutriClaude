@@ -32,7 +32,7 @@ export default async function AppLayout({
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <Link href="/menu" className="font-bold text-lg">
-              NutriCloud
+              NutriClaude
             </Link>
             <nav className="hidden md:flex items-center gap-1">
               {NAV.map((item) => (

@@ -1,4 +1,4 @@
-# NutriCloud
+# NutriClaude
 
 Brique nutrition de l'écosystème **Le Cadre**. Planification nutritionnelle familiale, recettes, et liste de courses triée par rayon.
 
