@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NutriClaude — Architecture Technique</title>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface2: #232735;
+            --border: #2e3345;
+            --text: #e4e6ef;
+            --text-muted: #8b90a5;
+            --accent: #6c63ff;
+            --accent-light: #8b84ff;
+            --green: #34d399;
+            --orange: #f59e0b;
+            --red: #ef4444;
+            --blue: #3b82f6;
+            --cyan: #06b6d4;
+            --pink: #ec4899;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Header */
+        header {
+            padding: 60px 0 40px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        header .badge {
+            display: inline-block;
+            background: rgba(108, 99, 255, 0.15);
+            color: var(--accent-light);
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+        }
+
+        h1 {
+            font-size: 42px;
+            font-weight: 800;
+            letter-spacing: -1px;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, var(--text), var(--accent-light));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 18px;
+            max-width: 700px;
+        }
+
+        /* Table of Contents */
+        .toc {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 28px 32px;
+            margin: 40px 0;
+        }
+
+        .toc h3 {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        .toc-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 8px;
+        }
+
+        .toc a {
+            color: var(--accent-light);
+            text-decoration: none;
+            font-size: 15px;
+            padding: 6px 0;
+            display: block;
+            transition: color 0.2s;
+        }
+
+        .toc a:hover { color: var(--text); }
+        .toc a .num { color: var(--text-muted); margin-right: 8px; font-size: 13px; }
+
+        /* Sections */
+        section {
+            padding: 50px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h2 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        h2 .icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin: 32px 0 16px;
+            color: var(--text);
+        }
+
+        h4 {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 24px 0 12px;
+            color: var(--accent-light);
+        }
+
+        p { margin-bottom: 16px; color: var(--text-muted); }
+        p strong { color: var(--text); }
+
+        /* Cards */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            transition: border-color 0.2s;
+        }
+
+        .card:hover { border-color: var(--accent); }
+
+        .card .card-title {
+            font-weight: 700;
+            font-size: 16px;
+            color: var(--text);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card .card-desc {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        /* Code blocks */
+        .code-block {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 16px;
+            background: var(--surface2);
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .code-header .lang {
+            color: var(--accent-light);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        pre {
+            padding: 20px;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+            font-size: 13px;
+            line-height: 1.8;
+            color: var(--text);
+        }
+
+        .kw { color: var(--pink); }
+        .type { color: var(--cyan); }
+        .str { color: var(--green); }
+        .cmt { color: var(--text-muted); font-style: italic; }
+        .fn { color: var(--blue); }
+        .num { color: var(--orange); }
+
+        /* Diagram */
+        .diagram {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 32px;
+            margin: 24px 0;
+            overflow-x: auto;
+        }
+
+        .diagram-title {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+
+        .arch-flow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            padding: 20px 0;
+        }
+
+        .arch-box {
+            padding: 14px 20px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            text-align: center;
+            min-width: 120px;
+            border: 2px solid;
+        }
+
+        .arch-box.ios { background: rgba(59, 130, 246, 0.1); border-color: var(--blue); color: var(--blue); }
+        .arch-box.api { background: rgba(108, 99, 255, 0.1); border-color: var(--accent); color: var(--accent-light); }
+        .arch-box.db { background: rgba(52, 211, 153, 0.1); border-color: var(--green); color: var(--green); }
+        .arch-box.ext { background: rgba(245, 158, 11, 0.1); border-color: var(--orange); color: var(--orange); }
+        .arch-box.ai { background: rgba(236, 72, 153, 0.1); border-color: var(--pink); color: var(--pink); }
+
+        .arch-arrow {
+            color: var(--text-muted);
+            font-size: 20px;
+        }
+
+        /* Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+
+        .data-table th {
+            text-align: left;
+            padding: 12px 16px;
+            background: var(--surface2);
+            color: var(--text);
+            font-weight: 600;
+            border-bottom: 2px solid var(--border);
+            font-size: 13px;
+        }
+
+        .data-table td {
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-muted);
+        }
+
+        .data-table tr:hover td { background: rgba(108, 99, 255, 0.03); }
+
+        .data-table code {
+            background: var(--surface2);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--accent-light);
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .tag.pk { background: rgba(108, 99, 255, 0.15); color: var(--accent-light); }
+        .tag.fk { background: rgba(245, 158, 11, 0.15); color: var(--orange); }
+        .tag.idx { background: rgba(52, 211, 153, 0.15); color: var(--green); }
+        .tag.rls { background: rgba(236, 72, 153, 0.15); color: var(--pink); }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 0;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 0;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+            background: none;
+            border-top: none;
+            border-left: none;
+            border-right: none;
+        }
+
+        .tab:hover { color: var(--text); }
+        .tab.active { color: var(--accent-light); border-bottom-color: var(--accent); }
+
+        .tab-content { display: none; padding-top: 20px; }
+        .tab-content.active { display: block; }
+
+        /* Roadmap */
+        .roadmap {
+            position: relative;
+            padding-left: 32px;
+            margin: 24px 0;
+        }
+
+        .roadmap::before {
+            content: '';
+            position: absolute;
+            left: 11px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--border);
+        }
+
+        .roadmap-item {
+            position: relative;
+            margin-bottom: 28px;
+        }
+
+        .roadmap-item::before {
+            content: '';
+            position: absolute;
+            left: -27px;
+            top: 6px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid;
+        }
+
+        .roadmap-item.phase1::before { border-color: var(--green); background: rgba(52, 211, 153, 0.3); }
+        .roadmap-item.phase2::before { border-color: var(--blue); background: rgba(59, 130, 246, 0.3); }
+        .roadmap-item.phase3::before { border-color: var(--accent); background: rgba(108, 99, 255, 0.3); }
+        .roadmap-item.phase4::before { border-color: var(--orange); background: rgba(245, 158, 11, 0.3); }
+
+        .roadmap-item .phase-label {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .roadmap-item.phase1 .phase-label { color: var(--green); }
+        .roadmap-item.phase2 .phase-label { color: var(--blue); }
+        .roadmap-item.phase3 .phase-label { color: var(--accent-light); }
+        .roadmap-item.phase4 .phase-label { color: var(--orange); }
+
+        .roadmap-item .phase-title {
+            font-size: 17px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 6px;
+        }
+
+        .roadmap-item .phase-desc {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        /* Highlight box */
+        .highlight {
+            border-left: 3px solid var(--accent);
+            padding: 16px 20px;
+            background: rgba(108, 99, 255, 0.06);
+            border-radius: 0 8px 8px 0;
+            margin: 20px 0;
+        }
+
+        .highlight p { margin-bottom: 0; }
+
+        /* Footer */
+        footer {
+            padding: 40px 0;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            h1 { font-size: 28px; }
+            h2 { font-size: 22px; }
+            .arch-flow { flex-direction: column; }
+            .arch-arrow { transform: rotate(90deg); }
+            .card-grid { grid-template-columns: 1fr; }
+            .toc-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <header>
+            <div class="badge">DOCUMENT D'ARCHITECTURE v2.0</div>
+            <h1>NutriClaude</h1>
+            <p>Planification nutritionnelle intelligente avec liste de courses partagée, alimentée par Claude et Open Food Facts. Brique nutrition de l'écosystème Le Cadre.</p>
+        </header>
+
+        <!-- TOC -->
+        <nav class="toc">
+            <h3>Sommaire</h3>
+            <div class="toc-grid">
+                <a href="#vision"><span class="num">01</span> Vision & Périmètre</a>
+                <a href="#architecture"><span class="num">02</span> Architecture Système</a>
+                <a href="#data-model"><span class="num">03</span> Modèle de Données</a>
+                <a href="#mcp-server"><span class="num">04</span> MCP Server</a>
+                <a href="#open-food-facts"><span class="num">05</span> Intégration Open Food Facts</a>
+                <a href="#shortcuts"><span class="num">06</span> iOS Shortcuts</a>
+                <a href="#api-design"><span class="num">07</span> API Design</a>
+                <a href="#le-cadre"><span class="num">08</span> Intégration Le Cadre</a>
+                <a href="#lead-magnet"><span class="num">09</span> Stratégie & Funnel</a>
+                <a href="#roadmap"><span class="num">10</span> Roadmap</a>
+            </div>
+        </nav>
+
+        <!-- Section 1: Vision -->
+        <section id="vision">
+            <h2><span class="icon" style="background: rgba(52, 211, 153, 0.15);">🎯</span> Vision & Périmètre</h2>
+
+            <h3>Le problème</h3>
+            <p>Les pères cadres tech avec un enfant en bas âge galèrent à coordonner la nutrition familiale. Chacun a ses objectifs macros, les courses sont un casse-tête du dimanche soir, et les apps de meal planning ne tiennent jamais plus de 2 semaines. C'est le même profil qui n'a plus de temps pour le sport — celui que <strong>Le Cadre</strong> aide à récupérer 6h par semaine.</p>
+
+            <h3>La solution</h3>
+            <p><strong>NutriClaude</strong> est un système backend qui connecte Claude (IA) à une base de produits alimentaires enrichie (Open Food Facts), des profils nutritionnels individuels, et une liste de courses partagée triée par rayon. L'interface se fait via des <strong>iOS Shortcuts</strong> et via <strong>Claude en conversation</strong> (MCP). C'est à la fois un outil perso, un lead magnet pour l'écosystème Le Cadre, et un bonus premium dans Le Cadre Endurance.</p>
+
+            <h3>Bounded Contexts</h3>
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-title">🧑 User Profiles</div>
+                    <div class="card-desc">Gestion des comptes, authentification, profils nutritionnels individuels (objectifs macros, calories, restrictions alimentaires).</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">🍽️ Recipe Management</div>
+                    <div class="card-desc">Création, stockage et recherche de recettes avec ingrédients, portions, et données nutritionnelles calculées.</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">📦 Product Catalog</div>
+                    <div class="card-desc">Catalogue de produits alimentaires alimenté par Open Food Facts, enrichi avec le mapping rayon personnalisé.</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">🛒 Grocery List</div>
+                    <div class="card-desc">Liste de courses partagée entre membres du foyer, triée par rayon, avec statuts (à acheter / acheté).</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Architecture -->
+        <section id="architecture">
+            <h2><span class="icon" style="background: rgba(108, 99, 255, 0.15);">🏗️</span> Architecture Système</h2>
+
+            <div class="diagram">
+                <div class="diagram-title">Vue d'ensemble</div>
+                <div class="arch-flow">
+                    <div class="arch-box ios">📱 iOS<br>Shortcuts</div>
+                    <span class="arch-arrow">→</span>
+                    <div class="arch-box api">⚡ Supabase<br>REST API + RLS</div>
+                    <span class="arch-arrow">→</span>
+                    <div class="arch-box db">🗄️ PostgreSQL<br>Supabase</div>
+                </div>
+                <div class="arch-flow" style="margin-top: 16px;">
+                    <div class="arch-box ai">🤖 Claude<br>Conversation</div>
+                    <span class="arch-arrow">→</span>
+                    <div class="arch-box api">🔌 MCP Server<br>TypeScript</div>
+                    <span class="arch-arrow">→</span>
+                    <div class="arch-box db">🗄️ PostgreSQL<br>Supabase</div>
+                    <span class="arch-arrow">←</span>
+                    <div class="arch-box ext">🌍 Open Food<br>Facts API</div>
+                </div>
+            </div>
+
+            <h3>Stack technique</h3>
+            <table class="data-table">
+                <thead>
+                    <tr><th>Composant</th><th>Technologie</th><th>Justification</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>Base de données</strong></td><td>PostgreSQL (Supabase)</td><td>Relations complexes entre recettes, produits, rayons. RLS pour le multi-utilisateur. API REST auto-générée.</td></tr>
+                    <tr><td><strong>API REST</strong></td><td>Supabase auto-generated + Edge Functions</td><td>Zéro serveur à maintenir. Les Shortcuts iOS appellent directement l'API REST. Edge Functions pour la logique custom.</td></tr>
+                    <tr><td><strong>MCP Server</strong></td><td>TypeScript + @modelcontextprotocol/sdk</td><td>Permet à Claude d'interagir directement avec la DB. Standard Anthropic.</td></tr>
+                    <tr><td><strong>Authentification</strong></td><td>Supabase Auth (Magic Link)</td><td>Pas de mot de passe. Magic link par email = simple pour l'utilisateur.</td></tr>
+                    <tr><td><strong>Data externe</strong></td><td>Open Food Facts API v2</td><td>3M+ produits, gratuit, open source. Nutrition, codes-barres, catégories.</td></tr>
+                    <tr><td><strong>Interface</strong></td><td>iOS Shortcuts</td><td>Natif, gratuit, partageable. Appels HTTP + Siri voice integration.</td></tr>
+                </tbody>
+            </table>
+
+            <div class="highlight">
+                <p><strong>Principe architectural :</strong> Supabase est un <em>détail</em>, pas l'architecture. Le modèle de données et le MCP server sont conçus pour être indépendants du provider. Si demain tu migres vers un Postgres auto-hébergé, seul le layer de connexion change.</p>
+            </div>
+        </section>
+
+        <!-- Section 3: Data Model -->
+        <section id="data-model">
+            <h2><span class="icon" style="background: rgba(52, 211, 153, 0.15);">🗄️</span> Modèle de Données</h2>
+
+            <p>Le schéma suit les principes DDD : chaque table est un <strong>aggregate</strong> ou une <strong>value table</strong> claire. Les références entre aggregates se font par ID. Le Row-Level Security (RLS) de Supabase assure l'isolation entre foyers.</p>
+
+            <!-- Tabs for each table -->
+            <div class="tabs" id="db-tabs">
+                <button class="tab active" data-tab="households">households</button>
+                <button class="tab" data-tab="profiles">profiles</button>
+                <button class="tab" data-tab="products">products</button>
+                <button class="tab" data-tab="aisles">aisles</button>
+                <button class="tab" data-tab="recipes">recipes</button>
+                <button class="tab" data-tab="grocery">grocery_items</button>
+            </div>
+
+            <div class="tab-content active" id="tab-households">
+                <div class="code-block">
+                    <div class="code-header">households — Foyers (unité de partage)<span class="lang">SQL</span></div>
+                    <pre><span class="kw">CREATE TABLE</span> <span class="type">households</span> (
+  <span class="fn">id</span>          <span class="type">uuid</span> <span class="kw">PRIMARY KEY DEFAULT</span> gen_random_uuid(),
+  <span class="fn">name</span>        <span class="type">text</span> <span class="kw">NOT NULL</span>,        <span class="cmt">-- "Famille Marin"</span>
+  <span class="fn">created_at</span>  <span class="type">timestamptz</span> <span class="kw">DEFAULT</span> now()
+);
+
+<span class="cmt">-- RLS: chaque utilisateur ne voit que son foyer</span>
+<span class="kw">ALTER TABLE</span> households <span class="kw">ENABLE ROW LEVEL SECURITY</span>;
+</pre>
+                </div>
+                <p>Le <strong>foyer</strong> est l'unité de partage. Toi et ta femme appartenez au même foyer. La liste de courses, les rayons, et les recettes sont partagés au niveau du foyer. Les profils nutritionnels restent individuels.</p>
+            </div>
+
+            <div class="tab-content" id="tab-profiles">
+                <div class="code-block">
+                    <div class="code-header">profiles — Profils nutritionnels individuels<span class="lang">SQL</span></div>
+                    <pre><span class="kw">CREATE TABLE</span> <span class="type">profiles</span> (
+  <span class="fn">id</span>              <span class="type">uuid</span> <span class="kw">PRIMARY KEY REFERENCES</span> auth.users(id),
+  <span class="fn">household_id</span>    <span class="type">uuid</span> <span class="kw">REFERENCES</span> households(id) <span class="kw">NOT NULL</span>,
+  <span class="fn">display_name</span>    <span class="type">text</span> <span class="kw">NOT NULL</span>,       <span class="cmt">-- "Florian"</span>
+  <span class="fn">daily_calories</span>  <span class="type">int</span>,                    <span class="cmt">-- 2200</span>
+  <span class="fn">daily_protein_g</span> <span class="type">int</span>,                    <span class="cmt">-- 150</span>
+  <span class="fn">daily_carbs_g</span>   <span class="type">int</span>,                    <span class="cmt">-- 250</span>
+  <span class="fn">daily_fat_g</span>     <span class="type">int</span>,                    <span class="cmt">-- 70</span>
+  <span class="fn">daily_fiber_g</span>   <span class="type">int</span>,                    <span class="cmt">-- 30</span>
+  <span class="fn">restrictions</span>    <span class="type">text[]</span>,                 <span class="cmt">-- {'gluten-free', 'lactose-free'}</span>
+  <span class="fn">preferences</span>     <span class="type">jsonb</span> <span class="kw">DEFAULT</span> <span class="str">'{}'</span>,   <span class="cmt">-- préférences libres</span>
+  <span class="fn">updated_at</span>      <span class="type">timestamptz</span> <span class="kw">DEFAULT</span> now()
+);
+
+<span class="cmt">-- Index pour la lookup par foyer</span>
+<span class="kw">CREATE INDEX</span> idx_profiles_household <span class="kw">ON</span> profiles(household_id);
+</pre>
+                </div>
+                <p>Chaque membre du foyer a son propre profil avec ses objectifs macros et ses restrictions. Claude utilise ces données pour proposer des recettes adaptées à chacun.</p>
+            </div>
+
+            <div class="tab-content" id="tab-products">
+                <div class="code-block">
+                    <div class="code-header">products — Catalogue produits (cache Open Food Facts)<span class="lang">SQL</span></div>
+                    <pre><span class="kw">CREATE TABLE</span> <span class="type">products</span> (
+  <span class="fn">id</span>               <span class="type">uuid</span> <span class="kw">PRIMARY KEY DEFAULT</span> gen_random_uuid(),
+  <span class="fn">barcode</span>          <span class="type">text</span> <span class="kw">UNIQUE</span>,            <span class="cmt">-- EAN-13 / UPC</span>
+  <span class="fn">name</span>             <span class="type">text</span> <span class="kw">NOT NULL</span>,
+  <span class="fn">brand</span>            <span class="type">text</span>,
+  <span class="fn">categories</span>       <span class="type">text[]</span>,                  <span class="cmt">-- tags OFF</span>
+  <span class="fn">nutriscore</span>       <span class="type">char(1)</span>,                  <span class="cmt">-- A, B, C, D, E</span>
+  <span class="fn">energy_kcal_100g</span> <span class="type">numeric(7,2)</span>,
+  <span class="fn">protein_100g</span>     <span class="type">numeric(7,2)</span>,
+  <span class="fn">carbs_100g</span>       <span class="type">numeric(7,2)</span>,
+  <span class="fn">fat_100g</span>         <span class="type">numeric(7,2)</span>,
+  <span class="fn">fiber_100g</span>       <span class="type">numeric(7,2)</span>,
+  <span class="fn">salt_100g</span>        <span class="type">numeric(7,2)</span>,
+  <span class="fn">sugar_100g</span>       <span class="type">numeric(7,2)</span>,
+  <span class="fn">saturated_fat_100g</span> <span class="type">numeric(7,2)</span>,
+  <span class="fn">image_url</span>        <span class="type">text</span>,
+  <span class="fn">off_data</span>         <span class="type">jsonb</span>,                   <span class="cmt">-- données OFF brutes complètes</span>
+  <span class="fn">last_synced_at</span>   <span class="type">timestamptz</span>,
+  <span class="fn">created_at</span>       <span class="type">timestamptz</span> <span class="kw">DEFAULT</span> now()
+);
+
+<span class="cmt">-- Full-text search sur le nom</span>
+<span class="kw">CREATE INDEX</span> idx_products_name_search
+  <span class="kw">ON</span> products <span class="kw">USING</span> gin(to_tsvector(<span class="str">'french'</span>, name));
+</pre>
+                </div>
+                <p>Cache local des produits Open Food Facts. Quand un produit est cherché, on vérifie d'abord le cache. Si absent ou périmé (<code>last_synced_at</code> > 30 jours), on requête l'API OFF et on met à jour. Le champ <code>off_data</code> stocke la réponse JSON brute pour ne rien perdre.</p>
+            </div>
+
+            <div class="tab-content" id="tab-aisles">
+                <div class="code-block">
+                    <div class="code-header">aisles & product_aisle_map — Rayons personnalisés<span class="lang">SQL</span></div>
+                    <pre><span class="kw">CREATE TABLE</span> <span class="type">aisles</span> (
+  <span class="fn">id</span>            <span class="type">uuid</span> <span class="kw">PRIMARY KEY DEFAULT</span> gen_random_uuid(),
+  <span class="fn">household_id</span>  <span class="type">uuid</span> <span class="kw">REFERENCES</span> households(id) <span class="kw">NOT NULL</span>,
+  <span class="fn">name</span>          <span class="type">text</span> <span class="kw">NOT NULL</span>,        <span class="cmt">-- "Fruits & Légumes"</span>
+  <span class="fn">sort_order</span>    <span class="type">int</span> <span class="kw">NOT NULL</span>,          <span class="cmt">-- ordre dans le magasin</span>
+  <span class="fn">icon</span>          <span class="type">text</span>,                     <span class="cmt">-- emoji optionnel "🥬"</span>
+  <span class="kw">UNIQUE</span>(household_id, name)
+);
+
+<span class="kw">CREATE TABLE</span> <span class="type">product_aisle_map</span> (
+  <span class="fn">id</span>            <span class="type">uuid</span> <span class="kw">PRIMARY KEY DEFAULT</span> gen_random_uuid(),
+  <span class="fn">household_id</span>  <span class="type">uuid</span> <span class="kw">REFERENCES</span> households(id) <span class="kw">NOT NULL</span>,
+  <span class="fn">product_id</span>    <span class="type">uuid</span> <span class="kw">REFERENCES</span> products(id),
+  <span class="fn">keyword</span>       <span class="type">text</span>,                     <span class="cmt">-- "poulet" (matching souple)</span>
+  <span class="fn">aisle_id</span>      <span class="type">uuid</span> <span class="kw">REFERENCES</span> aisles(id) <span class="kw">NOT NULL</span>,
+  <span class="cmt">-- Soit product_id soit keyword doit être rempli</span>
+  <span class="kw">CHECK</span> (product_id <span class="kw">IS NOT NULL OR</span> keyword <span class="kw">IS NOT NULL</span>)
+);
+
+<span class="cmt">-- Index pour le matching par keyword</span>
+<span class="kw">CREATE INDEX</span> idx_aisle_map_keyword
+  <span class="kw">ON</span> product_aisle_map <span class="kw">USING</span> gin(to_tsvector(<span class="str">'french'</span>, keyword));
+</pre>
+                </div>
+                <p>Deux mécanismes de mapping : par <strong>product_id</strong> (lien exact avec un produit du catalogue) ou par <strong>keyword</strong> (matching souple — "poulet" → Boucherie, "pâtes" → Épicerie Sèche). Le keyword permet de classer automatiquement des ingrédients même s'ils n'ont pas encore de fiche produit. L'ordre (<code>sort_order</code>) reflète le parcours physique dans ton supermarché.</p>
+            </div>
+
+            <div class="tab-content" id="tab-recipes">
+                <div class="code-block">
+                    <div class="code-header">recipes & recipe_ingredients — Recettes<span class="lang">SQL</span></div>
+                    <pre><span class="kw">CREATE TABLE</span> <span class="type">recipes</span> (
+  <span class="fn">id</span>              <span class="type">uuid</span> <span class="kw">PRIMARY KEY DEFAULT</span> gen_random_uuid(),
+  <span class="fn">household_id</span>    <span class="type">uuid</span> <span class="kw">REFERENCES</span> households(id) <span class="kw">NOT NULL</span>,
+  <span class="fn">title</span>           <span class="type">text</span> <span class="kw">NOT NULL</span>,
+  <span class="fn">description</span>     <span class="type">text</span>,
+  <span class="fn">instructions</span>    <span class="type">text</span>,                  <span class="cmt">-- étapes en markdown</span>
+  <span class="fn">servings</span>        <span class="type">int</span> <span class="kw">DEFAULT</span> <span class="num">2</span>,
+  <span class="fn">prep_time_min</span>   <span class="type">int</span>,
+  <span class="fn">cook_time_min</span>   <span class="type">int</span>,
+  <span class="fn">tags</span>            <span class="type">text[]</span>,                 <span class="cmt">-- {'rapide', 'batch-cooking', 'végé'}</span>
+  <span class="fn">total_kcal</span>      <span class="type">numeric(8,2)</span>,           <span class="cmt">-- calculé depuis ingrédients</span>
+  <span class="fn">total_protein_g</span> <span class="type">numeric(7,2)</span>,
+  <span class="fn">total_carbs_g</span>   <span class="type">numeric(7,2)</span>,
+  <span class="fn">total_fat_g</span>     <span class="type">numeric(7,2)</span>,
+  <span class="fn">source</span>          <span class="type">text</span> <span class="kw">DEFAULT</span> <span class="str">'claude'</span>,  <span class="cmt">-- 'claude', 'manual', 'import'</span>
+  <span class="fn">created_by</span>      <span class="type">uuid</span> <span class="kw">REFERENCES</span> auth.users(id),
+  <span class="fn">created_at</span>      <span class="type">timestamptz</span> <span class="kw">DEFAULT</span> now()
+);
+
+<span class="kw">CREATE TABLE</span> <span class="type">recipe_ingredients</span> (
+  <span class="fn">id</span>            <span class="type">uuid</span> <span class="kw">PRIMARY KEY DEFAULT</span> gen_random_uuid(),
+  <span class="fn">recipe_id</span>     <span class="type">uuid</span> <span class="kw">REFERENCES</span> recipes(id) <span class="kw">ON DELETE CASCADE</span>,
+  <span class="fn">product_id</span>    <span class="type">uuid</span> <span class="kw">REFERENCES</span> products(id),  <span class="cmt">-- nullable si pas matché</span>
+  <span class="fn">name</span>          <span class="type">text</span> <span class="kw">NOT NULL</span>,        <span class="cmt">-- "filet de poulet"</span>
+  <span class="fn">quantity</span>      <span class="type">numeric(8,2)</span>,
+  <span class="fn">unit</span>          <span class="type">text</span>,                     <span class="cmt">-- 'g', 'ml', 'pièce', 'cs', 'cc'</span>
+  <span class="fn">aisle_keyword</span> <span class="type">text</span>,                     <span class="cmt">-- pour le tri rayon si pas de product_id</span>
+  <span class="fn">optional</span>      <span class="type">boolean</span> <span class="kw">DEFAULT</span> <span class="num">false</span>,
+  <span class="fn">sort_order</span>    <span class="type">int</span>
+);
+</pre>
+                </div>
+                <p>Les recettes sont liées au foyer. Les macros totaux sont calculés automatiquement via une <strong>Edge Function</strong> qui somme les nutriments des ingrédients matchés. L'<code>aisle_keyword</code> sur chaque ingrédient permet le tri par rayon même sans fiche produit.</p>
+            </div>
+
+            <div class="tab-content" id="tab-grocery">
+                <div class="code-block">
+                    <div class="code-header">grocery_list_items — Liste de courses partagée<span class="lang">SQL</span></div>
+                    <pre><span class="kw">CREATE TABLE</span> <span class="type">grocery_list_items</span> (
+  <span class="fn">id</span>             <span class="type">uuid</span> <span class="kw">PRIMARY KEY DEFAULT</span> gen_random_uuid(),
+  <span class="fn">household_id</span>   <span class="type">uuid</span> <span class="kw">REFERENCES</span> households(id) <span class="kw">NOT NULL</span>,
+  <span class="fn">name</span>           <span class="type">text</span> <span class="kw">NOT NULL</span>,       <span class="cmt">-- "Filet de poulet"</span>
+  <span class="fn">quantity</span>       <span class="type">numeric(8,2)</span>,
+  <span class="fn">unit</span>           <span class="type">text</span>,
+  <span class="fn">product_id</span>     <span class="type">uuid</span> <span class="kw">REFERENCES</span> products(id),
+  <span class="fn">aisle_id</span>       <span class="type">uuid</span> <span class="kw">REFERENCES</span> aisles(id),
+  <span class="fn">recipe_id</span>      <span class="type">uuid</span> <span class="kw">REFERENCES</span> recipes(id),  <span class="cmt">-- d'où vient cet item</span>
+  <span class="fn">added_by</span>       <span class="type">uuid</span> <span class="kw">REFERENCES</span> auth.users(id),
+  <span class="fn">status</span>         <span class="type">text</span> <span class="kw">DEFAULT</span> <span class="str">'pending'</span>,    <span class="cmt">-- 'pending' | 'bought'</span>
+  <span class="fn">created_at</span>     <span class="type">timestamptz</span> <span class="kw">DEFAULT</span> now()
+);
+
+<span class="cmt">-- Index pour l'affichage trié par rayon</span>
+<span class="kw">CREATE INDEX</span> idx_grocery_household_aisle
+  <span class="kw">ON</span> grocery_list_items(household_id, aisle_id);
+
+<span class="cmt">-- Vue pour la liste triée par rayon</span>
+<span class="kw">CREATE VIEW</span> <span class="type">grocery_list_by_aisle</span> <span class="kw">AS</span>
+<span class="kw">SELECT</span>
+  g.*,
+  a.name <span class="kw">AS</span> aisle_name,
+  a.icon <span class="kw">AS</span> aisle_icon,
+  a.sort_order <span class="kw">AS</span> aisle_sort
+<span class="kw">FROM</span> grocery_list_items g
+<span class="kw">LEFT JOIN</span> aisles a <span class="kw">ON</span> g.aisle_id = a.id
+<span class="kw">WHERE</span> g.status = <span class="str">'pending'</span>
+<span class="kw">ORDER BY</span> a.sort_order, g.name;
+</pre>
+                </div>
+                <p>La vue <code>grocery_list_by_aisle</code> est le point d'entrée principal pour les Shortcuts. Elle retourne la liste triée par rayon avec les icônes, prête à afficher. Le champ <code>recipe_id</code> permet de savoir d'où vient chaque item ("ces oignons viennent de la recette Poulet Basquaise").</p>
+            </div>
+        </section>
+
+        <!-- Section 4: MCP Server -->
+        <section id="mcp-server">
+            <h2><span class="icon" style="background: rgba(236, 72, 153, 0.15);">🔌</span> MCP Server</h2>
+
+            <p>Le MCP server est la pièce maîtresse qui connecte Claude à ta base de données. Quand tu discutes de nutrition avec Claude, il peut lire tes profils, chercher des produits, créer des recettes, et alimenter ta liste de courses — directement en conversation.</p>
+
+            <h3>Tools exposés</h3>
+            <table class="data-table">
+                <thead>
+                    <tr><th>Tool</th><th>Description</th><th>Paramètres</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>get_profiles</code></td>
+                        <td>Récupère les profils nutritionnels du foyer</td>
+                        <td><code>household_id</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>update_profile</code></td>
+                        <td>Met à jour les objectifs macros d'un profil</td>
+                        <td><code>profile_id, daily_calories, protein_g, ...</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>search_product</code></td>
+                        <td>Cherche dans le cache local puis Open Food Facts</td>
+                        <td><code>query</code> ou <code>barcode</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>create_recipe</code></td>
+                        <td>Crée une recette avec ses ingrédients + calcule les macros</td>
+                        <td><code>title, ingredients[], instructions, servings</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>list_recipes</code></td>
+                        <td>Liste les recettes du foyer, filtrables par tag</td>
+                        <td><code>household_id, tags?, search?</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>add_to_grocery_list</code></td>
+                        <td>Ajoute des items à la liste, auto-assignés au bon rayon</td>
+                        <td><code>items[], recipe_id?</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>get_grocery_list</code></td>
+                        <td>Retourne la liste triée par rayon</td>
+                        <td><code>household_id, status?</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>manage_aisles</code></td>
+                        <td>CRUD sur les rayons et le mapping produits</td>
+                        <td><code>action, aisle_name, sort_order, mappings[]</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>plan_weekly_menu</code></td>
+                        <td>Génère un menu semaine adapté aux deux profils</td>
+                        <td><code>household_id, days?, constraints?</code></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Squelette MCP Server</h3>
+            <div class="code-block">
+                <div class="code-header">src/index.ts — Point d'entrée MCP<span class="lang">TypeScript</span></div>
+                <pre><span class="kw">import</span> { Server } <span class="kw">from</span> <span class="str">"@modelcontextprotocol/sdk/server/index.js"</span>;
+<span class="kw">import</span> { StdioServerTransport } <span class="kw">from</span> <span class="str">"@modelcontextprotocol/sdk/server/stdio.js"</span>;
+<span class="kw">import</span> { createClient } <span class="kw">from</span> <span class="str">"@supabase/supabase-js"</span>;
+
+<span class="kw">const</span> supabase = <span class="fn">createClient</span>(
+  process.env.<span class="fn">SUPABASE_URL</span>!,
+  process.env.<span class="fn">SUPABASE_SERVICE_KEY</span>!
+);
+
+<span class="kw">const</span> server = <span class="kw">new</span> <span class="type">Server</span>({
+  name: <span class="str">"nutriclaude"</span>,
+  version: <span class="str">"1.0.0"</span>,
+}, {
+  capabilities: { tools: {} }
+});
+
+<span class="cmt">// Tool: search_product</span>
+<span class="cmt">// 1. Cherche dans le cache local (full-text search)</span>
+<span class="cmt">// 2. Si pas trouvé → appel Open Food Facts API</span>
+<span class="cmt">// 3. Cache le résultat dans products</span>
+<span class="cmt">// 4. Retourne nom + macros + nutriscore</span>
+
+<span class="cmt">// Tool: create_recipe</span>
+<span class="cmt">// 1. Insère la recette</span>
+<span class="cmt">// 2. Pour chaque ingrédient :</span>
+<span class="cmt">//    - Match avec un produit (search_product)</span>
+<span class="cmt">//    - Détermine le rayon (product_aisle_map)</span>
+<span class="cmt">// 3. Calcule les macros totaux</span>
+<span class="cmt">// 4. Retourne la recette complète</span>
+
+<span class="cmt">// Tool: add_to_grocery_list</span>
+<span class="cmt">// 1. Pour chaque item :</span>
+<span class="cmt">//    - Résout le rayon via keyword matching</span>
+<span class="cmt">//    - Agrège si l'item existe déjà (additionne qty)</span>
+<span class="cmt">// 2. Insère dans grocery_list_items</span>
+
+<span class="kw">async function</span> <span class="fn">main</span>() {
+  <span class="kw">const</span> transport = <span class="kw">new</span> <span class="type">StdioServerTransport</span>();
+  <span class="kw">await</span> server.<span class="fn">connect</span>(transport);
+}
+
+<span class="fn">main</span>();
+</pre>
+            </div>
+        </section>
+
+        <!-- Section 5: Open Food Facts -->
+        <section id="open-food-facts">
+            <h2><span class="icon" style="background: rgba(245, 158, 11, 0.15);">🌍</span> Intégration Open Food Facts</h2>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-title">API v2</div>
+                    <div class="card-desc">
+                        <strong>Base URL :</strong> <code>https://world.openfoodfacts.org/api/v2</code><br><br>
+                        <strong>Endpoints :</strong><br>
+                        — <code>/product/{barcode}.json</code><br>
+                        — <code>/search?fields=...</code><br>
+                        — <code>/taxonomy?tagtype=categories</code>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Données disponibles</div>
+                    <div class="card-desc">
+                        <strong>3M+ produits</strong> avec :<br>
+                        — Nom, marque, code-barres<br>
+                        — Nutri-Score (A→E)<br>
+                        — Macros pour 100g et par portion<br>
+                        — Ingrédients, allergènes, additifs<br>
+                        — Catégories et labels
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Stratégie de cache</div>
+                    <div class="card-desc">
+                        <strong>Cache-aside pattern :</strong><br>
+                        1. Cherche dans <code>products</code> local<br>
+                        2. Si absent ou > 30 jours → appel OFF<br>
+                        3. Upsert dans <code>products</code><br>
+                        4. Retourne du cache<br><br>
+                        <strong>User-Agent :</strong> requis par OFF
+                    </div>
+                </div>
+            </div>
+
+            <div class="code-block">
+                <div class="code-header">Exemple d'appel Open Food Facts<span class="lang">TypeScript</span></div>
+                <pre><span class="kw">async function</span> <span class="fn">fetchFromOpenFoodFacts</span>(barcode: <span class="type">string</span>) {
+  <span class="kw">const</span> url = <span class="str">`https://world.openfoodfacts.org/api/v2/product/</span>${barcode}<span class="str">.json`</span>;
+  <span class="kw">const</span> fields = [
+    <span class="str">"product_name"</span>, <span class="str">"brands"</span>, <span class="str">"nutriscore_grade"</span>,
+    <span class="str">"nutriments"</span>, <span class="str">"categories_tags"</span>, <span class="str">"image_url"</span>,
+    <span class="str">"allergens_tags"</span>, <span class="str">"ingredients_text_fr"</span>
+  ].<span class="fn">join</span>(<span class="str">","</span>);
+
+  <span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">`</span>${url}<span class="str">?fields=</span>${fields}<span class="str">`</span>, {
+    headers: {
+      <span class="str">"User-Agent"</span>: <span class="str">"NutriClaude/1.0 (contact@nutriclaude.com)"</span>
+    }
+  });
+
+  <span class="kw">const</span> data = <span class="kw">await</span> res.<span class="fn">json</span>();
+
+  <span class="kw">if</span> (data.status === <span class="num">1</span>) {
+    <span class="kw">return</span> {
+      name: data.product.product_name,
+      brand: data.product.brands,
+      nutriscore: data.product.nutriscore_grade,
+      energy_kcal_100g: data.product.nutriments[<span class="str">"energy-kcal_100g"</span>],
+      protein_100g: data.product.nutriments.proteins_100g,
+      carbs_100g: data.product.nutriments.carbohydrates_100g,
+      fat_100g: data.product.nutriments.fat_100g,
+      fiber_100g: data.product.nutriments.fiber_100g,
+    };
+  }
+  <span class="kw">return null</span>;
+}
+</pre>
+            </div>
+        </section>
+
+        <!-- Section 6: iOS Shortcuts -->
+        <section id="shortcuts">
+            <h2><span class="icon" style="background: rgba(59, 130, 246, 0.15);">📱</span> iOS Shortcuts</h2>
+
+            <p>Quatre Shortcuts couvrent les interactions quotidiennes. Chacun est un workflow Shortcuts qui fait des appels HTTP à l'API REST Supabase.</p>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-title">🗣️ Ajouter un item (vocal)</div>
+                    <div class="card-desc">
+                        <strong>"Dis Siri, ajoute du poulet à la liste"</strong><br><br>
+                        1. Dictée → texte<br>
+                        2. POST vers Edge Function<br>
+                        3. L'Edge Function match le rayon via keyword<br>
+                        4. Insère dans grocery_list_items<br>
+                        5. Notification de confirmation
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">📋 Voir la liste par rayon</div>
+                    <div class="card-desc">
+                        <strong>"Dis Siri, ma liste de courses"</strong><br><br>
+                        1. GET sur <code>grocery_list_by_aisle</code> (vue SQL)<br>
+                        2. Groupe par rayon avec l'emoji<br>
+                        3. Affiche dans un menu Shortcuts<br>
+                        4. Tap pour marquer "acheté"<br>
+                        5. PATCH le statut → 'bought'
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">📸 Scanner un produit</div>
+                    <div class="card-desc">
+                        <strong>"Dis Siri, scan produit"</strong><br><br>
+                        1. Ouvre la caméra → scan code-barres<br>
+                        2. GET <code>/products?barcode=eq.{code}</code><br>
+                        3. Si pas en cache → fetch OFF<br>
+                        4. Affiche nom + macros + Nutri-Score<br>
+                        5. Option "Ajouter à la liste"
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">🍳 Générer une recette</div>
+                    <div class="card-desc">
+                        <strong>"Dis Siri, recette pour ce soir"</strong><br><br>
+                        1. Dicte une idée ou contrainte<br>
+                        2. POST vers Edge Function → appel Claude API<br>
+                        3. Claude reçoit les profils nutritionnels<br>
+                        4. Génère recette + ingrédients JSON<br>
+                        5. Sauvegarde recette + push vers liste
+                    </div>
+                </div>
+            </div>
+
+            <h3>Authentification dans les Shortcuts</h3>
+            <p>Chaque Shortcut stocke un <strong>token API</strong> (Supabase anon key + JWT utilisateur) dans un dictionnaire Shortcuts persistant. Le JWT est obtenu une seule fois via un Shortcut "Login" qui fait un appel <code>POST /auth/v1/magiclink</code>. Le token est ensuite passé en header <code>Authorization: Bearer {jwt}</code> à chaque appel.</p>
+        </section>
+
+        <!-- Section 7: API Design -->
+        <section id="api-design">
+            <h2><span class="icon" style="background: rgba(6, 182, 212, 0.15);">⚡</span> API Design</h2>
+
+            <h3>Edge Functions (logique custom)</h3>
+            <p>Supabase fournit une API REST auto-générée pour le CRUD simple. Pour la logique métier (matching rayon, calcul macros, appel Claude), on utilise des <strong>Edge Functions</strong> (Deno).</p>
+
+            <table class="data-table">
+                <thead>
+                    <tr><th>Endpoint</th><th>Méthode</th><th>Description</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>/functions/v1/add-grocery-item</code></td><td>POST</td><td>Ajoute un item, résout le rayon par keyword matching, agrège les doublons</td></tr>
+                    <tr><td><code>/functions/v1/generate-recipe</code></td><td>POST</td><td>Appelle Claude API avec les profils, retourne recette + pousse ingrédients en liste</td></tr>
+                    <tr><td><code>/functions/v1/sync-product</code></td><td>POST</td><td>Cherche un produit, cache-aside avec Open Food Facts</td></tr>
+                    <tr><td><code>/functions/v1/clear-grocery-list</code></td><td>POST</td><td>Archive les items 'bought', reset la liste pour la prochaine session</td></tr>
+                    <tr><td><code>/functions/v1/weekly-menu</code></td><td>POST</td><td>Génère un menu semaine via Claude, crée les recettes, pousse la liste complète</td></tr>
+                </tbody>
+            </table>
+
+            <h3>Row-Level Security (RLS)</h3>
+            <div class="code-block">
+                <div class="code-header">Politique RLS — Isolation par foyer<span class="lang">SQL</span></div>
+                <pre><span class="cmt">-- Les utilisateurs ne voient que les données de leur foyer</span>
+<span class="kw">CREATE POLICY</span> <span class="str">"household_isolation"</span> <span class="kw">ON</span> grocery_list_items
+  <span class="kw">FOR ALL USING</span> (
+    household_id <span class="kw">IN</span> (
+      <span class="kw">SELECT</span> household_id <span class="kw">FROM</span> profiles
+      <span class="kw">WHERE</span> id = auth.uid()
+    )
+  );
+
+<span class="cmt">-- Même politique sur toutes les tables liées au foyer</span>
+<span class="cmt">-- (aisles, recipes, recipe_ingredients, product_aisle_map)</span>
+</pre>
+            </div>
+        </section>
+
+        <!-- Section 8: Lead Magnet -->
+        <!-- Section 8: Intégration Le Cadre -->
+        <section id="le-cadre">
+            <h2><span class="icon" style="background: rgba(236, 72, 153, 0.15);">🎯</span> Intégration Le Cadre</h2>
+
+            <p>NutriClaude cible <strong>exactement le même ICP que Le Cadre</strong> : des pères cadres tech, 32-42 ans, avec un enfant en bas âge, qui veulent reprendre le contrôle sur leur santé. Le lien est organique, pas forcé.</p>
+
+            <div class="highlight">
+                <p><strong>ICP commun :</strong> Un père tech qui galère à organiser la bouffe de la semaine pour sa famille est le même qui n'a plus de temps pour le sport. NutriClaude résout la friction nutrition. Le Cadre résout la friction temps. Même personne, même douleur, deux angles complémentaires.</p>
+            </div>
+
+            <h3>L'écosystème Le Cadre</h3>
+            <table class="data-table">
+                <thead>
+                    <tr><th>Offre</th><th>Prix</th><th>Durée</th><th>Rôle de NutriClaude</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>NutriClaude (gratuit)</strong></td>
+                        <td>0 €</td>
+                        <td>-</td>
+                        <td><span class="tag pk">LEAD MAGNET</span> Outil gratuit qui attire l'ICP et capture les emails</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Le Cadre Sprint</strong></td>
+                        <td>200 € → 500 €</td>
+                        <td>14 jours</td>
+                        <td>Pas de NutriClaude. Focus pur sur le cadre temporel. Mais le client connaît déjà l'outil nutrition.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Le Cadre Endurance</strong></td>
+                        <td>2 500 €</td>
+                        <td>12 semaines</td>
+                        <td><span class="tag fk">BONUS PREMIUM</span> NutriClaude configuré pour le foyer du client. Plans nutrition personnalisés, recettes, liste de courses — tout est opérationnel à la fin de l'accompagnement.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Le Cadre Mensuel</strong></td>
+                        <td>80 €/mois</td>
+                        <td>Récurrent</td>
+                        <td>Maintenance NutriClaude incluse : ajustement des macros, nouvelles recettes, support technique.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>NutriClaude SaaS</strong></td>
+                        <td>5-10 €/mois</td>
+                        <td>Récurrent</td>
+                        <td><span class="tag idx">PHASE 2</span> Version standalone si la demande émerge organiquement. Non prioritaire au lancement.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>NutriClaude dans Le Cadre Endurance</h3>
+            <p>Pendant l'accompagnement 12 semaines, tu configures NutriClaude pour le foyer du client. C'est un livrable tangible à forte valeur perçue, qui justifie le premium par rapport au Sprint.</p>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-title">📋 Semaine 1-2 : Setup profils</div>
+                    <div class="card-desc">Tu crées les profils nutritionnels du client et de sa conjointe. Objectifs macros, restrictions, préférences. Le cadre nutrition est posé en même temps que le cadre temporel.</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">🛒 Semaine 3-6 : Recettes & courses</div>
+                    <div class="card-desc">Tu construis avec le client un répertoire de 10-15 recettes adaptées via Claude. La liste de courses se génère automatiquement, triée par rayon. Le dimanche soir n'est plus un casse-tête.</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">📱 Semaine 7-10 : Autonomie</div>
+                    <div class="card-desc">Le client prend la main. Il utilise les Shortcuts iOS pour ajouter, scanner, générer. Tu supervises et ajustes les plans nutritionnels en fonction des retours terrain.</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">🎁 Semaine 12 : Livraison</div>
+                    <div class="card-desc">Le client repart avec son instance NutriClaude fonctionnelle : profils configurés, répertoire de recettes, rayons personnalisés, Shortcuts installés. Coût marginal pour toi : quasi nul.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 9: Stratégie & Funnel -->
+        <section id="lead-magnet">
+            <h2><span class="icon" style="background: rgba(245, 158, 11, 0.15);">🧲</span> Stratégie & Funnel</h2>
+
+            <p>NutriClaude est gratuit. L'objectif n'est pas de monétiser l'outil directement mais d'<strong>attirer le même ICP que Le Cadre</strong> — des pères tech qui veulent reprendre le contrôle sur la nutrition de leur famille — et de les faire entrer dans l'écosystème.</p>
+
+            <h3>Le funnel complet</h3>
+            <div class="diagram">
+                <div class="diagram-title">Parcours utilisateur → client Le Cadre</div>
+                <div class="arch-flow">
+                    <div class="arch-box ext">📝 Contenu<br>"Papa tech + nutrition"</div>
+                    <span class="arch-arrow">→</span>
+                    <div class="arch-box ios">📱 NutriClaude<br>gratuit (email)</div>
+                    <span class="arch-arrow">→</span>
+                    <div class="arch-box api">📧 Séquence<br>email nurture</div>
+                    <span class="arch-arrow">→</span>
+                    <div class="arch-box ai">🏃 Le Cadre<br>Sprint 200€</div>
+                    <span class="arch-arrow">→</span>
+                    <div class="arch-box db">💪 Endurance<br>2 500€</div>
+                </div>
+            </div>
+
+            <div class="roadmap">
+                <div class="roadmap-item phase1">
+                    <div class="phase-label">Attraction</div>
+                    <div class="phase-title">Contenu "papa tech + nutrition automatisée"</div>
+                    <div class="phase-desc">Tu publies du contenu qui parle à ton ICP, pas aux devs. Angle : "Comment j'ai automatisé la nutrition de ma famille avec l'IA", "Fini les prises de tête du dimanche soir : recettes + courses en 2 minutes", "L'app que j'ai construite pour que ma femme et moi mangions bien sans y penser". Format : articles blog, posts LinkedIn, vidéos courtes (Reels/TikTok). Le build in public technique reste un angle secondaire pour la crédibilité.</div>
+                </div>
+                <div class="roadmap-item phase2">
+                    <div class="phase-label">Capture</div>
+                    <div class="phase-title">NutriClaude gratuit → email capturé</div>
+                    <div class="phase-desc">Landing page dédiée : "Reprends le contrôle de la nutrition de ta famille en 2 minutes par jour." Le visiteur entre son email, reçoit les Shortcuts iOS pré-configurés et un guide de setup rapide (Supabase en 10 min). Il découvre NutriClaude, il voit que ça marche, il entre dans ta liste.</div>
+                </div>
+                <div class="roadmap-item phase3">
+                    <div class="phase-label">Nurture</div>
+                    <div class="phase-title">Séquence email → transition vers Le Cadre</div>
+                    <div class="phase-desc">Séquence en 5 emails sur 2 semaines. E1 : Setup NutriClaude. E2 : Personnaliser tes rayons. E3 : "Et si le problème n'était pas la bouffe, mais le temps ?" (pivot vers Le Cadre). E4 : Témoignage Mathieu D. E5 : CTA Le Cadre Sprint. Le message pivot : "Tu as repris le contrôle de ta nutrition. Et si tu reprenais 6h par semaine pour tout le reste ?"</div>
+                </div>
+                <div class="roadmap-item phase4">
+                    <div class="phase-label">Conversion</div>
+                    <div class="phase-title">Le Cadre Sprint → Endurance</div>
+                    <div class="phase-desc">Le client entre par le Sprint à 200€. À J14, il a son cadre temporel. Si la nutrition est un sujet (et elle l'est pour cet ICP), tu proposes Le Cadre Endurance avec NutriClaude intégré comme bonus premium. Valeur perçue du bonus NutriClaude configuré : 500€+. Coût réel pour toi : 1h de setup.</div>
+                </div>
+            </div>
+
+            <h3>Assets à créer</h3>
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-title">🌐 Landing NutriClaude</div>
+                    <div class="card-desc">Page dédiée sur florianmarin.me/nutriclaude. Hero : vidéo démo de 90 secondes. Formulaire email. Pas de jargon technique — on parle "temps gagné" et "repas équilibré", pas "MCP server".</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">🎥 Vidéo démo ICP</div>
+                    <div class="card-desc">Screencast du point de vue utilisateur : "Dis Siri, recette pour ce soir" → recette adaptée → liste triée par rayon sur l'iPhone de sa femme. Pas de code. Que le résultat.</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">📧 Séquence email (5 mails)</div>
+                    <div class="card-desc">Onboarding NutriClaude → pivot "temps" → témoignage → CTA Le Cadre. Automatisée sur ConvertKit/Resend. Segmentation : utilisateurs actifs NutriClaude vs. inactifs.</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">📝 3 articles "papa tech"</div>
+                    <div class="card-desc">"Comment j'ai arrêté de stresser pour les courses", "La méthode des 2 minutes pour manger équilibré en famille", "Pourquoi les apps de meal planning ne marchent pas (et ce que j'ai fait à la place)". SEO + partage LinkedIn.</div>
+                </div>
+            </div>
+
+            <h3>Métriques à suivre</h3>
+            <table class="data-table">
+                <thead>
+                    <tr><th>Étape</th><th>Métrique</th><th>Objectif</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Landing page</td><td>Taux de conversion visiteur → email</td><td>> 25%</td></tr>
+                    <tr><td>NutriClaude</td><td>Taux d'activation (premier Shortcut utilisé)</td><td>> 40%</td></tr>
+                    <tr><td>Séquence email</td><td>Taux d'ouverture E3 (pivot Le Cadre)</td><td>> 50%</td></tr>
+                    <tr><td>Sprint</td><td>Taux de conversion email → Sprint</td><td>> 3%</td></tr>
+                    <tr><td>Endurance</td><td>Taux de conversion Sprint → Endurance</td><td>> 20%</td></tr>
+                </tbody>
+            </table>
+
+            <div class="highlight">
+                <p><strong>Le pivot clé de la séquence :</strong> NutriClaude résout un symptôme (la galère nutrition). Le Cadre résout la cause (le manque de cadre temporel). L'email E3 fait ce pont : "Tu vois, quand on automatise un truc, ça tient. Et si on faisait pareil pour tes 6h par semaine ?"</p>
+            </div>
+        </section>
+
+        <!-- Section 10: Roadmap -->
+        <section id="roadmap">
+            <h2><span class="icon" style="background: rgba(108, 99, 255, 0.15);">🗺️</span> Roadmap de développement</h2>
+
+            <h3>Phase 1 — Build (Semaines 1-6)</h3>
+            <div class="roadmap">
+                <div class="roadmap-item phase1">
+                    <div class="phase-label">Semaine 1-2</div>
+                    <div class="phase-title">Fondations Supabase</div>
+                    <div class="phase-desc">
+                        Setup Supabase (projet, auth, tables). Déployer le schéma SQL complet. Configurer RLS et l'isolation par foyer. Créer les rayons par défaut. Tester les requêtes API REST. Dogfooding : utiliser pour ton propre foyer dès J1.
+                    </div>
+                </div>
+                <div class="roadmap-item phase1">
+                    <div class="phase-label">Semaine 2-3</div>
+                    <div class="phase-title">MCP Server v1</div>
+                    <div class="phase-desc">
+                        Implémenter le MCP server TypeScript avec les tools principaux : get_profiles, search_product (avec cache OFF), create_recipe, add_to_grocery_list. Tester en local avec Claude Desktop. Commencer à construire ton répertoire de recettes familiales.
+                    </div>
+                </div>
+                <div class="roadmap-item phase2">
+                    <div class="phase-label">Semaine 3-4</div>
+                    <div class="phase-title">Edge Functions + Shortcuts iOS</div>
+                    <div class="phase-desc">
+                        Déployer les Edge Functions (add-grocery-item, sync-product, generate-recipe). Créer les 4 Shortcuts iOS. Tester le flow end-to-end : voix → Siri → Shortcut → Supabase → liste triée. Ta femme commence à utiliser le Shortcut "liste de courses".
+                    </div>
+                </div>
+                <div class="roadmap-item phase2">
+                    <div class="phase-label">Semaine 4-5</div>
+                    <div class="phase-title">Rayon intelligent + menu hebdo</div>
+                    <div class="phase-desc">
+                        Matching rayon par keyword avec fallback catégorie OFF. Personnalisation des rayons via MCP. Tool plan_weekly_menu : Claude génère un menu semaine optimisé pour les deux profils. Génération batch de la liste de courses.
+                    </div>
+                </div>
+                <div class="roadmap-item phase1">
+                    <div class="phase-label">Semaine 5-6</div>
+                    <div class="phase-title">Dogfooding & stabilisation</div>
+                    <div class="phase-desc">
+                        2 semaines d'utilisation quotidienne en conditions réelles avec ta femme. Corriger les bugs, ajuster le matching rayon, enrichir le catalogue produits. Documenter le setup pour le rendre reproductible pour les clients Endurance.
+                    </div>
+                </div>
+            </div>
+
+            <h3>Phase 2 — Launch Lead Magnet (Semaines 7-10)</h3>
+            <div class="roadmap">
+                <div class="roadmap-item phase3">
+                    <div class="phase-label">Semaine 7</div>
+                    <div class="phase-title">Landing page + capture email</div>
+                    <div class="phase-desc">
+                        Créer florianmarin.me/nutriclaude. Enregistrer la vidéo démo de 90 secondes (point de vue utilisateur, pas technique). Formulaire email → envoi automatique des Shortcuts + guide setup. Brancher ConvertKit/Resend.
+                    </div>
+                </div>
+                <div class="roadmap-item phase3">
+                    <div class="phase-label">Semaine 8</div>
+                    <div class="phase-title">Séquence email + premier article</div>
+                    <div class="phase-desc">
+                        Écrire et automatiser la séquence de 5 emails (onboarding → pivot Le Cadre). Publier le premier article "papa tech" sur le blog + LinkedIn. Objectif : 50 inscrits NutriClaude dans les 2 premières semaines.
+                    </div>
+                </div>
+                <div class="roadmap-item phase3">
+                    <div class="phase-label">Semaine 9-10</div>
+                    <div class="phase-title">Distribution & itération</div>
+                    <div class="phase-desc">
+                        Publier les 2 articles suivants. Partager sur les communautés de parents tech (Reddit, forums, groupes Facebook/LinkedIn). Analyser les métriques : taux d'activation, ouvertures email, premiers feedbacks utilisateurs. Itérer sur le setup guide si le taux d'activation est bas.
+                    </div>
+                </div>
+            </div>
+
+            <h3>Phase 3 — Intégration Le Cadre Endurance (Semaines 10-12)</h3>
+            <div class="roadmap">
+                <div class="roadmap-item phase4">
+                    <div class="phase-label">Semaine 10-11</div>
+                    <div class="phase-title">Process d'onboarding Endurance</div>
+                    <div class="phase-desc">
+                        Documenter le process de setup NutriClaude pour un client Endurance : script de création de foyer, questionnaire nutritionnel, template de profils, checklist d'installation Shortcuts. Objectif : passer de 2h à 30 min de setup par client.
+                    </div>
+                </div>
+                <div class="roadmap-item phase4">
+                    <div class="phase-label">Semaine 11-12</div>
+                    <div class="phase-title">Premier client Endurance avec NutriClaude</div>
+                    <div class="phase-desc">
+                        Tester le process complet avec un vrai client Endurance. Configurer ses profils, construire ses premières recettes, installer les Shortcuts. Documenter les frictions. À la fin de cette phase : process validé, reproductible, et NutriClaude est un bonus tangible dans l'offre Endurance.
+                    </div>
+                </div>
+            </div>
+
+            <h3>Phase 4 — Scale & Micro SaaS (Mois 4+)</h3>
+            <div class="roadmap">
+                <div class="roadmap-item phase4">
+                    <div class="phase-label">Signal à surveiller</div>
+                    <div class="phase-title">Demande standalone ?</div>
+                    <div class="phase-desc">
+                        Si des utilisateurs NutriClaude gratuits demandent "je ne veux pas Le Cadre, mais je paierais pour un hébergement clé en main de NutriClaude" → signal micro SaaS. À ce moment : wrapper une offre hosted à 5-10 €/mois, Stripe Billing, onboarding automatisé. Pas avant d'avoir le signal.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            NutriClaude Architecture — Avril 2026 — Florian Marin
+        </footer>
+
+    </div>
+
+    <!-- Tab switching -->
+    <script>
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabGroup = tab.closest('section');
+                tabGroup.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tabGroup.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                const targetId = 'tab-' + tab.dataset.tab;
+                document.getElementById(targetId).classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>
