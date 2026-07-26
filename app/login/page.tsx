@@ -1,15 +1,15 @@
-import { Suspense } from "react";
-import LoginForm from "./LoginForm";
+// Page d'attente. La connexion par magic link (AD-11) est construite en Story 1.2.
+// Elle existe ici uniquement pour que la redirection du proxy ait une destination
+// réelle — sans elle, le contrôle d'accès renverrait vers une page introuvable.
 
 export default function LoginPage() {
   return (
-    <main className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-sm">
-        <h1 className="text-3xl font-bold mb-2">NutriClaude</h1>
-        <p className="text-muted mb-8">Connecte-toi à ton foyer.</p>
-        <Suspense fallback={null}>
-          <LoginForm />
-        </Suspense>
+    <main className="flex-1 flex items-center justify-center p-8">
+      <div className="max-w-md text-center">
+        <h1 className="text-2xl font-semibold">NutriClaude</h1>
+        <p className="mt-3 text-sm opacity-70">
+          La connexion arrive à la prochaine étape.
+        </p>
       </div>
     </main>
   );

@@ -30,3 +30,10 @@ next-env.d.ts
 
 # Supabase local
 .supabase/
+# Cache du CLI : contient le project ref et l'URL du pooler Postgres
+supabase/.temp/
+
+# Outillage réinstallable — pas du code projet.
+# _bmad-output/ est en revanche versionné : c'est le corpus de planification.
+_bmad/
+.claude/
