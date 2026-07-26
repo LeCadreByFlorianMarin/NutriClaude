@@ -28,6 +28,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Vercel : créé par `vercel link`, contient l'identifiant du projet
+.vercel/
+
 # Supabase local
 .supabase/
 # Cache du CLI : contient le project ref et l'URL du pooler Postgres

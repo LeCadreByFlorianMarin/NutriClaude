@@ -1,16 +1,24 @@
-// Page d'attente. La connexion par magic link (AD-11) est construite en Story 1.2.
-// Elle existe ici uniquement pour que la redirection du proxy ait une destination
-// réelle — sans elle, le contrôle d'accès renverrait vers une page introuvable.
+import { safeNext } from "@/lib/auth/safe-next";
+import { LoginForm } from "./LoginForm";
 
-export default function LoginPage() {
+/**
+ * Écran de connexion. Aucun mot de passe n'est demandé ni créé (AD-11) : on
+ * envoie un lien par email, c'est le seul chemin d'entrée humain du produit.
+ *
+ * En Next 16, `searchParams` est une `Promise`. Avec `strictRouteTypes` activé,
+ * un typage en objet nu échouerait au build plutôt que de valoir `undefined`
+ * en silence à l'exécution.
+ */
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string; error?: string }>;
+}) {
+  const { next, error } = await searchParams;
+
   return (
-    <main className="flex-1 flex items-center justify-center p-8">
-      <div className="max-w-md text-center">
-        <h1 className="text-2xl font-semibold">NutriClaude</h1>
-        <p className="mt-3 text-sm opacity-70">
-          La connexion arrive à la prochaine étape.
-        </p>
-      </div>
+    <main className="flex-1 flex items-center justify-center p-6">
+      <LoginForm next={safeNext(next)} error={error} />
     </main>
   );
 }
