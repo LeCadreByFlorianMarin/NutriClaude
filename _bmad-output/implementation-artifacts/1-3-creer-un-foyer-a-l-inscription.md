@@ -39,6 +39,15 @@ so that je dispose d'un espace partagé où vivront la liste, les recettes, les 
 
 ## Tasks / Subtasks
 
+- [ ] **Task 0 — Générer les types de la base** (AC: 1)
+  - [ ] Décidé par Florian le 2026-07-26 : **on arrête d'écrire `lib/supabase/types.ts` à la main.** Cette story est la première à appeler une fonction Postgres — sans types générés, `supabase.rpc(…)` n'est vérifié par rien, ni le nom, ni les paramètres, ni le retour
+  - [ ] Prérequis : `npx supabase login`, puis `npx supabase link --project-ref <ref>` (le ref est lisible dans `NEXT_PUBLIC_SUPABASE_URL`). Le projet **n'est pas encore relié** — aucun `supabase/config.toml` n'existe. Ce lien sert aussi à la Task 5
+  - [ ] `npx supabase gen types typescript --linked > lib/supabase/types.ts` — **remplace** le fichier écrit à la main, ne le complète pas
+  - [ ] Vérifier que le fichier généré contient bien `Functions` avec `create_household_with_profile`, ses deux arguments et son retour `string`. **Si `Functions` est vide, la génération a échoué** — arrête-toi plutôt que de continuer sans filet
+  - [ ] Câbler le type sur les trois clients : `createBrowserClient<Database>`, `createServerClient<Database>` dans `server.ts` (les deux fabriques) et dans `proxy.ts`. C'est ce qui rend la RPC de la Task 4 réellement typée
+  - [ ] **Ne commite pas de secret** : `supabase link` écrit `supabase/config.toml` (sans secret) et peut créer `supabase/.temp/` — déjà ignoré par git. Vérifier `git status` avant de commiter
+  - [ ] ⚠️ **Aucune migration, aucune écriture en base.** `gen types` est en lecture seule. `git status --short supabase/migrations/` doit rester vide
+
 - [ ] **Task 1 — Garde d'appartenance au foyer** (AC: 2, 3)
   - [ ] Recréer `lib/supabase/queries.ts` avec `requireProfile()` — dette explicitement différée par la revue 1.1 aux « stories 1.3+ », et c'est ici qu'elle échoit
   - [ ] Signature attendue : fonction serveur qui lit la session, puis `profiles` pour `auth.uid()`, et retourne le profil. **Trois issues distinctes** : pas de session → `redirect("/login")` ; session mais pas de profil → `redirect("/onboarding")` ; profil → le retourner
@@ -78,7 +87,8 @@ so that je dispose d'un espace partagé où vivront la liste, les recettes, les 
 
 - [ ] **Task 7 — Vérification** (AC: 1, 2, 3)
   - [ ] `npm run typecheck` · `npm run lint` · `npm run build` → tous en succès, sans avertissement
-  - [ ] `git status --short supabase/` vide — **aucune migration**
+  - [ ] `git status --short supabase/migrations/` vide — **aucune migration**. *(Le contrôle porte sur `migrations/`, plus sur `supabase/` : la Task 0 y ajoute légitimement `config.toml`.)*
+  - [ ] Preuve que le typage mord réellement : introduire volontairement une faute dans l'appel RPC (paramètre mal nommé) et vérifier que `npm run typecheck` **échoue**, puis rétablir. Sans cette contre-épreuve, rien ne dit que les types générés sont branchés
   - [ ] Grep des mots bannis dans les chaînes rendues (NFR-9) et absence de `force-dynamic`
   - [ ] Parcours manuel : nouveau compte → connexion → arrivée sur `/onboarding` → saisie des deux noms → arrivée sur `/` nommant le foyer
   - [ ] Parcours AC3 : se déconnecter puis se reconnecter → arrivée **directe** sur `/`, aucun appel de création. Et `/onboarding` visité à la main → renvoi vers `/`
@@ -216,7 +226,7 @@ Une fois le foyer créé, la page d'accueil peut le nommer simplement : « Chez 
 - **AD-2** — RLS non contournable, **jamais de clé de service**. Toute vérification passe par une session réelle
 - **AD-1** — toute règle métier vit en Postgres. L'atomicité de la création est dans la RPC, pas dans du TypeScript
 - **AD-13** — Next = coquille ; Server Actions réduites au callback de connexion et à l'émission de jetons/invitations. La création de foyer **n'en fait pas partie** : client-direct. **N'ajoute pas `force-dynamic`**
-- **AR-MIGRATIONS** — schéma **déployé et gelé**. `git status --short supabase/` doit rester vide
+- **AR-MIGRATIONS** — schéma **déployé et gelé**. `git status --short supabase/migrations/` doit rester vide. `supabase gen types` est en lecture seule et ne le contredit pas ; `supabase link` n'ajoute qu'un `config.toml`
 - **NFR-5** — isolation appliquée à la donnée. C'est la première story où elle devient observable : profites-en pour la prouver (Task 6)
 
 ### Standards de test
@@ -240,13 +250,16 @@ app/
 lib/
   supabase/
     queries.ts          +  requireProfile() — dette 1.1 soldée
-    client.ts              inchangé
-    server.ts              inchangé
-    proxy.ts               INCHANGÉ — la garde ne va pas là
+    types.ts            ~  REMPLACÉ par `supabase gen types` (Task 0)
+    client.ts           ~  typé <Database>
+    server.ts           ~  typé <Database> sur les deux fabriques
+    proxy.ts            ~  typé <Database> — seule modification tolérée ici
 proxy.ts                   inchangé — n'ajoute PAS /onboarding aux routes publiques
 docs/
   migrations.md         +  discipline de migrations (Task 5)
-supabase/                  INTACT — aucune migration
+supabase/
+  config.toml           +  créé par `supabase link` (sans secret)
+  migrations/              INTACT — aucune migration
 ```
 
 ### Intelligence de la story précédente (1.2)
@@ -282,6 +295,17 @@ const { data, error } = await supabase.rpc("create_household_with_profile", {
 
 Les noms de paramètres portent le préfixe `p_` : ce sont ceux de la signature SQL, ils ne sont pas négociables. Le retour `data` est l'`uuid` du foyer créé. Une exception `raise` côté Postgres arrive dans `error`, avec son message anglais dans `error.message` — **à traduire, jamais à rendre**.
 
+Une fois la Task 0 faite, ces noms cessent d'être une convention de politesse : le client est typé `<Database>`, et une faute de frappe sur `p_household_name` **échoue au typecheck**. C'est tout l'intérêt de générer les types avant d'écrire l'appel, et non l'inverse.
+
+### État vérifié de l'environnement (2026-07-26)
+
+Mesures directes, pour t'éviter de rejouer un diagnostic déjà fait :
+
+- **Production en ligne** — `nutri.florianmarin.me`, TLS actif, variables d'environnement posées, contrôle d'accès fonctionnel
+- **`.env.local` renseigné** avec les vraies clés du projet `ywoubvebmlhtomwgouci`. Le serveur local parle au backend réel : `/login` rend 200, `/menu` redirige en conservant sa destination
+- **Un compte existe** : `flomarin88@gmail.com`, créé le 2026-07-26 à 19:52 UTC, **sans profil ni foyer**. C'est exactement le sujet de cette story — ce compte est ton cas de test nominal
+- ⚠️ **Le quota d'envoi d'emails était épuisé** en fin de journée (`429 over_email_send_rate_limit`, 2 emails/heure). Si tu dois te reconnecter pour tester, garde en tête que tu n'as que deux liens par heure. Le contenu de cette story se teste **avec la session déjà ouverte**, sans nouvel email
+
 ### References
 
 - [Source: _bmad-output/planning-artifacts/epics.md#Story-1.3] — user story et 3 AC, cités verbatim
@@ -297,8 +321,10 @@ Les noms de paramètres portent le préfixe `p_` : ce sont ceux de la signature 
 
 ## Questions pour Florian
 
-1. **Le nom du foyer, on le demande ou on l'invente ?** La base l'exige (`households.name` est `not null`), mais l'AC ne le mentionne pas. Je pars sur **on le demande** — un champ « le nom de chez toi », parce qu'il apparaîtra plus tard sur l'écran profil et dans l'invitation. L'alternative serait de le dériver du prénom (« Chez Florian ») et de le rendre modifiable en 1.6. Dis-moi si tu préfères ça : c'est un champ de moins à l'inscription.
-2. **`supabase gen types`** — troisième fois que la question revient. Cette story est la première à appeler une RPC : sans types générés, `data` est `any` et la signature n'est vérifiée par rien. Le coût d'une divergence silencieuse commence ici. Story de maintenance dédiée ?
+*Les deux questions ouvertes ont été tranchées le 2026-07-26. Conservées ici pour la traçabilité de la décision.*
+
+1. ~~**Le nom du foyer, on le demande ou on l'invente ?**~~ — **on le demande.** Deux champs à l'inscription, le nom du foyer et le prénom. C'est ce que décrit la Task 3.
+2. ~~**`supabase gen types` ?**~~ — **oui, et dans cette story** (Task 0). Le typage manuel s'arrête ici. Conséquence à assumer : la story s'élargit d'un cran, et la génération exige de relier le projet au CLI Supabase — ce que la Task 5 demandait de toute façon de documenter.
 
 ## Dev Agent Record
 
@@ -315,3 +341,4 @@ Les noms de paramètres portent le préfixe `p_` : ce sont ceux de la signature 
 | Date | Changement |
 |---|---|
 | 2026-07-26 | Story créée. Statut → `ready-for-dev` |
+| 2026-07-26 | Deux questions tranchées par Florian : le nom du foyer est demandé à l'inscription (deux champs), et `supabase gen types` entre dans le périmètre — nouvelle Task 0, clients typés `<Database>`, contrôle de non-régression sur `supabase/migrations/` resserré. État vérifié de l'environnement consigné |
