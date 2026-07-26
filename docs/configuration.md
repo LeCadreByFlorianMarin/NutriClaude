@@ -124,11 +124,29 @@ Dans l'ordre. Chaque étape suppose la précédente.
 5. **L'email arrive**, et son lien pointe vers `…/auth/callback?next=…&token_hash=…&type=…`.
 6. Cliquer → arrivée sur la destination d'origine, connecté.
 7. **Rouvrir le même lien** → retour à la connexion avec « Ce lien n'est plus bon ».
-8. Avec la session ouverte, dans *Supabase → SQL Editor* :
-   ```sql
-   select auth.uid(), current_household_id();
+8. Vérifier que la chaîne d'isolation est intacte — **surtout pas depuis le SQL Editor de Supabase**.
+
+   > ⚠️ Le SQL Editor exécute les requêtes avec un rôle d'administration, **sans jeton de session**. `auth.uid()` y vaut donc `NULL`, et `current_household_id()` renverrait `NULL` **quoi qu'il arrive** — y compris pour un membre parfaitement rattaché. Le test passerait pour la mauvaise raison, ce qui est pire que ne pas le faire.
+
+   Il faut interroger **avec la session du navigateur**. Une fois connecté, dans la console des outils de développement, sur l'onglet de l'application :
+
+   ```js
+   // Récupère le jeton d'accès depuis le cookie de session, puis interroge la base
+   // exactement comme le fait l'application — sous le contrôle de la RLS.
+   const raw = document.cookie.split('; ').find(c => /^sb-.*-auth-token=/.test(c)).split('=').slice(1).join('=');
+   const decoded = decodeURIComponent(raw).replace(/^base64-/, '');
+   const token = JSON.parse(raw.includes('base64-') ? atob(decoded) : decoded).access_token;
+
+   const url  = 'COLLER_NEXT_PUBLIC_SUPABASE_URL';
+   const anon = 'COLLER_NEXT_PUBLIC_SUPABASE_ANON_KEY';
+   await (await fetch(`${url}/rest/v1/rpc/current_household_id`, {
+     method: 'POST',
+     headers: { apikey: anon, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+     body: '{}',
+   })).text();
    ```
-   Attendu pour un compte neuf : un identifiant, et `current_household_id()` à **`NULL`**. **C'est le succès**, pas un échec — aucun profil n'est créé automatiquement, et c'est la story 1.3 qui s'en charge.
+
+   Attendu pour un compte neuf : **`null`**. **C'est le succès**, pas un échec — aucun profil n'est créé automatiquement, et c'est la story 1.3 qui s'en charge. Ce qui est prouvé ici, c'est que la chaîne *cookie → session → `auth.uid()` → `profiles`* fonctionne : une erreur d'authentification rendrait un 401, pas `null`.
 9. **Le contrôle qui reste ouvert** — la réponse de `/auth/callback` qui pose le cookie doit porter `Cache-Control: private, no-cache, no-store, must-revalidate, max-age=0`, `Expires: 0` et `Pragma: no-cache`. Le transport a été mesuré ; leur émission effective lors d'une vraie connexion **n'a jamais pu être observée**, faute de session. À vérifier au premier passage réussi, en inspectant les en-têtes de la redirection dans l'onglet réseau du navigateur.
 
 ---
