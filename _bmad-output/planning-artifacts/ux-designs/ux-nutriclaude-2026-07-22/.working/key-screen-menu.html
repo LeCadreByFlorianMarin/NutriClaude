@@ -1,0 +1,117 @@
+<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NutriClaude — grille du menu (web)</title>
+<style>
+/* Grille jour × repas (FR-15) — surface WEB / grand écran.
+   Corrige le scroll horizontal forcé du code actuel : la grille
+   s'EMPILE sous 720px au lieu de défiler (NFR-3 esprit).
+   Accent abricot réservé à l'action courses (générer la liste + compteur). */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--acc:#FFA94D;--acc-strong:#F5912B;--acc-text-light:#C2410C;--acc-ink:#3A1E04;--acc-soft-l:rgba(245,145,43,.14)}
+body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5;
+  --muted:#5C6157;--muted2:#8B9083;--txt:#20211D;--cardbg:#fff;--cardbd:rgba(20,20,20,.08);
+  background:#f4f1ea;background-image:radial-gradient(700px 400px at 12% 0%,rgba(255,255,255,.9),transparent 60%),linear-gradient(160deg,#f7f4ee,#eef1ee 60%,#f3ece3);
+  color:var(--txt);min-height:100vh;padding:28px 22px 70px}
+.tf{font-family:ui-rounded,"SF Pro Rounded",Nunito,system-ui,sans-serif}
+.num{font-variant-numeric:tabular-nums}
+.wrap{max-width:1080px;margin:0 auto}
+.appbar{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+.logo{width:34px;height:34px;border-radius:10px;background:var(--acc-soft-l);color:var(--acc-strong);display:flex;align-items:center;justify-content:center;font-size:18px}
+.appbar h1{font-size:20px;font-weight:800;letter-spacing:-.02em}
+.appbar .nav{display:flex;gap:4px;margin-left:18px}
+.appbar .nav a{font-size:14px;color:var(--muted);text-decoration:none;padding:7px 12px;border-radius:9px}
+.appbar .nav a.on{color:var(--txt);font-weight:600;background:#fff;box-shadow:0 2px 8px rgba(60,50,30,.06)}
+.appbar .spacer{flex:1}
+.people{display:flex;align-items:center;gap:9px;font-size:14px;color:var(--muted);background:#fff;border:1px solid var(--cardbd);border-radius:11px;padding:8px 12px}
+.people b{color:var(--txt);font-weight:700}
+.people .stp{width:26px;height:26px;border-radius:7px;border:1px solid var(--cardbd);background:#faf8f4;color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer}
+
+.title{font-size:15px;font-weight:700;margin-bottom:4px}
+.subtitle{font-size:13px;color:var(--muted);margin-bottom:18px}
+
+/* la grille : 7 colonnes jour, 2 lignes repas. S'empile sous 720px. */
+.grid{display:grid;grid-template-columns:64px repeat(7,1fr);gap:10px;align-items:stretch}
+.corner{}
+.dayhead{font-size:12px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);text-align:center;padding:4px 0;align-self:center}
+.dayhead.today{color:var(--acc-strong)}
+.rowlab{font-size:12px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center}
+.cell{min-height:92px;background:#fff;border:1px solid var(--cardbd);border-radius:13px;padding:9px 10px;display:flex;flex-direction:column;gap:5px;cursor:pointer;transition:.15s}
+.cell:hover{box-shadow:0 6px 18px rgba(60,50,30,.09)}
+.cell:focus-visible{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px var(--acc-text-light)}
+.cell.today{border-color:rgba(245,145,43,.4)}
+.cell .r{font-size:13.5px;font-weight:600;line-height:1.3}
+.cell .tags{margin-top:auto;display:flex;gap:5px;flex-wrap:wrap}
+.tag{font-size:10.5px;color:var(--muted);background:#f2efe9;border-radius:20px;padding:2px 8px}
+.cell.empty{align-items:center;justify-content:center;color:var(--muted2);border-style:dashed;background:rgba(255,255,255,.5)}
+.cell.empty .plus{font-size:20px;line-height:1}.cell.empty .txt{font-size:11.5px}
+
+.footer{display:flex;align-items:center;gap:16px;margin-top:26px;padding:16px 18px;background:#fff;border:1px solid var(--cardbd);border-radius:16px;flex-wrap:wrap}
+.footer .info{font-size:14px;color:var(--muted)}
+.footer .info b{color:var(--txt)}
+.footer .spacer{flex:1}
+.btn-gen{display:inline-flex;align-items:center;gap:9px;background:var(--acc-strong);color:var(--acc-ink);font-weight:700;font-size:15px;border:none;border-radius:12px;padding:12px 20px;cursor:pointer;min-height:44px}
+.btn-gen .n{font-variant-numeric:tabular-nums}
+.note{font-size:12.5px;color:var(--muted);margin-top:14px;text-align:center;font-style:italic}
+
+@media(max-width:720px){
+  .grid{grid-template-columns:1fr;gap:14px}
+  .corner,.dayhead{display:none}
+  .daystack{background:rgba(255,255,255,.4);border-radius:14px;padding:10px;margin-bottom:2px}
+  .daystack .dh{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin:2px 2px 8px}
+  .rowlab{display:none}
+}
+/* affichage responsive : on rend DEUX structures, on masque selon largeur */
+.stack{display:none}
+@media(max-width:720px){.grid{display:none}.stack{display:block}}
+</style></head><body><div class="wrap">
+<div class="appbar">
+  <div class="logo">🛒</div><h1 class="tf">NutriClaude</h1>
+  <nav class="nav"><a>Liste</a><a class="on">Menu</a><a>Recettes</a><a>Rayons</a></nav>
+  <div class="spacer"></div>
+  <div class="people"><span class="stp">−</span>Pour <b>2</b> personnes<span class="stp">+</span></div>
+</div>
+
+<div class="title">La semaine du 21 au 27 juillet</div>
+<div class="subtitle">Assigne une recette à chaque case. Quand tu es prêt, génère la liste — les ingrédients s'agrègent et se classent par rayon.</div>
+
+<!-- GRILLE grand écran -->
+<div class="grid">
+  <div class="corner"></div>
+  <div class="dayhead">Lun</div><div class="dayhead today">Mar</div><div class="dayhead">Mer</div><div class="dayhead">Jeu</div><div class="dayhead">Ven</div><div class="dayhead">Sam</div><div class="dayhead">Dim</div>
+
+  <div class="rowlab">Midi</div>
+  <div class="cell" tabindex="0"><div class="r">Salade de lentilles</div><div class="tags"><span class="tag">rapide</span></div></div>
+  <div class="cell today" tabindex="0"><div class="r">Buddha bowl</div><div class="tags"><span class="tag">végé</span></div></div>
+  <div class="cell empty" tabindex="0"><div class="plus">+</div><div class="txt">Assigner</div></div>
+  <div class="cell" tabindex="0"><div class="r">Restes</div></div>
+  <div class="cell" tabindex="0"><div class="r">Quiche courgettes</div></div>
+  <div class="cell empty" tabindex="0"><div class="plus">+</div><div class="txt">Assigner</div></div>
+  <div class="cell" tabindex="0"><div class="r">Brunch</div><div class="tags"><span class="tag">week-end</span></div></div>
+
+  <div class="rowlab">Soir</div>
+  <div class="cell" tabindex="0"><div class="r">Pâtes pesto</div><div class="tags"><span class="tag">rapide</span></div></div>
+  <div class="cell today" tabindex="0"><div class="r">Gratin de courgettes</div><div class="tags"><span class="tag">batch</span></div></div>
+  <div class="cell" tabindex="0"><div class="r">Curry pois chiches</div><div class="tags"><span class="tag">végé</span></div></div>
+  <div class="cell" tabindex="0"><div class="r">Gratin (reste)</div></div>
+  <div class="cell empty" tabindex="0"><div class="plus">+</div><div class="txt">Assigner</div></div>
+  <div class="cell" tabindex="0"><div class="r">Pizza maison</div></div>
+  <div class="cell empty" tabindex="0"><div class="plus">+</div><div class="txt">Assigner</div></div>
+</div>
+
+<!-- STACK mobile (empilé, jamais de scroll horizontal) -->
+<div class="stack">
+  <div class="daystack"><div class="dh">Mardi — aujourd'hui</div>
+    <div class="cell" tabindex="0" style="margin-bottom:8px"><div class="r">Midi · Buddha bowl</div><div class="tags"><span class="tag">végé</span></div></div>
+    <div class="cell" tabindex="0"><div class="r">Soir · Gratin de courgettes</div><div class="tags"><span class="tag">batch</span></div></div>
+  </div>
+  <div class="daystack"><div class="dh">Mercredi</div>
+    <div class="cell empty" tabindex="0" style="margin-bottom:8px"><div class="txt">＋ Assigner le midi</div></div>
+    <div class="cell" tabindex="0"><div class="r">Soir · Curry pois chiches</div></div>
+  </div>
+</div>
+
+<div class="footer">
+  <div class="info">Menu prêt à générer : <b>9 repas</b> assignés cette semaine, pour <b>2</b> personnes.</div>
+  <div class="spacer"></div>
+  <button class="btn-gen">🛒 Générer la liste — <span class="n">23</span> ingrédients</button>
+</div>
+<div class="note">La génération n'écrase rien : elle ajoute à la liste existante et te dit combien d'articles ont rejoint tes courses.</div>
+</div></body></html>

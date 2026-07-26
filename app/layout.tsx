@@ -1,20 +1,20 @@
-import "./globals.css";
 import type { Metadata } from "next";
+import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "NutriCloud — Le Cadre",
+  title: "NutriClaude",
   description:
-    "Planification nutritionnelle familiale avec liste de courses triée par rayon. Brique nutrition de Le Cadre.",
+    "La liste de courses du foyer, triée par les rayons de ton magasin.",
 };
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
-    <html lang="fr">
-      <body className="font-sans">{children}</body>
+    <html lang="fr" className="h-full antialiased">
+      <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
 }

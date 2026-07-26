@@ -1,0 +1,129 @@
+# generated: 2026-07-25
+# last_updated: 2026-07-25
+# project: nutriclaude
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# Action Item Status:
+#   - open: Committed during a retrospective, not yet addressed
+#   - in-progress: Actively being worked on
+#   - done: Completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - Retrospective appends its action items to action_items; sprint-status surfaces open ones
+
+generated: 2026-07-25
+last_updated: 2026-07-26  # story 1.1 revue et close
+project: nutriclaude
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # ── Epic 1 : Socle technique & foyer partageable ──
+  epic-1: in-progress
+  1-1-poser-le-socle-applicatif-next-16: done
+  1-2-authentification-par-magic-link-sans-mot-de-passe: backlog
+  1-3-creer-un-foyer-a-l-inscription: backlog
+  1-4-generer-un-code-d-invitation: backlog
+  1-5-rejoindre-un-foyer-via-un-code-d-invitation: backlog
+  1-6-ecran-profil-membres-du-foyer: backlog
+  1-7-fondations-de-theme-clair-sombre-de-ton: backlog
+  epic-1-retrospective: optional
+
+  # ── Epic 2 : Le classement par rayon qui apprend ──
+  epic-2: backlog
+  2-1-amorcer-un-jeu-de-rayons-par-defaut: backlog
+  2-2-gerer-ses-rayons: backlog
+  2-3-reordonner-le-parcours-par-manipulation-directe: backlog
+  2-4-definir-des-regles-mot-cle-rayon: backlog
+  2-5-resoudre-automatiquement-le-rayon-d-un-article-ajoute: backlog
+  2-6-groupe-a-classer-toujours-visible: backlog
+  2-7-correction-de-rayon-apprenante-en-silence: backlog
+  epic-2-retrospective: optional
+
+  # ── Epic 3 : Recettes & menu — les affluents de la liste ──
+  epic-3: backlog
+  3-1-creer-et-editer-une-recette: backlog
+  3-2-gerer-les-ingredients-d-une-recette: backlog
+  3-3-consulter-une-recette-en-lecture: backlog
+  3-4-etiquettes-filtre-et-recherche-du-repertoire: backlog
+  3-5-planifier-le-menu-de-la-semaine-sans-defilement-horizontal: backlog
+  3-6-assigner-recettes-et-nombre-de-personnes-aux-cases-du-menu: backlog
+  epic-3-retrospective: optional
+
+  # ── Epic 4 : La liste qui ne lâche jamais — hors-ligne, convergence & contrat ──
+  epic-4: backlog
+  4-1-modele-canonique-de-la-ligne-d-article-isolation-rls: backlog
+  4-2-lecture-client-direct-de-la-liste-groupee-par-rayon: backlog
+  4-3-cocher-et-decocher-idempotent-et-reversible: backlog
+  4-4-ajouter-un-article-avec-agregation-et-unites-fermees: backlog
+  4-5-supprimer-archiver-les-achetes-vider-la-liste: backlog
+  4-6-provenance-de-chaque-article: backlog
+  4-7-generer-la-liste-depuis-le-menu-sans-rien-ecraser: backlog
+  4-8-consulter-la-liste-hors-ligne: backlog
+  4-9-ecrire-hors-ligne-via-une-outbox-rejouee: backlog
+  4-10-convergence-lww-par-champ-entre-appareils: backlog
+  4-11-propagation-temps-reel-entre-surfaces: backlog
+  4-12-contrat-de-liste-stable-et-versionne: backlog
+  4-13-coche-reelle-plancher-d-accessibilite-de-la-liste: backlog
+  4-14-etats-hors-ligne-et-differe-a-l-ecran: backlog
+  4-15-filet-de-verification-tests-d-isolation-de-convergence: backlog
+  epic-4-retrospective: optional
+
+  # ── Epic 5 : Le dashboard de la cuisine ──
+  epic-5: backlog
+  5-1-identite-d-appareil-scopee-foyer-revocable: backlog
+  5-2-appairer-le-dashboard-sans-login: backlog
+  5-3-afficher-la-liste-lisible-a-un-metre-tuile-courses: backlog
+  5-4-cocher-et-supprimer-depuis-le-dashboard: backlog
+  5-5-reflet-temps-reel-sans-rechargement: backlog
+  5-6-menu-du-jour-sur-le-dashboard: backlog
+  5-7-gerer-les-appareils-depuis-l-ecran-profil: backlog
+  epic-5-retrospective: optional
+
+  # ── Epic 6 : Les surfaces mobiles & l'ajout à la voix ──
+  epic-6: backlog
+  6-1-pwa-installable-sur-iphone-et-android: backlog
+  6-2-cible-de-partage-systeme: backlog
+  6-3-ajout-par-dictee-partage-sur-telephone: backlog
+  6-4-raccourci-ios-mains-libres-a-identite-d-appareil: backlog
+  6-5-pont-google-keep-ingestion-unidirectionnelle-et-idempotente: backlog
+  6-6-degradation-gracieuse-alerte-du-pont: backlog
+  epic-6-retrospective: optional
+
+  # ── Epic 7 : Le pilotage conversationnel (Claude / MCP) ──
+  epic-7: backlog
+  7-1-acces-conversationnel-scope-foyer-sans-contournement-de-l-isolation: backlog
+  7-2-piloter-la-liste-depuis-claude: backlog
+  7-3-consulter-et-faconner-recettes-menu-depuis-claude: backlog
+  7-4-consulter-et-modifier-rayons-regles-depuis-claude: backlog
+  epic-7-retrospective: optional
