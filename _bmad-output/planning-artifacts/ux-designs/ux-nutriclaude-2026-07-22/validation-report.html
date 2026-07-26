@@ -1,0 +1,90 @@
+<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Validation UX — nutriclaude</title>
+<style>
+:root{--bg:#fafaf9;--surface:#fff;--border:#e7e5e4;--text:#1c1917;--muted:#78716c;
+--strong:#16a34a;--adequate:#65a30d;--thin:#d97706;--broken:#dc2626;
+--low:#64748b;--medium:#ca8a04;--high:#ea580c;--critical:#dc2626}
+@media(prefers-color-scheme:dark){:root{--bg:#161514;--surface:#1f1e1c;--border:#33312e;--text:#f2f0ee;--muted:#a8a29e}}
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;font-size:15px}
+.container{max-width:960px;margin:0 auto;padding:32px 24px 64px}
+header{display:flex;justify-content:space-between;gap:24px;border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:24px;flex-wrap:wrap}
+h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:12.5px;margin-top:6px;font-family:ui-monospace,"SF Mono",Menlo,monospace}
+.synthesis{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--muted);border-radius:8px;padding:16px 20px;margin-bottom:24px}
+.synthesis p{margin:0 0 10px}.synthesis p:last-child{margin:0}
+h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:32px 0 12px}
+table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+td,th{padding:9px 14px;text-align:left;border-bottom:1px solid var(--border);font-size:14px}
+th{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+tr:last-child td{border-bottom:none}
+.pill{display:inline-block;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700;color:#fff}
+.v-strong{background:var(--strong)}.v-adequate{background:var(--adequate)}.v-thin{background:var(--thin)}.v-broken{background:var(--broken)}
+.sev{display:inline-block;min-width:74px;text-align:center;padding:1px 8px;border-radius:6px;font-size:11px;font-weight:700;color:#fff;margin-right:8px}
+.s-critical{background:var(--critical)}.s-high{background:var(--high)}.s-medium{background:var(--medium)}.s-low{background:var(--low)}
+.finding{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:10px}
+.finding .t{font-weight:600}
+.finding .meta{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--muted)}
+.fix{font-size:13.5px;margin-top:6px}
+.done{color:var(--strong);font-weight:700}
+.grp{margin:20px 0 10px;font-weight:700;font-size:15px;display:flex;align-items:center;gap:10px}
+.count{color:var(--muted);font-weight:400;font-size:13px}
+footer{margin-top:36px;padding-top:16px;border-top:1px solid var(--border);color:var(--muted);font-size:12.5px;font-family:ui-monospace,Menlo,monospace}
+ul{margin:6px 0 0;padding-left:20px}li{margin:3px 0}
+</style></head><body><div class="container">
+<header>
+  <div><h1>Validation UX — NutriClaude</h1><div class="sub">DESIGN.md · EXPERIENCE.md · Reviewer Gate (Finalize) · 2026-07-22</div></div>
+  <div style="text-align:right"><div class="sub">Lentilles</div><div style="font-size:13px">Rubric walker · Accessibilité</div></div>
+</header>
+
+<div class="synthesis">
+  <p><b>Contrat aval solide.</b> Tous les tokens se définissent, tous les <code>{path.to.token}</code> se résolvent, les 4 parcours canoniques (UJ-1→UJ-4) deviennent 4 Key Flows verbatim avec protagoniste nommé et beat climax, et les 3 fichiers visuels sont liés sans orphelin. Le rubric walker n'a relevé <b>aucun finding critique ni high</b>.</p>
+  <p>L'audit accessibilité a révélé que les contrastes étaient jugés contre les <b>bases pleines</b> alors que le contenu rend sur le <b>verre translucide</b> (≈ #261d23) et les cartes blanches — faisant basculer plusieurs PASS supposés en FAIL, dont la coche vide (geste central) et le <b>thème clair plein soleil</b>, cas d'usage pivot. <b>Les 2 findings critiques, 4 high et 3 medium ont tous été corrigés dans les spines</b> (tokens recalculés sur fonds réels, provenance à double canal, planchers de lisibilité dashboard à un mètre, focus clavier et sémantique lecteur d'écran spécifiés). Le plancher d'accessibilité est désormais une <b>décision ferme</b>.</p>
+</div>
+
+<h2>Verdicts par catégorie — rubric walker</h2>
+<table>
+<tr><th>Catégorie</th><th>Verdict</th></tr>
+<tr><td>Flow coverage</td><td><span class="pill v-strong">strong</span></td></tr>
+<tr><td>Token completeness</td><td><span class="pill v-strong">strong</span></td></tr>
+<tr><td>Component coverage</td><td><span class="pill v-adequate">adequate</span></td></tr>
+<tr><td>State coverage</td><td><span class="pill v-strong">strong</span></td></tr>
+<tr><td>Visual reference coverage</td><td><span class="pill v-strong">strong</span></td></tr>
+<tr><td>Bloat &amp; overspecification</td><td><span class="pill v-adequate">adequate</span></td></tr>
+<tr><td>Inheritance discipline</td><td><span class="pill v-strong">strong</span></td></tr>
+<tr><td>Shape fit</td><td><span class="pill v-adequate">adequate</span></td></tr>
+</table>
+
+<h2>Findings par sévérité</h2>
+
+<div class="grp"><span class="sev s-critical">critical</span> <span class="count">2 — <span class="done">résolus ✅</span></span></div>
+<div class="finding"><div class="t">Coche vide illisible, thème clair</div><div class="meta">DESIGN.colors.checkbox-empty · §Shapes</div><div>#C9CCC0 ≈ 1,45–1,63:1 sur carte blanche — invisible en plein soleil (cas pivot).</div><div class="fix"><span class="done">Fix :</span> #83887B (3,64:1) + fond interne d'affordance + règle « contour ≥3:1 contre la carte ».</div></div>
+<div class="finding"><div class="t">Coche vide sous seuil, thème sombre</div><div class="meta">DESIGN.colors.checkbox-empty-dark</div><div>#59617A ≈ 2,66:1 sur le verre réel (ne passait que contre la base pleine, jamais atteinte).</div><div class="fix"><span class="done">Fix :</span> #828AA3 (4,77:1 sur verre).</div></div>
+
+<div class="grp"><span class="sev s-high">high</span> <span class="count">4 — <span class="done">résolus ✅</span></span></div>
+<div class="finding"><div class="t">muted-2 en texte échoue AA</div><div class="meta">DESIGN.colors.muted-2*</div><div>Portait quantités, horodatage, provenance texte, séparateur (2,46:1 clair / 4,02:1 halo).</div><div class="fix"><span class="done">Fix :</span> rôles porteurs réassignés à <code>muted</code> (5,15:1 blanc / 8,06:1 verre) ; muted-2 remonté et restreint au non-essentiel.</div></div>
+<div class="finding"><div class="t">Provenance FR-7 mono-canal</div><div class="meta">EXPERIENCE.Component Patterns · Accessibility Floor</div><div>Icône seule (2,86:1), sans équivalent texte.</div><div class="fix"><span class="done">Fix :</span> icône ≥3:1 <b>+</b> <code>aria-label</code> obligatoire (« ajouté à la voix », « dicté / partagé », « ajout manuel », « issu d'une recette »).</div></div>
+<div class="finding"><div class="t">Dashboard illisible à 1 m au-delà du compteur</div><div class="meta">FR-24 · DESIGN.Typography</div><div>Contexte en 12px, illisible à distance.</div><div class="fix"><span class="done">Fix :</span> planchers <code>body-dashboard</code> ≥18px, <code>meta-dashboard</code> ≥15px ; 12px interdit pour un texte porteur sur dashboard.</div></div>
+<div class="finding"><div class="t">Focus clavier non spécifié</div><div class="meta">mocks en tap-highlight:transparent</div><div>Aucun retour de focus sur surfaces web/PWA.</div><div class="fix"><span class="done">Fix :</span> tokens <code>focus-ring-light/-dark</code> + composant <code>focus</code> (anneau 2px + offset) ; <code>outline:none</code> sans remplacement interdit.</div></div>
+
+<div class="grp"><span class="sev s-medium">medium</span> <span class="count">5 — 3 résolus, 2 ouverts bénins</span></div>
+<div class="finding"><div class="t">Sémantique lecteur d'écran contredite (coches en span)</div><div class="fix"><span class="done">Fix :</span> coche = vrai <code>role="checkbox"</code> annonçant son état ; compteur annoncé « 12 articles à prendre ».</div></div>
+<div class="finding"><div class="t">Bandeau hors-ligne clair marginal (4,42:1)</div><div class="fix"><span class="done">Fix :</span> offline-text → #7E6224 (5,20:1).</div></div>
+<div class="finding"><div class="t">Libellé « acheté » clair trop pâle (2,04:1)</div><div class="fix"><span class="done">Fix :</span> libellé barré porté en <code>muted</code> ; barré + coche pleine restent les signaux primaires.</div></div>
+<div class="finding"><div class="t">« Correction de rayon » sans ligne DESIGN.Components <span class="meta">— ouvert, bénin</span></div><div class="fix">C'est une interaction, déjà couverte en Interaction Primitives. Pas de spec visuelle nécessaire.</div></div>
+<div class="finding"><div class="t">Section <i>Inspiration &amp; Anti-patterns</i> absente <span class="meta">— à traiter au finalize</span></div><div class="fix">Rejets élicités (lecture vocale FR-30, natif NFR-11, menthe/indigo) présents mais dispersés ; méritent un titre dédié dans EXPERIENCE.md.</div></div>
+
+<div class="grp"><span class="sev s-low">low</span> <span class="count">9 — rubric walker, aucun bloquant</span></div>
+<div class="finding"><div class="fix">Asymétrie provenance (résolue par le double canal), quelques tokens clair dérivés (complétés), variantes dashboard/<code>rounded.full</code> non référencées, chemins d'échec implicites Flows 2/4, états vides recherche/menu (hors périmètre maquetté), duplication de la traçabilité FR, littéral <code>11px</code> hors échelle, section « Lacunes &amp; hypothèses » (conservée à dessein — utile au consommateur aval).</div></div>
+
+<h2>Hypothèses restantes — à trancher au finalize</h2>
+<ul>
+<li><b>Zoom texte 200 %</b> — tenue de la colonne unique sans scroll horizontal, non mesurable sans rendu réel.</li>
+<li><b>Icônes provenance manuel (＋) / recette (🍴)</b> — mapping proposé pour couvrir FR-7 en entier, à valider.</li>
+<li><b>Section Inspiration &amp; Anti-patterns</b> — à ajouter pour consigner les rejets.</li>
+</ul>
+
+<footer>
+DESIGN.md · EXPERIENCE.md — _bmad-output/planning-artifacts/ux-designs/ux-nutriclaude-2026-07-22/<br>
+Reviewer files : review-rubric.md · review-accessibility.md · Run 2026-07-22
+</footer>
+</div></body></html>

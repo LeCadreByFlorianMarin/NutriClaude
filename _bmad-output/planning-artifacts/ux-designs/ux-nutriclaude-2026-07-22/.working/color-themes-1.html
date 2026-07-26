@@ -1,0 +1,171 @@
+<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NutriClaude — Couleur-signature & thème</title>
+<style>
+/* ============================================================
+   PLANCHE DE COMPARAISON — écran pivot : liste au supermarché
+   Langage visuel hérité de la réf premium (verre, profondeur,
+   compteur, coche), mais couleur-signature OUVERTE.
+   Bloc A : 5 teintes-signature sur fond sombre premium.
+   Bloc B : même écran, thème SOMBRE vs CLAIR, cas "plein soleil".
+   ============================================================ */
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#07070c;color:#e8ebf4;padding:32px 20px 80px;line-height:1.5}
+.num{font-variant-numeric:tabular-nums}
+h1{font-size:22px;font-weight:700;letter-spacing:-.02em;text-align:center}
+.lede{text-align:center;color:#8b93a9;font-size:13px;max-width:640px;margin:8px auto 0}
+h2{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#8b93a9;margin:52px auto 6px;max-width:1180px}
+.h2sub{color:#6a melt;font-size:12px;color:#6a7183;max-width:1180px;margin:0 auto 22px}
+.row{display:flex;flex-wrap:wrap;gap:22px;justify-content:center;max-width:1220px;margin:0 auto}
+
+/* ---- phone frame ---- */
+.phone{width:300px;border-radius:30px;padding:12px;position:relative;overflow:hidden;
+  box-shadow:0 24px 60px rgba(0,0,0,.55),0 2px 0 rgba(255,255,255,.04) inset;border:1px solid rgba(255,255,255,.07)}
+.phone.dark{background:#12101c;
+  background-image:radial-gradient(420px 320px at 18% 4%,rgba(96,74,180,.28),transparent 60%),
+    radial-gradient(420px 340px at 88% 96%,rgba(74,30,100,.34),transparent 60%),
+    linear-gradient(160deg,#191330,#10222f 55%,#20122e)}
+.phone.light{background:#f4f1ea;
+  background-image:radial-gradient(420px 320px at 15% 2%,rgba(255,255,255,.9),transparent 60%),
+    linear-gradient(160deg,#f7f4ee,#eef1ee 60%,#f1ece6)}
+.cap{font-size:12px;font-weight:600;text-align:center;margin-bottom:9px;color:#c7cddb}
+.hex{font-size:10.5px;color:#6a7183;text-align:center;margin-bottom:16px;font-variant-numeric:tabular-nums}
+
+/* ---- screen chrome ---- */
+.sbar{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:2px 8px 12px;font-weight:600}
+.dark .sbar{color:#aeb6c9}.light .sbar{color:#6a6f66}
+.head{padding:0 8px 12px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+.dark .eyebrow{color:var(--muted)}.light .eyebrow{color:#8a8f82}
+.bigcount{display:flex;align-items:baseline;gap:8px;margin-top:3px}
+.bigcount .n{font-size:46px;font-weight:800;line-height:.9;letter-spacing:-.03em;color:var(--accent)}
+.bigcount .l{font-size:14px}.dark .bigcount .l{color:#aeb6c9}.light .bigcount .l{color:#6a6f66}
+.store{font-size:11.5px;margin-top:7px}.dark .store{color:#7d849c}.light .store{color:#8a8f82}
+.store b{color:var(--accent);font-weight:700}
+
+/* ---- aisle card ---- */
+.card{border-radius:16px;padding:11px 12px 6px;margin:0 4px 10px}
+.dark .card{background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.10)}
+.light .card{background:#fff;border:1px solid rgba(20,20,20,.07);box-shadow:0 6px 18px rgba(60,50,30,.06)}
+.aisle{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.aisle .t{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+.dark .aisle .t{color:#aeb6c9}.light .aisle .t{color:#6a6f66}
+.aisle .c{font-size:11px;font-variant-numeric:tabular-nums}.dark .aisle .c{color:#7d849c}.light .aisle .c{color:#a2a79a}
+.ic{width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;
+  background:var(--accent-soft);color:var(--accent)}
+
+/* ---- item row ---- */
+.it{display:flex;align-items:center;gap:11px;min-height:46px;padding:4px 4px}
+.cb{width:25px;height:25px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;
+  border:2px solid var(--cb-empty);transition:.15s}
+.cb svg{width:15px;height:15px;opacity:0}
+.it .lbl{flex:1;font-size:15px}.dark .it .lbl{color:#eef1f8}.light .it .lbl{color:#20211d}
+.it .qty{font-size:12px;font-variant-numeric:tabular-nums}.dark .it .qty{color:#7d849c}.light .it .qty{color:#a2a79a}
+.it .src{width:14px;height:14px;flex:none}.dark .it .src{color:#6a7183}.light .it .src{color:#b3b7ab}
+.it.done .cb{background:var(--accent);border-color:var(--accent)}
+.it.done .cb svg{opacity:1;color:#08130d}
+.it.done .lbl{text-decoration:line-through}.dark .it.done .lbl{color:#6a7183}.light .it.done .lbl{color:#b3b7ab}
+/* pending sync (NFR-1) */
+.it.pending .lbl{opacity:.8}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none;box-shadow:0 0 0 3px var(--accent-soft)}
+.pendtag{font-size:9.5px;letter-spacing:.03em;padding:2px 6px;border-radius:20px;background:var(--accent-soft);color:var(--accent);font-weight:600}
+.sep{font-size:10px;letter-spacing:.05em;text-transform:uppercase;margin:6px 4px 2px}.dark .sep{color:#6a7183}.light .sep{color:#b3b7ab}
+.offline{display:flex;align-items:center;gap:7px;font-size:11px;margin:0 8px 10px;padding:7px 10px;border-radius:11px}
+.dark .offline{background:rgba(255,255,255,.04);color:#aeb6c9;border:1px solid rgba(255,255,255,.08)}
+.light .offline{background:#fbf3e2;color:#8a6d2e;border:1px solid #f0e2c0}
+.reg{font-size:11px;text-align:center;font-style:italic;margin-top:2px}.dark .reg{color:#7d849c}.light .reg{color:#9a9f92}
+.note{max-width:1180px;margin:14px auto 0;font-size:12px;color:#8b93a9;padding:12px 14px;border-left:2px solid #333a4d;background:rgba(255,255,255,.02);border-radius:0 8px 8px 0}
+</style></head><body>
+
+<h1>NutriClaude — la même liste, plusieurs peaux</h1>
+<p class="lede">Écran pivot : <b>le supermarché, téléphone à une main</b> (NFR-3, le seul écran non négociable). Le langage visuel de ta réf est conservé — verre, profondeur, gros compteur, grosse coche. Ce qui bouge : la <b>couleur-signature</b>, puis le <b>thème</b>.</p>
+
+<h2>A · Couleur-signature — 5 registres, même écran sombre premium</h2>
+<p class="h2sub" style="text-align:center;color:#6a7183;font-size:12px;max-width:760px;margin:0 auto 22px">Le vert n'est qu'un candidat parmi d'autres. Chaque teinte porte une émotion différente pour « bien manger sans y penser ». La couleur reste <b>réservée à l'action courses</b> (compteur, coche, provenance) — le reste est neutre.</p>
+<div class="row" id="rowA"></div>
+
+<h2>B · Thème — sombre premium vs clair, cas « plein soleil, une main »</h2>
+<p class="h2sub" style="text-align:center;color:#6a7183;font-size:12px;max-width:760px;margin:0 auto 22px">Ta réf brille sur un écran de cuisine allumé en continu. Mais dans un magasin très éclairé, écran à bout de bras, le clair peut gagner en lisibilité. Même teinte, deux thèmes.</p>
+<div class="row" id="rowB"></div>
+
+<div class="note" id="foot"></div>
+
+<script>
+const CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2"><path d="M20 6 9 17l-5-5"/></svg>';
+const MIC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
+const NOTE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3h14v18H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>';
+const HAND='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11V4a1.5 1.5 0 0 1 3 0v6"/><path d="M12 10V3.5a1.5 1.5 0 0 1 3 0V10"/><path d="M15 10V5a1.5 1.5 0 0 1 3 0v8a7 7 0 0 1-7 7h-1a7 7 0 0 1-6-3.5L4 15a1.5 1.5 0 0 1 2.6-1.5L8 15V6a1.5 1.5 0 0 1 3 0"/></svg>';
+
+// signature colors: [name, register, accent, accent-soft, cb-empty(dark)]
+const SIG=[
+  ['Menthe','frais · vivant · sain','#4FD69B','rgba(79,214,155,.16)','#59617a'],
+  ['Abricot','appétit · chaleur · cuisine','#FFA94D','rgba(255,169,77,.16)','#59617a'],
+  ['Corail','marché · gourmand · énergie','#FF6F61','rgba(255,111,97,.16)','#59617a'],
+  ['Lagon','calme · propre · net','#39D3DE','rgba(57,211,222,.15)','#59617a'],
+  ['Lilas','apaisé · premium · s’efface','#B39BFF','rgba(179,155,255,.18)','#59617a'],
+];
+
+// list content (French, tutoiement-adjacent, non-technical)
+function screenHTML(theme, showOffline){
+  return `
+  <div class="sbar"><span class="num">9:41</span><span>Samedi · Grand Frais</span></div>
+  <div class="head">
+    <div class="eyebrow">Ta liste</div>
+    <div class="bigcount"><span class="n num">12</span><span class="l">à prendre</span></div>
+    <div class="store">Rangée dans l'ordre de <b>ton magasin</b></div>
+  </div>
+  ${showOffline?`<div class="offline">${wifiOff()} Hors ligne — tes coches partiront toutes seules au retour du réseau</div>`:''}
+  <div class="card">
+    <div class="aisle"><span class="t"><span class="ic">🥬</span>Fruits &amp; légumes</span><span class="c num">3/4</span></div>
+    ${item('Poivrons','×3',MIC,false,false)}
+    ${item('Tomates','',MIC,false,false)}
+    ${item('Bananes','',NOTE,false,true)}
+    <div class="sep">Dans le panier</div>
+    ${item('Salade','',NOTE,true,false)}
+  </div>
+  <div class="card">
+    <div class="aisle"><span class="t"><span class="ic">🥛</span>Frais</span><span class="c num">2/3</span></div>
+    ${item('Lait','×2',MIC,false,false)}
+    ${item('Yaourts','',NOTE,false,false)}
+    <div class="sep">Dans le panier</div>
+    ${item('Beurre','',MIC,true,false)}
+  </div>
+  <div class="reg">Un article ajouté à la voix arrive en moins d'une minute.</div>`;
+}
+function item(name,qty,src,done,pending){
+  return `<div class="it ${done?'done':''} ${pending?'pending':''}">
+    <span class="cb">${CHECK}</span>
+    <span class="lbl">${name}</span>
+    ${pending?`<span class="pendtag">arrive…</span>`:''}
+    ${qty?`<span class="qty num">${qty}</span>`:''}
+    <span class="src">${src}</span>
+  </div>`;
+}
+function wifiOff(){return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l22 22M8.5 16.5a5 5 0 0 1 7 0M5 12.8a10 10 0 0 1 3-2M2 8.8a15 15 0 0 1 4-2.7M22 8.8a15 15 0 0 0-6-3.4M12 20h.01"/></svg>';}
+
+const rowA=document.getElementById('rowA');
+SIG.forEach(([name,reg,acc,soft,cbe])=>{
+  const el=document.createElement('div');
+  el.innerHTML=`<div class="cap">${name}</div><div class="hex">${acc}</div>
+    <div class="phone dark" style="--accent:${acc};--accent-soft:${soft};--cb-empty:${cbe};--muted:#aeb6c9">
+      ${screenHTML('dark',false)}
+      <div class="reg" style="margin-top:8px;color:#7d849c">${reg}</div>
+    </div>`;
+  rowA.appendChild(el);
+});
+
+const rowB=document.getElementById('rowB');
+// use Abricot as neutral-warm placeholder for theme comparison — decision A picks the real hue
+const T=['#FFA94D','rgba(255,169,77,.16)'];
+[['Sombre premium','dark',true],['Clair « plein soleil »','light',true]].forEach(([cap,theme,off])=>{
+  const el=document.createElement('div');
+  const cbe = theme==='dark' ? '#59617a' : '#c9ccc0';
+  el.innerHTML=`<div class="cap">${cap}</div><div class="hex">accent provisoire ${T[0]} — la teinte finale sort du bloc A</div>
+    <div class="phone ${theme}" style="--accent:${T[0]};--accent-soft:${T[1]};--cb-empty:${cbe};--muted:#aeb6c9">
+      ${screenHTML(theme,off)}
+    </div>`;
+  rowB.appendChild(el);
+});
+
+document.getElementById('foot').innerHTML=
+  "Points d'attention repérés dès maintenant — <b>l'état hors-ligne</b> (bandeau + pastille « arrive… » sur Bananes) répond à NFR-1 : une action non confirmée est visuellement distincte sans jamais bloquer le geste. <b>La provenance</b> (icône micro / note) répond à FR-7. La <b>coche</b> reste le geste le plus gros de l'écran. Rien de tout ça n'est figé — c'est une base à critiquer.";
+</script>
+</body></html>

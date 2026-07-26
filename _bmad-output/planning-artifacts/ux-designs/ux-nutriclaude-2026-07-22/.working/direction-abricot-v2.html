@@ -1,0 +1,153 @@
+<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NutriClaude — Abricot, deux thèmes + typo + fond</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--acc:#FFA94D;--acc-strong:#F5912B;--acc-soft-d:rgba(255,169,77,.16);--acc-soft-l:rgba(245,145,43,.14)}
+body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#07070c;color:#e8ebf4;padding:32px 20px 90px;line-height:1.5}
+.num{font-variant-numeric:tabular-nums}
+h1{font-size:22px;font-weight:800;letter-spacing:-.02em;text-align:center}
+.lede{text-align:center;color:#8b93a9;font-size:13px;max-width:660px;margin:8px auto 0}
+h2{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#8b93a9;text-align:center;margin:54px auto 4px}
+.sub{text-align:center;color:#6a7183;font-size:12px;max-width:720px;margin:0 auto 22px}
+.row{display:flex;flex-wrap:wrap;gap:24px;justify-content:center;max-width:1240px;margin:0 auto;align-items:flex-start}
+.cap{font-size:12px;font-weight:700;text-align:center;margin-bottom:4px;color:#c7cddb}
+.hex{font-size:10.5px;color:#6a7183;text-align:center;margin-bottom:14px}
+
+/* phone */
+.phone{width:298px;border-radius:30px;padding:12px;overflow:hidden;border:1px solid rgba(255,255,255,.07);
+  box-shadow:0 24px 60px rgba(0,0,0,.55)}
+.dark{--muted:#aeb6c9;--muted2:#7d849c;--txt:#eef1f8;--cardbg:rgba(255,255,255,.055);--cardbd:rgba(255,255,255,.10);--cbE:#59617a}
+.dark.cool{background:#12101c;background-image:radial-gradient(420px 320px at 18% 4%,rgba(96,74,180,.28),transparent 60%),radial-gradient(420px 340px at 88% 96%,rgba(74,30,100,.34),transparent 60%),linear-gradient(160deg,#191330,#10222f 55%,#20122e)}
+.dark.warm{background:#140f10;background-image:radial-gradient(420px 320px at 18% 4%,rgba(180,96,60,.22),transparent 60%),radial-gradient(440px 360px at 88% 96%,rgba(120,50,70,.30),transparent 60%),linear-gradient(160deg,#211318,#191016 55%,#2a1512)}
+.dark.flat{background:#141318;background-image:linear-gradient(180deg,#17161d,#101015)}
+.light{--muted:#6a6f66;--muted2:#a2a79a;--txt:#20211d;--cardbg:#fff;--cardbd:rgba(20,20,20,.07);--cbE:#c9ccc0;
+  background:#f4f1ea;background-image:radial-gradient(420px 320px at 15% 2%,rgba(255,255,255,.9),transparent 60%),linear-gradient(160deg,#f7f4ee,#eef1ee 60%,#f3ece3)}
+
+.sbar{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:2px 8px 12px;font-weight:600;color:var(--muted)}
+.head{padding:0 8px 12px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.bigcount{display:flex;align-items:baseline;gap:8px;margin-top:3px}
+.bigcount .n{font-size:48px;font-weight:800;line-height:.9;letter-spacing:-.03em;color:var(--acc)}
+.bigcount .l{font-size:14px;color:var(--muted)}
+.store{font-size:11.5px;margin-top:7px;color:var(--muted2)}.store b{color:var(--acc);font-weight:700}
+.offline{display:flex;align-items:center;gap:7px;font-size:11px;margin:0 8px 10px;padding:7px 10px;border-radius:11px;background:var(--cardbg);color:var(--muted);border:1px solid var(--cardbd)}
+.card{border-radius:16px;padding:11px 12px 6px;margin:0 4px 10px;background:var(--cardbg);border:1px solid var(--cardbd)}
+.light .card{box-shadow:0 6px 18px rgba(60,50,30,.06)}
+.aisle{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.aisle .t{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.aisle .c{font-size:11px;color:var(--muted2)}
+.ic{width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;background:var(--acc-soft-d);color:var(--acc)}
+.light .ic{background:var(--acc-soft-l)}
+.it{display:flex;align-items:center;gap:11px;min-height:46px;padding:4px 4px}
+.cb{width:25px;height:25px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;border:2px solid var(--cbE);transition:.15s}
+.cb svg{width:15px;height:15px;opacity:0}
+.it .lbl{flex:1;font-size:15px;color:var(--txt)}
+.it .qty{font-size:12px;color:var(--muted2)}
+.it .src{width:14px;height:14px;flex:none;color:var(--muted2);opacity:.7}
+.it.done .cb{background:var(--acc);border-color:var(--acc)}.it.done .cb svg{opacity:1;color:#3a1e04}
+.it.done .lbl{text-decoration:line-through;color:var(--muted2)}
+.pendtag{font-size:9.5px;padding:2px 6px;border-radius:20px;background:var(--acc-soft-d);color:var(--acc);font-weight:600}
+.light .pendtag{background:var(--acc-soft-l);color:var(--acc-strong)}
+.sep{font-size:10px;letter-spacing:.05em;text-transform:uppercase;margin:6px 4px 2px;color:var(--muted2)}
+.reg{font-size:11px;text-align:center;font-style:italic;margin-top:2px;color:var(--muted2)}
+
+/* dashboard tile screen */
+.dash{width:420px;border-radius:22px;padding:18px;overflow:hidden;border:1px solid rgba(255,255,255,.07);box-shadow:0 24px 60px rgba(0,0,0,.55)}
+.dtop{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px}
+.dclock{font-size:34px;font-weight:700;letter-spacing:-.02em;line-height:1;color:var(--txt)}
+.dday{font-size:12px;color:var(--muted);margin-top:4px}
+.dgrid{display:grid;grid-template-columns:1.4fr 1fr;gap:14px}
+.dtile{border-radius:16px;padding:14px;background:var(--cardbg);border:1px solid var(--cardbd)}
+.dtile.courses{border-color:var(--acc);box-shadow:0 0 26px var(--acc-soft-d)}
+.dtile .th{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--txt)}
+.dtile .th .di{width:26px;height:26px;border-radius:8px;background:var(--acc-soft-d);color:var(--acc);display:flex;align-items:center;justify-content:center}
+.dbig{font-size:40px;font-weight:800;color:var(--acc);line-height:1;margin:10px 0 2px;letter-spacing:-.02em}
+.dbig .l{font-size:13px;color:var(--muted);font-weight:400}
+.dpeek{font-size:12px;color:var(--muted);border-top:1px solid var(--cardbd);padding-top:8px;margin-top:8px;line-height:1.5}
+.dpeek b{color:var(--txt)}
+.dmeal{font-size:12px;color:var(--muted);line-height:1.7}
+.dmeal .m{color:var(--txt);font-weight:600}
+.dmini{font-size:12px;color:var(--muted)}
+.dmini .v{font-size:22px;font-weight:700;color:var(--txt);display:block;margin-top:2px}
+
+/* typography specimens */
+.spec{width:300px;border-radius:20px;padding:20px;background:#141320;border:1px solid rgba(255,255,255,.09)}
+.spec .fam{font-size:11px;color:#8b93a9;margin-bottom:12px;letter-spacing:.04em}
+.spec .big{font-size:52px;font-weight:800;letter-spacing:-.03em;color:var(--acc);line-height:.9}
+.spec .h{font-size:19px;font-weight:700;margin-top:14px;color:#eef1f8}
+.spec .b{font-size:14px;color:#c7cddb;margin-top:8px}
+.spec .cta{margin-top:14px;display:inline-block;font-size:13px;font-weight:700;color:#3a1e04;background:var(--acc);padding:9px 16px;border-radius:11px}
+.f-neutral{font-family:ui-sans-serif,"Inter","Helvetica Neue",system-ui,sans-serif}
+.f-round{font-family:ui-rounded,"SF Pro Rounded","Nunito",system-ui,sans-serif}
+.f-edito .big,.f-edito .h{font-family:ui-serif,"Georgia","Times New Roman",serif}
+.f-edito .b,.f-edito .fam,.f-edito .cta{font-family:ui-sans-serif,system-ui,sans-serif}
+
+/* background swatches */
+.bgsw{width:220px;border-radius:18px;padding:0;overflow:hidden;border:1px solid rgba(255,255,255,.09)}
+.bgsw .swatch{height:120px}
+.bgsw .lab{padding:11px 13px;font-size:12px;color:#c7cddb;background:#0e0d14}
+.bgsw .lab b{color:#fff}.bgsw .lab span{color:#8b93a9;display:block;font-size:11px;margin-top:2px}
+.sw-cool{background:#191330;background-image:radial-gradient(200px 160px at 18% 4%,rgba(96,74,180,.4),transparent 60%),radial-gradient(220px 180px at 88% 96%,rgba(74,30,100,.5),transparent 60%),linear-gradient(160deg,#191330,#10222f 55%,#20122e)}
+.sw-warm{background-image:radial-gradient(200px 160px at 18% 4%,rgba(180,96,60,.32),transparent 60%),radial-gradient(220px 180px at 88% 96%,rgba(120,50,70,.42),transparent 60%),linear-gradient(160deg,#211318,#191016 55%,#2a1512)}
+.sw-flat{background-image:linear-gradient(180deg,#17161d,#101015)}
+</style></head><body>
+
+<h1>NutriClaude — Abricot, verrouillé. Deux thèmes automatiques.</h1>
+<p class="lede">L'accent <b style="color:#FFA94D">#FFA94D</b> ne sert qu'aux courses. Le thème suit le système : voici le <b>pivot</b> (liste magasin) en clair et sombre, puis le <b>dashboard cuisine</b>. Restent deux détails : l'ambiance du fond sombre, et la typo.</p>
+
+<h2>Écran pivot · liste au supermarché</h2>
+<p class="sub">Clair « plein soleil » et sombre premium — le même écran, thème automatique.</p>
+<div class="row" id="rowPivot"></div>
+
+<h2>Dashboard cuisine · lisible à un mètre</h2>
+<p class="sub">Écran fixe, allumé en continu → sombre. La tuile Courses porte l'accent et le halo. Affiche aussi le repas du jour (FR-44).</p>
+<div class="row" id="rowDash"></div>
+
+<h2>Ambiance du fond sombre · lequel derrière l'abricot ?</h2>
+<p class="sub">L'abricot est chaud. Le fond peut le laisser trancher (froid), l'envelopper (chaud), ou s'effacer (sobre).</p>
+<div class="row">
+  <div class="bgsw"><div class="swatch sw-cool"></div><div class="lab"><b>Froid — indigo/teal/magenta</b><span>Ta réf. L'abricot ressort par contraste.</span></div></div>
+  <div class="bgsw"><div class="swatch sw-warm"></div><div class="lab"><b>Chaud — aubergine/espresso</b><span>Enveloppant, cuisine du soir, cohérent avec l'abricot.</span></div></div>
+  <div class="bgsw"><div class="swatch sw-flat"></div><div class="lab"><b>Sobre — presque plat</b><span>Retenu, l'accent fait tout le travail.</span></div></div>
+</div>
+
+<h2>Personnalité typographique</h2>
+<p class="sub">Trois familles pour les titres et le gros compteur. Le corps reste lisible partout.</p>
+<div class="row">
+  <div class="spec f-neutral"><div class="fam">A · Neutre tech-premium (Inter-like)</div><div class="big num">12</div><div class="h">Ta liste est prête</div><div class="b">Rangée dans l'ordre de ton magasin. Coche au fur et à mesure.</div><span class="cta">Ajouter un truc</span></div>
+  <div class="spec f-round"><div class="fam">B · Humaniste chaleureux (arrondi)</div><div class="big num">12</div><div class="h">Ta liste est prête</div><div class="b">Rangée dans l'ordre de ton magasin. Coche au fur et à mesure.</div><span class="cta">Ajouter un truc</span></div>
+  <div class="spec f-edito"><div class="fam">C · Éditorial contrasté (serif titres)</div><div class="big num">12</div><div class="h">Ta liste est prête</div><div class="b">Rangée dans l'ordre de ton magasin. Coche au fur et à mesure.</div><span class="cta">Ajouter un truc</span></div>
+</div>
+
+<script>
+const CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2"><path d="M20 6 9 17l-5-5"/></svg>';
+const MIC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
+const NOTE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3h14v18H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>';
+const WIFI='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l22 22M8.5 16.5a5 5 0 0 1 7 0M5 12.8a10 10 0 0 1 3-2M22 8.8a15 15 0 0 0-6-3.4M12 20h.01"/></svg>';
+function item(n,q,src,done,pend){return `<div class="it ${done?'done':''}"><span class="cb">${CHECK}</span><span class="lbl">${n}</span>${pend?'<span class="pendtag">arrive…</span>':''}${q?`<span class="qty num">${q}</span>`:''}<span class="src">${src}</span></div>`}
+function pivot(offline){return `
+  <div class="sbar"><span class="num">9:41</span><span>Samedi · Grand Frais</span></div>
+  <div class="head"><div class="eyebrow">Ta liste</div><div class="bigcount"><span class="n num">12</span><span class="l">à prendre</span></div><div class="store">Rangée dans l'ordre de <b>ton magasin</b></div></div>
+  ${offline?`<div class="offline">${WIFI} Hors ligne — tes coches partiront au retour du réseau</div>`:''}
+  <div class="card"><div class="aisle"><span class="t"><span class="ic">🥬</span>Fruits &amp; légumes</span><span class="c num">3/4</span></div>
+    ${item('Poivrons','×3',MIC,0,0)}${item('Tomates','',MIC,0,0)}${item('Bananes','',NOTE,0,1)}<div class="sep">Dans le panier</div>${item('Salade','',NOTE,1,0)}</div>
+  <div class="card"><div class="aisle"><span class="t"><span class="ic">🥛</span>Frais</span><span class="c num">2/3</span></div>
+    ${item('Lait','×2',MIC,0,0)}${item('Yaourts','',NOTE,0,0)}<div class="sep">Dans le panier</div>${item('Beurre','',MIC,1,0)}</div>
+  <div class="reg">Un article dicté arrive en moins d'une minute.</div>`}
+
+const rp=document.getElementById('rowPivot');
+[['Clair','light',0],['Sombre','dark cool',1]].forEach(([cap,cls,off])=>{
+  const d=document.createElement('div');d.innerHTML=`<div class="cap">${cap}</div><div class="hex">thème automatique</div><div class="phone ${cls}">${pivot(off)}</div>`;rp.appendChild(d);});
+
+const dash=document.getElementById('rowDash');
+const dd=document.createElement('div');
+dd.innerHTML=`<div class="cap">Écran cuisine · sombre</div><div class="hex">FR-24 · FR-44</div>
+<div class="dash dark cool">
+  <div class="dtop"><div><div class="dclock num">17:05</div><div class="dday">Samedi 22 juillet</div></div><div class="dmini">Ce soir<span class="v">Gratin</span></div></div>
+  <div class="dgrid">
+    <div class="dtile courses"><div class="th"><span class="di">🛒</span>Courses</div><div class="dbig num">12 <span class="l">à prendre</span></div><div class="dpeek">Derniers ajouts : <b>Poivrons</b>, <b>Lait</b>, <b>Café</b> +9<br>maj vocale il y a 2 min</div></div>
+    <div class="dtile"><div class="th">🍽️ Le menu du jour</div><div class="dmeal" style="margin-top:10px"><span class="m">Midi</span> · Salade de lentilles<br><span class="m">Soir</span> · Gratin de courgettes<br><span class="m">Pour</span> · 2 personnes</div></div>
+  </div>
+</div>`;
+dash.appendChild(dd);
+</script>
+</body></html>

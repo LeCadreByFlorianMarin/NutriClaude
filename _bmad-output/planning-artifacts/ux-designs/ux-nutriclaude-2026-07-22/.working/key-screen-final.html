@@ -1,0 +1,135 @@
+<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NutriClaude — écrans clés (spec finale)</title>
+<style>
+/* ============================================================
+   MAQUETTE FINALE — reflète les tokens DURCIS (post Reviewer Gate)
+   coche visible ≥3:1 · provenance 4 canaux + aria · gris porteurs=muted
+   dashboard lisible 1m ≥18/15px · focus visible
+   ============================================================ */
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--acc:#FFA94D;--acc-strong:#F5912B;--acc-text-light:#C2410C;--acc-ink:#3A1E04;
+  --acc-soft-d:rgba(255,169,77,.16);--acc-soft-l:rgba(245,145,43,.14)}
+body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#0a0a0f;color:#e8ebf4;padding:30px 20px 80px;line-height:1.5}
+.num{font-variant-numeric:tabular-nums}
+h1{font-size:21px;font-weight:800;letter-spacing:-.02em;text-align:center;font-family:ui-rounded,"SF Pro Rounded",Nunito,system-ui}
+.lede{text-align:center;color:#8b93a9;font-size:12.5px;max-width:680px;margin:8px auto 0}
+.badge{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;color:#7E6224;background:#FBF3E2;padding:3px 10px;border-radius:20px;margin:10px auto 0}
+h2{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#8b93a9;text-align:center;margin:48px auto 4px}
+.sub{text-align:center;color:#6a7183;font-size:12px;max-width:640px;margin:0 auto 22px}
+.row{display:flex;flex-wrap:wrap;gap:24px;justify-content:center;max-width:1180px;margin:0 auto;align-items:flex-start}
+.cap{font-size:12px;font-weight:700;text-align:center;margin-bottom:12px;color:#c7cddb}
+.tf{font-family:ui-rounded,"SF Pro Rounded",Nunito,system-ui,sans-serif}
+
+.phone{width:300px;border-radius:30px;padding:12px;overflow:hidden;border:1px solid rgba(255,255,255,.07);box-shadow:0 24px 60px rgba(0,0,0,.55)}
+.dark{--muted:#C7CCDA;--muted2:#8990A5;--txt:#EEF1F8;--cardbg:rgba(255,255,255,.055);--cardbd:rgba(255,255,255,.10);--cbE:#828AA3;--cbFill:rgba(255,255,255,.04);
+  background:#191016;background-image:radial-gradient(420px 320px at 18% 4%,rgba(180,96,60,.22),transparent 60%),radial-gradient(440px 360px at 88% 96%,rgba(120,50,70,.30),transparent 60%),linear-gradient(160deg,#211318,#191016 55%,#2a1512)}
+.light{--muted:#5C6157;--muted2:#8B9083;--txt:#20211D;--cardbg:#fff;--cardbd:rgba(20,20,20,.07);--cbE:#83887B;--cbFill:rgba(20,20,20,.03);--acc-txt:var(--acc-text-light);
+  background:#f4f1ea;background-image:radial-gradient(420px 320px at 15% 2%,rgba(255,255,255,.9),transparent 60%),linear-gradient(160deg,#f7f4ee,#eef1ee 60%,#f3ece3)}
+.dark{--acc-txt:var(--acc)}
+
+.sbar{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:2px 8px 12px;font-weight:600;color:var(--muted)}
+.head{padding:0 8px 12px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.bigcount{display:flex;align-items:baseline;gap:8px;margin-top:3px}
+.bigcount .n{font-size:48px;font-weight:800;line-height:.9;letter-spacing:-.03em;color:var(--acc-txt)}
+.bigcount .l{font-size:14px;color:var(--muted)}
+.store{font-size:12px;margin-top:7px;color:var(--muted)}.store b{color:var(--acc-txt);font-weight:700}
+.offline{display:flex;align-items:center;gap:7px;font-size:11.5px;margin:0 8px 10px;padding:8px 10px;border-radius:11px;background:var(--cardbg);color:var(--muted);border:1px solid var(--cardbd)}
+.light .offline{background:#FBF3E2;color:#7E6224;border-color:#F0E2C0}
+.card{border-radius:16px;padding:11px 12px 6px;margin:0 4px 10px;background:var(--cardbg);border:1px solid var(--cardbd)}
+.light .card{box-shadow:0 6px 18px rgba(60,50,30,.06)}
+.aisle{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.aisle .t{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.aisle .c{font-size:12px;color:var(--muted)}
+.ic{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;background:var(--acc-soft-d);color:var(--acc)}
+.light .ic{background:var(--acc-soft-l)}
+.it{display:flex;align-items:center;gap:11px;min-height:46px;padding:4px 4px;border-radius:9px}
+.it:focus-visible{outline:none;box-shadow:0 0 0 2px var(--cardbg),0 0 0 4px var(--acc-txt)}
+.cb{width:25px;height:25px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;border:2px solid var(--cbE);background:var(--cbFill);transition:.15s}
+.cb svg{width:15px;height:15px;opacity:0}
+.it .lbl{flex:1;font-size:15px;color:var(--txt)}
+.it .qty{font-size:12px;color:var(--muted)}
+.it .src{width:15px;height:15px;flex:none;color:var(--muted)}
+.it.done .cb{background:var(--acc);border-color:var(--acc)}.light .it.done .cb{background:var(--acc-strong);border-color:var(--acc-strong)}
+.it.done .cb svg{opacity:1;color:var(--acc-ink)}
+.it.done .lbl{text-decoration:line-through;color:var(--muted)}
+.it.done .qty,.it.done .src{color:var(--muted2)}
+.pendtag{font-size:9.5px;padding:2px 7px;border-radius:20px;background:var(--acc-soft-d);color:var(--acc-txt);font-weight:700}
+.light .pendtag{background:var(--acc-soft-l)}
+.sep{font-size:10px;letter-spacing:.05em;text-transform:uppercase;margin:6px 4px 2px;color:var(--muted)}
+.reg{font-size:11.5px;text-align:center;font-style:italic;margin-top:2px;color:var(--muted)}
+
+.dash{width:440px;border-radius:22px;padding:18px;overflow:hidden;border:1px solid rgba(255,255,255,.07);box-shadow:0 24px 60px rgba(0,0,0,.55)}
+.dtop{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px}
+.dclock{font-size:34px;font-weight:700;letter-spacing:-.02em;line-height:1;color:var(--txt)}
+.dday{font-size:13px;color:var(--muted);margin-top:4px}
+.dtoni .k{font-size:13px;color:var(--muted)}.dtoni .v{font-size:22px;font-weight:700;color:var(--txt)}
+.dgrid{display:grid;grid-template-columns:1.35fr 1fr;gap:14px}
+.dtile{border-radius:16px;padding:15px;background:var(--cardbg);border:1px solid var(--cardbd)}
+.dtile.courses{border-color:var(--acc);box-shadow:0 0 26px var(--acc-soft-d)}
+.dtile .th{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--txt)}
+.dtile .th .di{width:28px;height:28px;border-radius:8px;background:var(--acc-soft-d);color:var(--acc);display:flex;align-items:center;justify-content:center;font-size:15px}
+.dbig{font-size:40px;font-weight:800;color:var(--acc);line-height:1;margin:12px 0 2px;letter-spacing:-.02em}
+.dbig .l{font-size:14px;color:var(--muted);font-weight:400}
+.dpeek{font-size:18px;color:var(--muted);border-top:1px solid var(--cardbd);padding-top:10px;margin-top:10px;line-height:1.45;font-weight:500}
+.dpeek b{color:var(--txt)}
+.dstamp{font-size:15px;color:var(--muted);margin-top:8px}
+.dmeal{font-size:18px;color:var(--muted);line-height:1.6;font-weight:500;margin-top:12px}
+.dmeal .m{color:var(--txt);font-weight:700}
+.legend{max-width:1180px;margin:26px auto 0;font-size:12.5px;color:#8b93a9;display:flex;flex-wrap:wrap;gap:8px 22px;justify-content:center}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend svg{width:15px;height:15px;color:#aab3c8}
+</style></head><body>
+
+<h1 class="tf">NutriClaude — écrans clés, spec finale</h1>
+<p class="lede">Rendu des tokens <b>après durcissement accessibilité</b> : coche vide visible dans les deux thèmes, provenance à 4 canaux, gris porteurs d'info remontés en <code>muted</code>, contexte dashboard lisible à un mètre, anneau de focus.</p>
+<div style="text-align:center"><span class="badge">tous contrastes recalculés sur fonds réels · AA</span></div>
+
+<h2>Écran pivot · liste au supermarché — thème automatique</h2>
+<p class="sub">À gauche le cas « plein soleil » (clair), à droite le sombre chaud. Un article est <i>focusé</i> au clavier (anneau abricot) pour montrer le focus visible.</p>
+<div class="row" id="rowPivot"></div>
+
+<h2>Dashboard cuisine · lisible à un mètre</h2>
+<p class="sub">Contexte porteur en ≥18px (peek, menu) et ≥15px (horodatage). Tuile Courses = seul objet à porter l'accent + le halo.</p>
+<div class="row" id="rowDash"></div>
+
+<div class="legend" id="legend"></div>
+
+<script>
+const CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2"><path d="M20 6 9 17l-5-5"/></svg>';
+const MIC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
+const NOTE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3h14v18H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>';
+const PLUS='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>';
+const FORK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v7a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V3M8 12v9M17 3c-1.5 0-2 2-2 5s.5 4 2 4 2-1 2-4-.5-5-2-5zM17 12v9"/></svg>';
+const WIFI='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l22 22M8.5 16.5a5 5 0 0 1 7 0M5 12.8a10 10 0 0 1 3-2M22 8.8a15 15 0 0 0-6-3.4M12 20h.01"/></svg>';
+const SRC={mic:[MIC,'ajouté à la voix'],note:[NOTE,'dicté / partagé'],plus:[PLUS,'ajout manuel'],fork:[FORK,'issu d’une recette']};
+function item(n,q,src,done,pend,focus){const [ic,al]=SRC[src];return `<div class="it ${done?'done':''}" tabindex="0" ${focus?'style="box-shadow:0 0 0 2px var(--cardbg),0 0 0 4px var(--acc-txt)"':''} role="checkbox" aria-checked="${done?'true':'false'}" aria-label="${n}${q?', '+q:''}, ${al}, ${done?'dans le panier':'à prendre'}"><span class="cb">${CHECK}</span><span class="lbl">${n}</span>${pend?'<span class="pendtag">arrive…</span>':''}${q?`<span class="qty num">${q}</span>`:''}<span class="src" title="${al}">${ic}</span></div>`}
+function pivot(off,focusFirst){return `
+  <div class="sbar"><span class="num">9:41</span><span>Samedi · Grand Frais</span></div>
+  <div class="head"><div class="eyebrow tf">Ta liste</div><div class="bigcount"><span class="n num tf" role="status" aria-label="12 articles à prendre">12</span><span class="l">à prendre</span></div><div class="store">Rangée dans l'ordre de <b>ton magasin</b></div></div>
+  ${off?`<div class="offline">${WIFI} Hors ligne — tes coches partiront au retour du réseau</div>`:''}
+  <div class="card"><div class="aisle"><span class="t"><span class="ic">🥬</span>Fruits &amp; légumes</span><span class="c num">3/4</span></div>
+    ${item('Poivrons','×3','mic',0,0,focusFirst)}${item('Tomates','','plus',0,0,0)}${item('Bananes','','note',0,1,0)}<div class="sep">Dans le panier</div>${item('Salade','','fork',1,0,0)}</div>
+  <div class="card"><div class="aisle"><span class="t"><span class="ic">🥛</span>Frais</span><span class="c num">2/3</span></div>
+    ${item('Lait','×2','mic',0,0,0)}${item('Yaourts','','fork',0,0,0)}<div class="sep">Dans le panier</div>${item('Beurre','','plus',1,0,0)}</div>
+  <div class="reg">Un article dicté arrive en moins d'une minute.</div>`}
+
+const rp=document.getElementById('rowPivot');
+[['Clair · plein soleil','light',0,1],['Sombre · chaud','dark',1,0]].forEach(([cap,cls,off,foc])=>{
+  const d=document.createElement('div');d.innerHTML=`<div class="cap">${cap}</div><div class="phone ${cls}">${pivot(off,foc)}</div>`;rp.appendChild(d);});
+
+const dash=document.getElementById('rowDash');
+const dd=document.createElement('div');
+dd.innerHTML=`<div class="cap">Écran cuisine · sombre</div>
+<div class="dash dark">
+  <div class="dtop"><div><div class="dclock num tf">17:05</div><div class="dday">Samedi 22 juillet</div></div><div class="dtoni" style="text-align:right"><div class="k">Ce soir</div><div class="v">Gratin</div></div></div>
+  <div class="dgrid">
+    <div class="dtile courses"><div class="th"><span class="di">🛒</span>Courses</div><div class="dbig num tf">12 <span class="l">à prendre</span></div><div class="dpeek">Derniers ajouts : <b>Poivrons</b>, <b>Lait</b>, <b>Café</b> +9</div><div class="dstamp">maj vocale il y a 2 min</div></div>
+    <div class="dtile"><div class="th">🍽️ Le menu du jour</div><div class="dmeal"><span class="m">Midi</span> · Salade de lentilles<br><span class="m">Soir</span> · Gratin de courgettes<br><span class="m">Pour</span> · 2 personnes</div></div>
+  </div>
+</div>`;
+dash.appendChild(dd);
+
+document.getElementById('legend').innerHTML='<b>Provenance (4 canaux, chacun doublé d’un aria-label) :</b>'+
+  Object.values(SRC).map(([ic,al])=>`<span>${ic.replace('width="15" height="15"','')} ${al}</span>`).join('');
+</script>
+</body></html>
