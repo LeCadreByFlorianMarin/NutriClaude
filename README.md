@@ -105,5 +105,6 @@ Un sixième, de forme : **aucun jargon technique n'est rendu à l'écran.** Mots
 ## Documentation
 
 - **[`docs/configuration.md`](docs/configuration.md)** — tout ce qui se règle **hors du dépôt** : Supabase, Vercel, domaine, variables d'environnement. À lire avant de tenter une connexion.
+- **[`docs/migrations.md`](docs/migrations.md)** — la discipline de migrations. À lire **avant** de toucher à `supabase/migrations/` : un seul projet sert la production, et une migration appliquée ne se modifie jamais.
 - `_bmad-output/planning-artifacts/` — PRD, architecture, design UX, découpage en epics et stories.
 - `_bmad-output/implementation-artifacts/` — stories, revues de code, travaux différés.

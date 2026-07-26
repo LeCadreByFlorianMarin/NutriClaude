@@ -4,7 +4,7 @@ baseline_commit: ac03895dbfb2fb22f99ee1a6dc1058d1cd068d47
 
 # Story 1.3: Créer un foyer à l'inscription
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -48,36 +48,36 @@ so that je dispose d'un espace partagé où vivront la liste, les recettes, les 
   - [ ] **Ne commite pas de secret** : `supabase link` écrit `supabase/config.toml` (sans secret) et peut créer `supabase/.temp/` — déjà ignoré par git. Vérifier `git status` avant de commiter
   - [ ] ⚠️ **Aucune migration, aucune écriture en base.** `gen types` est en lecture seule. `git status --short supabase/migrations/` doit rester vide
 
-- [ ] **Task 1 — Garde d'appartenance au foyer** (AC: 2, 3)
-  - [ ] Recréer `lib/supabase/queries.ts` avec `requireProfile()` — dette explicitement différée par la revue 1.1 aux « stories 1.3+ », et c'est ici qu'elle échoit
-  - [ ] Signature attendue : fonction serveur qui lit la session, puis `profiles` pour `auth.uid()`, et retourne le profil. **Trois issues distinctes** : pas de session → `redirect("/login")` ; session mais pas de profil → `redirect("/onboarding")` ; profil → le retourner
-  - [ ] **Ne mets pas cette garde dans le proxy.** Elle exige une requête base à chaque requête HTTP, ce que le proxy — conçu avec un délai de 3 s et une bascule hors-ligne — ne peut pas absorber. C'est une garde **de page**, appelée par les Server Components qui lisent des données de foyer
-  - [ ] Consulter le prototype comme référence de forme, jamais de contenu : `git show prototype-2026-05-02:lib/supabase/queries.ts`
+- [x] **Task 1 — Garde d'appartenance au foyer** (AC: 2, 3)
+  - [x] Recréer `lib/supabase/queries.ts` avec `requireProfile()` — dette explicitement différée par la revue 1.1 aux « stories 1.3+ », et c'est ici qu'elle échoit
+  - [x] Signature attendue : fonction serveur qui lit la session, puis `profiles` pour `auth.uid()`, et retourne le profil. **Trois issues distinctes** : pas de session → `redirect("/login")` ; session mais pas de profil → `redirect("/onboarding")` ; profil → le retourner
+  - [x] **Ne mets pas cette garde dans le proxy.** Elle exige une requête base à chaque requête HTTP, ce que le proxy — conçu avec un délai de 3 s et une bascule hors-ligne — ne peut pas absorber. C'est une garde **de page**, appelée par les Server Components qui lisent des données de foyer
+  - [x] Consulter le prototype comme référence de forme, jamais de contenu : `git show prototype-2026-05-02:lib/supabase/queries.ts`
 
-- [ ] **Task 2 — Écran d'accueil qui aiguille** (AC: 2, 3)
-  - [ ] `app/page.tsx` — remplace le texte d'attente du socle. Server Component qui appelle `requireProfile()` : un utilisateur sans profil part vers `/onboarding`, un membre voit une page d'accueil minimale nommant son foyer
-  - [ ] Se contenter du minimum : le foyer et le prénom affiché. **Aucune surface métier ici** — la liste, le menu et les recettes appartiennent aux epics 2 à 4
-  - [ ] Vérifier dans la sortie de `next build` que la route est bien `ƒ` (dynamique) et non `○`. **Sans ajouter `force-dynamic`**, interdit par AD-13
+- [x] **Task 2 — Écran d'accueil qui aiguille** (AC: 2, 3)
+  - [x] `app/page.tsx` — remplace le texte d'attente du socle. Server Component qui appelle `requireProfile()` : un utilisateur sans profil part vers `/onboarding`, un membre voit une page d'accueil minimale nommant son foyer
+  - [x] Se contenter du minimum : le foyer et le prénom affiché. **Aucune surface métier ici** — la liste, le menu et les recettes appartiennent aux epics 2 à 4
+  - [x] Vérifier dans la sortie de `next build` que la route est bien `ƒ` (dynamique) et non `○`. **Sans ajouter `force-dynamic`**, interdit par AD-13
 
-- [ ] **Task 3 — Écran d'onboarding** (AC: 1)
-  - [ ] `app/onboarding/page.tsx` — Server Component. **Route protégée** : ne l'ajoute surtout pas à `PUBLIC_ROUTES`
-  - [ ] Garde d'entrée : un utilisateur qui a **déjà** un profil est renvoyé à `/` (c'est la moitié de l'AC3)
-  - [ ] `app/onboarding/CreateHouseholdForm.tsx` — Client Component, **deux champs** : le nom du foyer et le prénom affiché. La RPC les exige tous les deux (voir piège n°2). Les deux sont obligatoires et non vides après `trim()`
-  - [ ] Structurer l'écran pour que la Story 1.5 puisse y greffer « rejoindre avec un code » **sans réécriture**, mais **ne construis pas ce chemin maintenant**
-  - [ ] Cibles ≥ 44px, anneau de focus visible, aucune couleur d'alerte — mêmes contraintes qu'en 1.2, mêmes classes utilitaires ad hoc (les tokens arrivent en 1.7)
+- [x] **Task 3 — Écran d'onboarding** (AC: 1)
+  - [x] `app/onboarding/page.tsx` — Server Component. **Route protégée** : ne l'ajoute surtout pas à `PUBLIC_ROUTES`
+  - [x] Garde d'entrée : un utilisateur qui a **déjà** un profil est renvoyé à `/` (c'est la moitié de l'AC3)
+  - [x] `app/onboarding/CreateHouseholdForm.tsx` — Client Component, **deux champs** : le nom du foyer et le prénom affiché. La RPC les exige tous les deux (voir piège n°2). Les deux sont obligatoires et non vides après `trim()`
+  - [x] Structurer l'écran pour que la Story 1.5 puisse y greffer « rejoindre avec un code » **sans réécriture**, mais **ne construis pas ce chemin maintenant**
+  - [x] Cibles ≥ 44px, anneau de focus visible, aucune couleur d'alerte — mêmes contraintes qu'en 1.2, mêmes classes utilitaires ad hoc (les tokens arrivent en 1.7)
 
-- [ ] **Task 4 — Appel de la RPC** (AC: 1, 3)
-  - [ ] `supabase.rpc("create_household_with_profile", { p_household_name, p_display_name })` **depuis le navigateur** via `lib/supabase/client.ts` — client-direct (AD-13). Ce n'est ni un jeton ni une invitation : ce n'est pas de l'irréductible serveur
-  - [ ] La fonction est `security definer` : elle crée le foyer **et** le profil en une transaction. **N'écris jamais toi-même dans `households` puis `profiles`** — deux écritures séparées ne sont pas atomiques et laisseraient un foyer orphelin en cas d'échec
-  - [ ] Empêcher la double soumission (bouton désactivé pendant l'appel). Et **traiter `Profile already exists` comme un succès** : c'est la course des deux clics, l'état visé est atteint
-  - [ ] Traduire les erreurs, **jamais rendre le message brut** (NFR-8) — la RPC lève en anglais (`Not authenticated`, `Profile already exists`). Voir « Microcopy imposée »
-  - [ ] Après succès, rediriger vers `/`. Ne recharge pas la session : `current_household_id()` prend effet immédiatement (piège n°3)
+- [x] **Task 4 — Appel de la RPC** (AC: 1, 3)
+  - [x] `supabase.rpc("create_household_with_profile", { p_household_name, p_display_name })` **depuis le navigateur** via `lib/supabase/client.ts` — client-direct (AD-13). Ce n'est ni un jeton ni une invitation : ce n'est pas de l'irréductible serveur
+  - [x] La fonction est `security definer` : elle crée le foyer **et** le profil en une transaction. **N'écris jamais toi-même dans `households` puis `profiles`** — deux écritures séparées ne sont pas atomiques et laisseraient un foyer orphelin en cas d'échec
+  - [x] Empêcher la double soumission (bouton désactivé pendant l'appel). Et **traiter `Profile already exists` comme un succès** : c'est la course des deux clics, l'état visé est atteint
+  - [x] Traduire les erreurs, **jamais rendre le message brut** (NFR-8) — la RPC lève en anglais (`Not authenticated`, `Profile already exists`). Voir « Microcopy imposée »
+  - [x] Après succès, rediriger vers `/`. Ne recharge pas la session : `current_household_id()` prend effet immédiatement (piège n°3)
 
-- [ ] **Task 5 — Établir la discipline de migrations** (AC: 1)
-  - [ ] **Aucune migration à écrire dans cette story** — voir piège n°4. La RPC existe, elle est déployée, elle fait exactement ce que l'AC1 demande
-  - [ ] Ce que l'AC1 réclame réellement, c'est la **convention** que l'Architecture Spine laisse ouverte (`Deferred` → « Discipline de migration incrémentale … à établir »). L'écrire dans `docs/migrations.md` : nommage horodaté, caractère strictement additif, procédure d'application au projet déployé, et vérification qu'un fichier appliqué n'est plus jamais modifié
-  - [ ] Mentionner que le projet n'est **pas encore relié** au CLI Supabase en local (`supabase link` non joué, aucun `supabase/config.toml`) — c'est le préalable à toute migration future
-  - [ ] Référencer ce document depuis `README.md`, à côté de `docs/configuration.md`
+- [x] **Task 5 — Établir la discipline de migrations** (AC: 1)
+  - [x] **Aucune migration à écrire dans cette story** — voir piège n°4. La RPC existe, elle est déployée, elle fait exactement ce que l'AC1 demande
+  - [x] Ce que l'AC1 réclame réellement, c'est la **convention** que l'Architecture Spine laisse ouverte (`Deferred` → « Discipline de migration incrémentale … à établir »). L'écrire dans `docs/migrations.md` : nommage horodaté, caractère strictement additif, procédure d'application au projet déployé, et vérification qu'un fichier appliqué n'est plus jamais modifié
+  - [x] Mentionner que le projet n'est **pas encore relié** au CLI Supabase en local (`supabase link` non joué, aucun `supabase/config.toml`) — c'est le préalable à toute migration future
+  - [x] Référencer ce document depuis `README.md`, à côté de `docs/configuration.md`
 
 - [ ] **Task 6 — Vérifier l'isolation pour de vrai** (AC: 2)
   - [ ] Une fois le foyer créé, contrôler avec **la session du navigateur** (jamais de clé de service, AD-2) que `current_household_id()` renvoie désormais l'identifiant du foyer
@@ -86,12 +86,12 @@ so that je dispose d'un espace partagé où vivront la liste, les recettes, les 
   - [ ] Consigner les résultats dans le Dev Agent Record
 
 - [ ] **Task 7 — Vérification** (AC: 1, 2, 3)
-  - [ ] `npm run typecheck` · `npm run lint` · `npm run build` → tous en succès, sans avertissement
-  - [ ] `git status --short supabase/migrations/` vide — **aucune migration**. *(Le contrôle porte sur `migrations/`, plus sur `supabase/` : la Task 0 y ajoute légitimement `config.toml`.)*
-  - [ ] Preuve que le typage mord réellement : introduire volontairement une faute dans l'appel RPC (paramètre mal nommé) et vérifier que `npm run typecheck` **échoue**, puis rétablir. Sans cette contre-épreuve, rien ne dit que les types générés sont branchés
-  - [ ] Grep des mots bannis dans les chaînes rendues (NFR-9) et absence de `force-dynamic`
-  - [ ] Parcours manuel : nouveau compte → connexion → arrivée sur `/onboarding` → saisie des deux noms → arrivée sur `/` nommant le foyer
-  - [ ] Parcours AC3 : se déconnecter puis se reconnecter → arrivée **directe** sur `/`, aucun appel de création. Et `/onboarding` visité à la main → renvoi vers `/`
+  - [x] `npm run typecheck` · `npm run lint` · `npm run build` → tous en succès, sans avertissement
+  - [x] `git status --short supabase/migrations/` vide — **aucune migration**. *(Le contrôle porte sur `migrations/`, plus sur `supabase/` : la Task 0 y ajoute légitimement `config.toml`.)*
+  - [ ] Preuve que le typage mord réellement : introduire volontairement une faute dans l'appel RPC (paramètre mal nommé) et vérifier que `npm run typecheck` **échoue**, puis rétablir. Sans cette contre-épreuve, rien ne dit que les types générés sont branchés → *dépend de la Task 0. **Bloqué***
+  - [x] Grep des mots bannis dans les chaînes rendues (NFR-9) et absence de `force-dynamic`
+  - [ ] Parcours manuel : nouveau compte → connexion → arrivée sur `/onboarding` → saisie des deux noms → arrivée sur `/` nommant le foyer → *exige une session sur l'origine testée. **Bloqué** (quota d'emails épuisé)*
+  - [ ] Parcours AC3 : se déconnecter puis se reconnecter → arrivée **directe** sur `/`, aucun appel de création. Et `/onboarding` visité à la main → renvoi vers `/` → *idem. **Bloqué***
 
 ## Dev Notes
 
@@ -330,11 +330,90 @@ Mesures directes, pour t'éviter de rejouer un diagnostic déjà fait :
 
 ### Agent Model Used
 
+claude-opus-5 (Claude Code) — 2026-07-26
+
 ### Debug Log References
+
+| Commande | Résultat |
+|---|---|
+| `npm run typecheck` | exit 0 |
+| `npm run lint` | exit 0 |
+| `npm run build` | succès, **0 avertissement** |
+| `git status --short supabase/migrations/` | vide |
+
+**Modes de rendu** (`next build`), sans aucun `force-dynamic` :
+
+```
+┌ ƒ /                 dynamique — lit la session
+├ ○ /_not-found
+├ ƒ /auth/callback
+├ ƒ /login
+└ ƒ /onboarding       dynamique — lit la session
+```
+
+**Contrôle d'accès** (serveur local, anonyme) — la nouvelle route est bien protégée :
+
+| Requête | Résultat |
+|---|---|
+| `/onboarding` | `307 → /login?next=%2Fonboarding` |
+| `/onboarding/foo` | `307 → /login?next=%2Fonboarding%2Ffoo` |
+
+**Greps de non-régression** : aucun mot banni dans les chaînes rendues (NFR-9) ; aucun `force-dynamic` (AD-13) ; aucun `outline-none`/`outline-hidden`/`tap-highlight` (UX-DR11) ; **aucune écriture directe dans `households` ou `profiles`** — tout passe par la fonction Postgres.
+
+**Tentatives de génération des types** (Task 0), toutes deux en échec :
+
+```
+LegacyGenTypesUnexpectedStatusError
+"Your account does not have the necessary privileges to access this endpoint"
+```
+
+Diagnostic : le CLI (2.109.1) est installé et `supabase/.temp/project-ref` porte bien `ywoubvebmlhtomwgouci`, mais **aucun jeton d'accès n'existe** (`~/.supabase/` ne contient que de la télémétrie). `gen types --linked` passe par l'API de gestion, qui exige `supabase login` — une commande interactive qui ouvre un navigateur, hors de portée d'un agent.
+
+**Tentatives d'obtention d'un lien de connexion**, à 20:47 et 20:51 UTC : `429 over_email_send_rate_limit` les deux fois. Le compte ayant été créé à 19:52, la fenêtre de reconstitution est **plus longue qu'une heure** — bon à savoir pour les stories suivantes.
 
 ### Completion Notes List
 
+**Livré : les tasks 1 à 5 en entier. Bloquées : la task 0, la task 6, et trois contrôles de la task 7.** Deux verrous, tous deux hors de portée d'un agent.
+
+**Verrou n°1 — `supabase login` est interactif.** La Task 0 (types générés) exige un jeton d'accès que seule une authentification par navigateur peut produire. Conséquence en cascade : les trois clients ne sont pas typés `<Database>`, l'appel à la fonction Postgres n'est vérifié par rien, et la contre-épreuve de typage de la Task 7 est sans objet. **Le code écrit est prêt à recevoir le générique** — c'est un ajout mécanique, sans réécriture.
+
+**Verrou n°2 — le quota d'envoi d'emails.** Tester le parcours exige une session **sur l'origine testée**. La session existante vit sur le domaine de production ; ni `localhost` ni un déploiement de prévisualisation ne la partagent. Obtenir une session ailleurs suppose un nouveau lien, refusé par le quota.
+
+> Une solution a été écartée délibérément : transplanter le cookie de session du domaine de production vers `localhost`. Techniquement faisable, mais elle ferait transiter un jeton d'accès vivant par la conversation. Le bénéfice ne vaut pas le risque.
+
+**L'implémentation ne réplique aucune règle métier.** L'atomicité vit dans la fonction Postgres, appelée telle quelle. Vérifié par grep : aucun `insert` sur `households` ni `profiles` dans le code applicatif. C'est le piège que la story signalait — deux écritures séparées laisseraient un foyer orphelin si la seconde échouait.
+
+**La garde a été factorisée plutôt que dupliquée.** Une première version avait `getCurrentProfile()` et `requireProfile()` répétant la même séquence, et surtout incapables de distinguer « pas de session » de « pas de profil » — les deux rendaient `null`. Refondu autour de `getMembership()`, qui retourne `{ signedIn, profile }` : `requireProfile()` en dérive les deux redirections, et l'écran d'inscription au foyer en dérive la sienne (déjà un profil → retour à l'accueil). Trois aiguillages, une seule lecture.
+
+**`redirect()` de Next lève une exception que le framework intercepte.** Elle est documentée dans le code pour la même raison qui a mordu deux fois sur ce dépôt : un `try/catch` bien intentionné l'avalerait, et la redirection ne se produirait jamais.
+
+**Un écart de forme assumé.** La Task 3 demandait de structurer l'écran pour que la Story 1.5 puisse y greffer « rejoindre avec un code » sans réécriture. `app/onboarding/page.tsx` rend directement le formulaire de création : la 1.5 devra y introduire un choix. Mais `CreateHouseholdForm.tsx` reste intact dans l'opération — seule la page change, et c'est bien une greffe, pas une réécriture.
+
+**Écart de méthode assumé — pas de TDD.** Le workflow impose un cycle red-green-refactor ; la story l'interdit explicitement (aucun framework de test, planifiés en Story 4.15, NFR-10 proscrit tout outil supplémentaire). La story fait autorité. Vérification exécutable et manuelle, comme prescrit. **Aucune dépendance ajoutée.**
+
+**Ce qui reste à faire, dans l'ordre :**
+
+1. `npx supabase login`, puis reprendre la Task 0 — c'est le prérequis de tout le reste
+2. Un lien de connexion vers l'origine à tester, quand le quota le permettra
+3. Les tasks 6 et 7 : parcours complet, parcours de non-répétition, et **surtout** le contrôle d'isolation à deux comptes, qui est la seule preuve de NFR-5
+
 ### File List
+
+**Nouveaux**
+- `lib/supabase/queries.ts` — `getMembership()` et `requireProfile()`
+- `app/onboarding/page.tsx`
+- `app/onboarding/CreateHouseholdForm.tsx`
+- `docs/migrations.md`
+
+**Modifiés**
+- `app/page.tsx` — contenu intégralement remplacé (le texte d'attente du socle disparaît)
+- `README.md` — renvoi vers `docs/migrations.md`
+
+**Inchangés, vérifiés**
+- `lib/supabase/{client,server,proxy}.ts`, `proxy.ts` — `git diff` vide. Les clients recevront `<Database>` avec la Task 0
+- `lib/supabase/types.ts` — toujours écrit à la main, en attente de génération
+- `package.json`, `package-lock.json` — **aucune dépendance ajoutée**
+- `supabase/migrations/` — **aucune migration**
 
 ## Change Log
 
@@ -342,3 +421,4 @@ Mesures directes, pour t'éviter de rejouer un diagnostic déjà fait :
 |---|---|
 | 2026-07-26 | Story créée. Statut → `ready-for-dev` |
 | 2026-07-26 | Deux questions tranchées par Florian : le nom du foyer est demandé à l'inscription (deux champs), et `supabase gen types` entre dans le périmètre — nouvelle Task 0, clients typés `<Database>`, contrôle de non-régression sur `supabase/migrations/` resserré. État vérifié de l'environnement consigné |
+| 2026-07-26 | Implémentation : garde d'appartenance, accueil qui aiguille, écran d'inscription au foyer, appel de la fonction Postgres, discipline de migrations. Tasks 1 à 5 complètes ; task 0 bloquée (`supabase login` interactif), tasks 6 et 7 partiellement bloquées (quota d'emails). Statut maintenu `in-progress` |
