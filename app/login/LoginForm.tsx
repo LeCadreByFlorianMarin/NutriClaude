@@ -12,7 +12,12 @@ const MESSAGES: Record<string, string> = {
   "lien-expire": "Ce lien n'est plus bon. On t'en envoie un autre ?",
   "adresse-invalide": "Cette adresse n'a pas l'air valide.",
   "adresse-non-autorisee": "Cette adresse n'est pas encore autorisée pour NutriClaude.",
-  "trop-de-demandes": "Attends une minute avant d'en redemander un.",
+  /*
+   * Deux plafonds distincts remontent sous le même code : une minute entre deux
+   * demandes, et un petit nombre d'envois par heure. Impossible de savoir lequel
+   * s'applique — le message ne promet donc pas de délai qu'il ne peut pas tenir.
+   */
+  "trop-de-demandes": "On en a déjà envoyé un à l'instant. Laisse passer un moment avant d'en redemander un.",
   "envoi-impossible": "Ça n'a pas marché. Réessaie dans un instant.",
 };
 
