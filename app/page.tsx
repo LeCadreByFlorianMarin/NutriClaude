@@ -34,7 +34,7 @@ export default async function HomePage() {
             href="/foyer"
             className="inline-flex min-h-11 items-center px-2 text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
           >
-            Inviter quelqu&apos;un chez toi
+            Ton foyer
           </Link>
         </p>
       </div>
