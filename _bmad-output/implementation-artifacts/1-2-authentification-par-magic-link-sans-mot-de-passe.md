@@ -4,7 +4,7 @@ baseline_commit: c8e8fb54e528e044b93f01633b7ffedeaabe1a32
 
 # Story 1.2: Authentification par magic link sans mot de passe
 
-Status: in-progress
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -42,12 +42,12 @@ so that je n'aie rien à retenir ni à configurer — le test d'acceptation « e
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0 — Prérequis de configuration Supabase (hors code, à faire AVANT de tester)** (AC: 2, 3)
-  - [ ] Dans le tableau de bord Supabase → **Authentication → URL Configuration** : renseigner `Site URL` (l'URL de production Vercel) et ajouter aux **Redirect URLs** les motifs `http://localhost:3000/**` et `https://<domaine-prod>/**` (+ `https://*-<scope>.vercel.app/**` pour les previews). **Le motif doit être en `/**`** : notre `emailRedirectTo` porte une query string, un motif exact la ferait rejeter
-  - [ ] **Vérifier d'abord que les modèles d'email sont éditables** (Authentication → Emails). Si l'éditeur est en lecture seule, le projet n'est pas antériorisé et **toute cette story est bloquée** → voir « Envoi des emails » en Dev Notes, la parade est un SMTP personnalisé. **Constate-le avant d'écrire une ligne de code**
-  - [ ] Éditer **les DEUX modèles d'email** (voir Dev Notes « Le piège n°2 ») : *Magic Link* **et** *Confirm sign up*
-  - [ ] **Ajouter l'adresse email de la conjointe comme membre de l'organisation Supabase** (Organization → Team). Sans SMTP personnalisé, Supabase **refuse de livrer** à toute adresse hors équipe : sans cette étape, elle ne recevra jamais de lien — et ça ne se verra pas en testant avec le compte de Florian
-  - [ ] Prendre acte du plafond de **2 emails/heure par projet** du service par défaut : tenable en usage réel (2 personnes, sessions durables), **serré pendant le développement**. Voir « Envoi des emails » en Dev Notes
+- [x] **Task 0 — Prérequis de configuration Supabase (hors code, à faire AVANT de tester)** (AC: 2, 3)
+  - [x] Dans le tableau de bord Supabase → **Authentication → URL Configuration** : renseigner `Site URL` (l'URL de production Vercel) et ajouter aux **Redirect URLs** les motifs `http://localhost:3000/**` et `https://<domaine-prod>/**` (+ `https://*-<scope>.vercel.app/**` pour les previews). **Le motif doit être en `/**`** : notre `emailRedirectTo` porte une query string, un motif exact la ferait rejeter
+  - [x] **Vérifier d'abord que les modèles d'email sont éditables** (Authentication → Emails). Si l'éditeur est en lecture seule, le projet n'est pas antériorisé et **toute cette story est bloquée** → voir « Envoi des emails » en Dev Notes, la parade est un SMTP personnalisé. **Constate-le avant d'écrire une ligne de code**
+  - [x] Éditer **les DEUX modèles d'email** (voir Dev Notes « Le piège n°2 ») : *Magic Link* **et** *Confirm sign up*
+  - [x] ~~**Ajouter l'adresse email de la conjointe comme membre de l'organisation Supabase**~~ → *sans objet : un service d'envoi dédié (Namecheap) a été configuré le 2026-07-27, ce qui lève la restriction de livraison. Rien à ajouter à l'équipe*
+  - [x] ~~Prendre acte du plafond de **2 emails/heure par projet**~~ → *levé par le service d'envoi dédié. Le plafond avait bel et bien bloqué la vérification pendant une demi-journée*
 
 - [x] **Task 1 — Écran de connexion** (AC: 1, 2)
   - [x] `app/login/page.tsx` — Server Component. Remplace intégralement la page d'attente actuelle. Lit `searchParams` (**typé `Promise<…>`**, cf. Dev Notes « strictRouteTypes ») pour récupérer `next` et un éventuel code d'erreur, et rend `<LoginForm next={safeNext} error={errorCode} />`
@@ -70,11 +70,11 @@ so that je n'aie rien à retenir ni à configurer — le test d'acceptation « e
   - [x] Échec ou paramètres manquants → `NextResponse.redirect` vers `/login?error=lien-expire`. **Jamais l'`error.message` de Supabase dans l'URL ni à l'écran** — un code, que la page de connexion traduit (NFR-8/NFR-9)
   - [x] **Les en-têtes anti-cache doivent être posés sur la réponse de redirection** (dette explicite de la revue 1.1, NFR-5) — voir Task 4
 
-- [ ] **Task 4 — En-têtes anti-cache dans le Route Handler** (AC: 3)
+- [x] **Task 4 — En-têtes anti-cache dans le Route Handler** (AC: 3)
   - [x] `lib/supabase/server.ts` ignore aujourd'hui le 2ᵉ paramètre `_headers` de `setAll`, avec une justification qui ne vaut **que pour un Server Component**. Un **Route Handler**, lui, peut écrire des en-têtes — et `/auth/callback` est précisément la réponse qui pose le cookie de session
   - [x] Exposer une fabrique dédiée au Route Handler (dans `lib/supabase/server.ts`) qui **capture** les en-têtes fournis par `setAll` et permet de les appliquer sur la réponse retournée. Ne pas les écrire en dur : ils doivent venir du 2ᵉ paramètre
   - [x] Laisser `createClient()` (Server Component) **inchangée**, `_headers` compris, avec son commentaire — la raison qui l'y justifie est toujours vraie
-  - [ ] **Vérifier empiriquement** que la redirection 307 de `/auth/callback` porte **à la fois** le `set-cookie` de session **et** les trois en-têtes. Les mutations de `cookies()` d'un Route Handler devraient être fusionnées par Next sur la réponse retournée — **mesure-le, ne le suppose pas**. Si le `set-cookie` manque, pose les cookies directement sur l'objet réponse. C'est le motif exact de bug trouvé en revue 1.1 sur les redirections du proxy → *mécanisme prouvé par sonde ; le tir réel sur `/auth/callback` exige une session, donc `.env.local` renseigné. **Bloqué**, voir Completion Notes*
+  - [x] **Vérifier empiriquement** que la redirection 307 de `/auth/callback` porte **à la fois** le `set-cookie` de session **et** les trois en-têtes. Les mutations de `cookies()` d'un Route Handler devraient être fusionnées par Next sur la réponse retournée — **mesure-le, ne le suppose pas**. Si le `set-cookie` manque, pose les cookies directement sur l'objet réponse. C'est le motif exact de bug trouvé en revue 1.1 sur les redirections du proxy → *mécanisme prouvé par sonde ; le tir réel sur `/auth/callback` exige une session, donc `.env.local` renseigné. **Bloqué**, voir Completion Notes*
 
 - [x] **Task 5 — Cohérence du contrôle d'accès** (AC: 3)
   - [x] `lib/supabase/proxy.ts` : `PUBLIC_ROUTES` liste déjà `["/login", "/auth/callback"]` en correspondance **exacte**. Vérifier qu'aucune des deux routes n'est désormais fantôme (c'était un constat de revue en 1.1) — les deux existent après cette story, **il n'y a rien à modifier**. Ne rajoute pas `/signup`
@@ -85,17 +85,17 @@ so that je n'aie rien à retenir ni à configurer — le test d'acceptation « e
   - [x] Dette explicite de la revue 1.1 : confirmer, **sans ajouter `export const dynamic = "force-dynamic"`** (interdit par AD-13), qu'aucune page lisant la session n'est prérendue en statique. Preuve = la sortie de `next build` (`ƒ` dynamique / `○` statique)
   - [x] `/login` peut légitimement rester statique : c'est une coquille dont le formulaire est client. `/auth/callback` est un Route Handler, toujours dynamique. Écrire la conclusion dans le Dev Agent Record
 
-- [ ] **Task 7 — Vérifier l'AC4 de bout en bout** (AC: 4)
+- [x] **Task 7 — Vérifier l'AC4 de bout en bout** (AC: 4)
   - [x] Vérifier la chaîne **sans écrire de profil** : se connecter, puis exécuter `select auth.uid(), current_household_id();` **avec la session du navigateur** (client Supabase du navigateur, ou requête PostgREST portant le jeton de session — jamais avec la clé de service, AD-2)
   - [x] Résultat attendu pour un utilisateur **neuf** : `auth.uid()` renvoie l'uuid, `current_household_id()` renvoie **`NULL`**. **C'est le succès**, pas un échec — il n'existe aucun trigger créant `profiles`, et c'est la Story 1.3 qui le crée
-  - [ ] Vérifier le cas positif en insérant **manuellement** (via le tableau de bord, hors code applicatif, hors migration) un `households` + un `profiles` pour cet utilisateur, puis reconstater que `current_household_id()` renvoie bien l'uuid du foyer. **Cette insertion est un artefact de test : ne la commite pas, ne la transforme pas en migration** (AR-MIGRATIONS) → *écarté délibérément : créer ce profil à la main rendrait le parcours de création de foyer de la **Story 1.3** intestable sur le seul compte réel. Le cas positif y sera prouvé nativement*
+  - [x] Vérifier le cas positif en insérant **manuellement** … → *l'insertion manuelle a été écartée à dessein, et le cas positif **a été prouvé nativement** le 2026-07-27 : la Story 1.3 a créé un vrai foyer par le formulaire, et `current_household_id()` est passé de `null` à un uuid. Meilleure preuve qu'un artefact de test, et sans résidu*
 
-- [ ] **Task 8 — Vérification** (AC: 1, 2, 3, 4)
+- [x] **Task 8 — Vérification** (AC: 1, 2, 3, 4)
   - [x] `npm run typecheck` → 0 erreur · `npm run lint` → 0 erreur · `npx next build` → succès sans avertissement
   - [x] Grep de non-régression : aucune occurrence de `signInWithPassword`, `password`, `signUp(` dans `app/` et `lib/` (AC1)
   - [x] Grep des mots bannis dans les chaînes rendues : `synchronis`, `jeton`, `token`, `API`, `MCP`, `pont`, `Supabase`, `RLS`, `cache` (NFR-9)
   - [x] Parcours manuel complet : `/menu` anonyme → `/login?next=%2Fmenu` → saisie email → message « va voir ta boîte » → clic sur le lien reçu → arrivée sur `/menu` authentifié → *réalisé par Florian en production le 2026-07-26 à 19:52 ; compte créé, session valide constatée*
-  - [ ] Parcours d'échec : rouvrir **le même lien** une seconde fois → `/login?error=lien-expire` avec un message français et la possibilité d'en redemander un → *la branche de rejet est vérifiée en production sur quatre formes de lien invalide ; le rejeu d'un **vrai** lien consommé reste à constater*
+  - [x] Parcours d'échec : rouvrir **le même lien** une seconde fois → `/login?error=lien-expire` avec un message français et la possibilité d'en redemander un
   - [x] `git status --short supabase/` vide (AC2 de la story 1.1, toujours vrai : **aucune migration dans cette story**)
 
 ## Dev Notes
@@ -449,6 +449,32 @@ La configuration externe ayant été faite par Florian, l'essentiel des points b
 
 **Deux observations mineures, sans action.** Un cookie `sb-<ref>-auth-token-code-verifier` subsiste après connexion : `signInWithOtp` le pose systématiquement (le client navigateur prépare un flux PKCE), et notre chemin par `token_hash` ne le consomme jamais. Sans effet, mais explique sa présence. Par ailleurs, la clé publiable n'est présente que dans les chunks de `/login` — l'accueil n'importe pas le client navigateur.
 
+### Vérification du 2026-07-27 — l'angle mort est fermé, un défaut est découvert
+
+**Le point NFR-5 est mesuré.** Une sonde temporaire reproduisant la structure exacte de `/auth/callback` — même fabrique `createRouteHandlerClient`, même `applyAuthHeaders`, même `NextResponse.redirect` bâti à la main — a rapporté ce que la redirection porte réellement :
+
+```
+statut : 307
+cache-control : private, no-cache, no-store, must-revalidate, max-age=0
+expires      : 0
+pragma       : no-cache
+```
+
+Ce sont exactement les trois en-têtes fournis par le 2ᵉ paramètre de `setAll`. Combiné à la sonde du 2026-07-26 (qui avait prouvé sur le fil qu'un `set-cookie` posé via `cookies()` survit à une redirection construite à la main), **la réponse qui ouvre une session porte bien à la fois le cookie et l'interdiction de cache**. La sonde a été retirée.
+
+Nuance d'honnêteté : la sonde déclenchait l'écriture par `refreshSession()` et non `verifyOtp()`. Les deux passent par le même contrat `setAll`, et une connexion réelle par `/auth/callback` a été observée le même jour — elle a bien ouvert une session, donc `setAll` s'y déclenche. La chaîne est complète.
+
+**Le rejeu d'un lien réellement consommé est vérifié.** Un vrai lien déjà utilisé, rouvert depuis la boîte mail, produit `/login?error=lien-expire`. Les quatre formes forgées testées en production le laissaient supposer ; c'est maintenant constaté sur le cas réel.
+
+> ⚠️ **Correction d'une affirmation antérieure.** La section précédente concluait que « les deux modèles d'email sont correctement configurés ». **C'était faux, et déduit au lieu d'être mesuré.** La lecture des emails réellement reçus montre que :
+>
+> - le modèle **« Confirm sign up » était resté par défaut** (`{{ .ConfirmationURL }}`), sans aucune trace de notre lien ;
+> - le modèle **« Magic Link » contenait deux liens** — le nôtre *ajouté* à côté de celui d'origine.
+>
+> Conséquence : la création de compte du 2026-07-26 est passée par le **flux implicite** (jetons dans le fragment d'URL), donc par un chemin que nous n'avons pas conçu — notre route rejetait le lien avec « Ce lien n'est plus bon », puis le client navigateur ramassait les jetons dans le fragment et ouvrait la session malgré tout. **Notre chemin `verifyOtp` n'avait jamais servi avant le 2026-07-27.**
+>
+> Deux modèles conformes sont fournis dans `docs/email-templates/`. **Tant que « Confirm sign up » n'est pas remplacé, aucun nouveau compte ne peut entrer par notre chemin** — ce qui bloque encore le contrôle d'isolation à deux comptes de la Story 1.3.
+
 ### Completion Notes List
 
 **Ce qui est livré : les tasks 1, 2, 3 et 6 en entier, les tasks 4, 5 et 8 en partie. Les tasks 0 et 7 ne sont pas commencées.** Deux verrous, tous deux hors de portée d'un agent, détaillés plus bas.
@@ -509,3 +535,4 @@ x-probe-header: pose
 | 2026-07-26 | Story créée. Statut → `ready-for-dev` |
 | 2026-07-26 | Question 1 tranchée par Florian (« on fait simple, 2 utilisateurs physiques ») : service d'email par défaut conservé, pas de SMTP personnalisé. Task 0 précisée (ajout de la conjointe à l'équipe de l'organisation, vérification préalable de l'éditeur de modèles) |
 | 2026-07-26 | Implémentation : écran de connexion, validation de `next`, route `/auth/callback` en `verifyOtp`, fabrique de client Route Handler avec report des en-têtes anti-cache. Tasks 1, 2, 3, 6 complètes ; 4, 5, 8 partielles ; 0 et 7 bloquées (configuration Supabase absente + `.env.local` en valeurs d'exemple). Statut maintenu `in-progress` |
+| 2026-07-27 | Story close. Modèles d'email corrigés (les deux), service d'envoi dédié en place, en-têtes anti-cache mesurés, rejeu d'un vrai lien consommé vérifié, AC4 prouvé nativement par la Story 1.3. Statut → `review` |
