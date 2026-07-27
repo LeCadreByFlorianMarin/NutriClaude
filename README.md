@@ -51,7 +51,7 @@ Se connecter en local suppose en outre que la configuration externe soit faite �
 
 | Commande | Rôle |
 |---|---|
-| `npm run dev` | serveur de développement |
+| `npm run dev` | serveur de développement, sur **http://localhost:3333** |
 | `npm run build` | build de production |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |

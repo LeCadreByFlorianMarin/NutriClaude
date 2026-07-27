@@ -33,7 +33,7 @@ Symptôme d'une variable absente ou fausse : **500 sur toutes les routes**, écr
 |---|---|
 | **Site URL** | `https://nutri.florianmarin.me` |
 | **Redirect URLs** | `https://nutri.florianmarin.me/**` |
-| | `http://localhost:3000/**` |
+| | `http://localhost:3333/**` |
 | | `https://*.vercel.app/**` *(facultatif — uniquement pour se connecter depuis une prévisualisation)* |
 
 **Le `/**` est obligatoire.** L'URL de retour que l'application transmet porte une query string (`/auth/callback?next=…`) ; un motif exact la ferait rejeter par Supabase.
@@ -121,9 +121,9 @@ C'est la raison d'être de `createRouteHandlerClient()` dans `lib/supabase/serve
 Dans l'ordre. Chaque étape suppose la précédente.
 
 1. **L'éditeur de modèles d'email est-il modifiable ?** Si non, s'arrêter (§3).
-2. `.env.local` renseigné → `npm run dev`, puis `curl -sI localhost:3000/login` doit rendre **200**, pas 500.
+2. `.env.local` renseigné → `npm run dev` (il écoute sur le **port 3333**), puis `curl -sI localhost:3333/login` doit rendre **200**, pas 500.
 3. Une route protégée renvoie vers la connexion en gardant sa destination :
-   `curl -si localhost:3000/menu` → `307` vers `/login?next=%2Fmenu`.
+   `curl -si localhost:3333/menu` → `307` vers `/login?next=%2Fmenu`.
 4. Saisir son adresse sur `/login` → l'écran annonce que le lien est parti.
 5. **L'email arrive**, et son lien pointe vers `…/auth/callback?next=…&token_hash=…&type=…`.
 6. Cliquer → arrivée sur la destination d'origine, connecté.
