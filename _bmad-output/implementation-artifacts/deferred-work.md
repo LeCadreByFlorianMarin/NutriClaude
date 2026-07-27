@@ -64,3 +64,19 @@
 - **Aucune annulation d'invitation** (décision de Florian, 2026-07-27). `invites_delete_own` reste inutilisé. Conséquence : générer un nouveau code **n'invalide pas l'ancien**, et plusieurs codes peuvent rester valables sept jours en parallèle.
 - **Rien ne purge les invitations expirées.** Sans conséquence à cette échelle.
 - Le commentaire du schéma décrit le code comme « 8-char base32 » : **c'est faux**, il est hexadécimal. Le commentaire vit dans une migration appliquée, donc non modifiable.
+
+## Deferred from: story 1.5 (2026-07-27)
+
+**Course non traitée dans `redeem_household_invite` — l'AC3 n'est vraie qu'en séquentiel :**
+
+- La fonction lit `uses_remaining` **sans verrou** (`for update` absent), contrôle `<= 0`, insère le profil, puis décrémente. Deux personnes rachetant le **dernier** usage au même instant lisent toutes deux `1`, passent toutes deux le contrôle, et décrémentent : le compteur tombe à **-1**, ce que l'AC3 interdit. Vérifié en séquentiel (5 → 4) ; la concurrence reste ouverte. Corriger exige un `for update` dans la fonction, donc une **migration sur une base gelée**. Sans portée à l'échelle d'un foyer de deux personnes ; à traiter le jour où le produit sortirait de la famille.
+
+**Résidu de test à retirer de la base :**
+
+- Compte `flomarin88+nc3@gmail.com`, profil « Temoin3 ». ⚠️ **Différent des précédents** : il n'a pas son propre foyer, il est **membre du foyer « Marin »**. Le supprimer depuis *Authentication → Users* emporte son profil par cascade sans toucher au foyer. Le compteur de l'invitation `388B626A` restera à 4 — sans conséquence.
+
+**Choix assumés, à ne pas prendre pour des oublis :**
+
+- **« Code inconnu » et « code plus valable » donnent deux messages distincts** (question laissée sans réponse, implémentée selon la recommandation). Les deux appellent des gestes différents — re-saisir, ou redemander un code. Révèle marginalement qu'un code existe ; facile à fusionner si l'arbitrage change.
+- **Deux branches d'erreur ne sont pas vérifiées** : « code expiré » demanderait d'attendre sept jours, « code épuisé » cinq comptes. Écartées explicitement plutôt que simulées.
+- **« Créer » reste le chemin par défaut** à l'entrée du foyer, « J'ai un code » le second. L'inverse ferait buter tout nouvel arrivant sur un champ qu'il ne peut pas remplir.
