@@ -4,7 +4,7 @@ baseline_commit: c8e8fb54e528e044b93f01633b7ffedeaabe1a32
 
 # Story 1.2: Authentification par magic link sans mot de passe
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -536,3 +536,4 @@ x-probe-header: pose
 | 2026-07-26 | Question 1 tranchée par Florian (« on fait simple, 2 utilisateurs physiques ») : service d'email par défaut conservé, pas de SMTP personnalisé. Task 0 précisée (ajout de la conjointe à l'équipe de l'organisation, vérification préalable de l'éditeur de modèles) |
 | 2026-07-26 | Implémentation : écran de connexion, validation de `next`, route `/auth/callback` en `verifyOtp`, fabrique de client Route Handler avec report des en-têtes anti-cache. Tasks 1, 2, 3, 6 complètes ; 4, 5, 8 partielles ; 0 et 7 bloquées (configuration Supabase absente + `.env.local` en valeurs d'exemple). Statut maintenu `in-progress` |
 | 2026-07-27 | Story close. Modèles d'email corrigés (les deux), service d'envoi dédié en place, en-têtes anti-cache mesurés, rejeu d'un vrai lien consommé vérifié, AC4 prouvé nativement par la Story 1.3. Statut → `review` |
+| 2026-07-27 | PR #5 approuvée par Florian et fusionnée. Statut → `done`. **Aucune revue de code adversariale n'a été menée** sur cette story, contrairement à la 1.1 — écart assumé, traçable ici |
