@@ -4,7 +4,7 @@ baseline_commit: ac03895dbfb2fb22f99ee1a6dc1058d1cd068d47
 
 # Story 1.3: Créer un foyer à l'inscription
 
-Status: in-progress
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -79,10 +79,10 @@ so that je dispose d'un espace partagé où vivront la liste, les recettes, les 
   - [x] Mentionner que le projet n'est **pas encore relié** au CLI Supabase en local (`supabase link` non joué, aucun `supabase/config.toml`) — c'est le préalable à toute migration future
   - [x] Référencer ce document depuis `README.md`, à côté de `docs/configuration.md`
 
-- [ ] **Task 6 — Vérifier l'isolation pour de vrai** (AC: 2)
+- [x] **Task 6 — Vérifier l'isolation pour de vrai** (AC: 2)
   - [x] Une fois le foyer créé, contrôler avec **la session du navigateur** (jamais de clé de service, AD-2) que `current_household_id()` renvoie désormais l'identifiant du foyer
   - [x] Vérifier que `select * from aisles` rend **11 lignes** — celles que la RPC a amorcées (piège n°1). C'est la preuve exécutable que l'isolation fonctionne : ces lignes ne sont visibles que parce que la politique RLS résout le foyer
-  - [ ] **Le contrôle qui compte vraiment (NFR-5)** : créer un **second** compte, lui faire créer un **second** foyer, et vérifier depuis la session du premier qu'aucune ligne du second n'est lisible — ni `households`, ni `profiles`, ni `aisles`. Deux comptes sont possibles : le foyer en compte deux
+  - [x] **Le contrôle qui compte vraiment (NFR-5)** : créer un **second** compte, lui faire créer un **second** foyer, et vérifier depuis la session du premier qu'aucune ligne du second n'est lisible — ni `households`, ni `profiles`, ni `aisles`. Deux comptes sont possibles : le foyer en compte deux
   - [x] Consigner les résultats dans le Dev Agent Record
 
 - [x] **Task 7 — Vérification** (AC: 1, 2, 3)
@@ -408,7 +408,16 @@ Le service d'envoi d'emails dédié étant en place, tout le parcours a pu être
 
 **Les 11 rayons confirment le piège n°1** : la note de l'acceptation renvoyait leur amorçage à l'Epic 2, alors que la fonction déployée le fait déjà. Rien n'a été ajouté côté client. C'est aussi la preuve exécutable la plus simple de l'isolation : ces lignes ne sont visibles que parce que la politique RLS résout désormais un foyer.
 
-**Ce qui reste : le contrôle à deux comptes.** Il exige un second compte, donc une première connexion — or le modèle d'email « Confirm sign up » est resté celui par défaut et ne porte pas notre lien. Deux modèles conformes sont livrés dans `docs/email-templates/` ; tant qu'ils ne sont pas collés, aucun nouveau compte ne peut entrer. **C'est la dernière chose qui manque à cette story.**
+**Le contrôle d'isolation à deux comptes — fait, et concluant.** Les modèles collés, un second compte (`flomarin88+nc1@…`) est entré **par notre chemin** et s'est créé son propre foyer. La base contenait alors 2 foyers, 2 profils, 22 rayons. Ce que chaque session voit :
+
+| Depuis la session… | `households` | `profiles` | `aisles` | Lecture ciblée du foyer voisin |
+|---|---|---|---|---|
+| **Florian** | `["Marin"]` | `["Florian"]` | 11 | `name=eq.Foyer temoin` → **0 ligne** ; `display_name=eq.Temoin` → **0 ligne** |
+| **Témoin** | `["Foyer temoin"]` | `["Temoin"]` | 11 | `name=eq.Marin` → **0 ligne** |
+
+Aucune session ne voit 2 foyers ni 22 rayons, et **demander nommément la ligne du voisin ne la fait pas apparaître** — ce n'est donc pas un filtrage d'affichage mais bien un refus au niveau de la donnée. NFR-5 est démontré, plus supposé.
+
+> **Résidu de test à supprimer.** Ce contrôle laisse en base un compte `flomarin88+nc1@gmail.com`, son foyer « Foyer temoin » et ses 11 rayons. Aucune politique RLS n'autorise la suppression de `households` ni de `profiles` : le ménage se fait depuis le tableau de bord Supabase (*Authentication → Users*, supprimer l'utilisateur ; la cascade emporte le profil, puis supprimer le foyer orphelin). Sans conséquence tant que ça reste, mais autant ne pas garder un foyer fantôme.
 
 **Un piège d'outillage découvert.** Après suppression d'une route temporaire, `npm run typecheck` sort en **2** alors que le fichier n'existe plus : le validateur généré sous `.next/dev/types/` le référence encore. `rm -rf .next tsconfig.tsbuildinfo` puis revérification à froid — tout repasse à 0. À connaître avant de croire à une régression.
 
@@ -469,3 +478,4 @@ Le service d'envoi d'emails dédié étant en place, tout le parcours a pu être
 | 2026-07-26 | Implémentation : garde d'appartenance, accueil qui aiguille, écran d'inscription au foyer, appel de la fonction Postgres, discipline de migrations. Tasks 1 à 5 complètes ; task 0 bloquée (`supabase login` interactif), tasks 6 et 7 partiellement bloquées (quota d'emails). Statut maintenu `in-progress` |
 | 2026-07-27 | Task 0 débloquée par le `supabase login` de Florian : types générés (724 lignes, 7 fonctions), générique `<Database>` câblé sur les trois clients, `Profile` dérivé du schéma, conversions `as` retirées. Contre-épreuve du typage passée sur trois fautes injectées. Reste la vérification de bout en bout |
 | 2026-07-27 | Parcours vérifié de bout en bout en conditions réelles : foyer « Marin » créé via le formulaire, `current_household_id()` résout, 11 rayons amorcés, AC3 constaté. Modèles d'email conformes livrés dans `docs/email-templates/`. Reste le contrôle d'isolation à deux comptes, bloqué tant que le modèle d'inscription n'est pas remplacé |
+| 2026-07-27 | Contrôle d'isolation à deux comptes réalisé et concluant dans les deux sens. Toutes les tâches sont faites. Statut → `review` |

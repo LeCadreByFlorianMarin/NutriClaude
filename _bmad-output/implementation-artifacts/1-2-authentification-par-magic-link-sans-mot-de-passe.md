@@ -4,7 +4,7 @@ baseline_commit: c8e8fb54e528e044b93f01633b7ffedeaabe1a32
 
 # Story 1.2: Authentification par magic link sans mot de passe
 
-Status: in-progress
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -42,12 +42,12 @@ so that je n'aie rien à retenir ni à configurer — le test d'acceptation « e
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0 — Prérequis de configuration Supabase (hors code, à faire AVANT de tester)** (AC: 2, 3)
-  - [ ] Dans le tableau de bord Supabase → **Authentication → URL Configuration** : renseigner `Site URL` (l'URL de production Vercel) et ajouter aux **Redirect URLs** les motifs `http://localhost:3000/**` et `https://<domaine-prod>/**` (+ `https://*-<scope>.vercel.app/**` pour les previews). **Le motif doit être en `/**`** : notre `emailRedirectTo` porte une query string, un motif exact la ferait rejeter
-  - [ ] **Vérifier d'abord que les modèles d'email sont éditables** (Authentication → Emails). Si l'éditeur est en lecture seule, le projet n'est pas antériorisé et **toute cette story est bloquée** → voir « Envoi des emails » en Dev Notes, la parade est un SMTP personnalisé. **Constate-le avant d'écrire une ligne de code**
-  - [ ] Éditer **les DEUX modèles d'email** (voir Dev Notes « Le piège n°2 ») : *Magic Link* **et** *Confirm sign up*
-  - [ ] **Ajouter l'adresse email de la conjointe comme membre de l'organisation Supabase** (Organization → Team). Sans SMTP personnalisé, Supabase **refuse de livrer** à toute adresse hors équipe : sans cette étape, elle ne recevra jamais de lien — et ça ne se verra pas en testant avec le compte de Florian
-  - [ ] Prendre acte du plafond de **2 emails/heure par projet** du service par défaut : tenable en usage réel (2 personnes, sessions durables), **serré pendant le développement**. Voir « Envoi des emails » en Dev Notes
+- [x] **Task 0 — Prérequis de configuration Supabase (hors code, à faire AVANT de tester)** (AC: 2, 3)
+  - [x] Dans le tableau de bord Supabase → **Authentication → URL Configuration** : renseigner `Site URL` (l'URL de production Vercel) et ajouter aux **Redirect URLs** les motifs `http://localhost:3000/**` et `https://<domaine-prod>/**` (+ `https://*-<scope>.vercel.app/**` pour les previews). **Le motif doit être en `/**`** : notre `emailRedirectTo` porte une query string, un motif exact la ferait rejeter
+  - [x] **Vérifier d'abord que les modèles d'email sont éditables** (Authentication → Emails). Si l'éditeur est en lecture seule, le projet n'est pas antériorisé et **toute cette story est bloquée** → voir « Envoi des emails » en Dev Notes, la parade est un SMTP personnalisé. **Constate-le avant d'écrire une ligne de code**
+  - [x] Éditer **les DEUX modèles d'email** (voir Dev Notes « Le piège n°2 ») : *Magic Link* **et** *Confirm sign up*
+  - [x] ~~**Ajouter l'adresse email de la conjointe comme membre de l'organisation Supabase**~~ → *sans objet : un service d'envoi dédié (Namecheap) a été configuré le 2026-07-27, ce qui lève la restriction de livraison. Rien à ajouter à l'équipe*
+  - [x] ~~Prendre acte du plafond de **2 emails/heure par projet**~~ → *levé par le service d'envoi dédié. Le plafond avait bel et bien bloqué la vérification pendant une demi-journée*
 
 - [x] **Task 1 — Écran de connexion** (AC: 1, 2)
   - [x] `app/login/page.tsx` — Server Component. Remplace intégralement la page d'attente actuelle. Lit `searchParams` (**typé `Promise<…>`**, cf. Dev Notes « strictRouteTypes ») pour récupérer `next` et un éventuel code d'erreur, et rend `<LoginForm next={safeNext} error={errorCode} />`
@@ -85,12 +85,12 @@ so that je n'aie rien à retenir ni à configurer — le test d'acceptation « e
   - [x] Dette explicite de la revue 1.1 : confirmer, **sans ajouter `export const dynamic = "force-dynamic"`** (interdit par AD-13), qu'aucune page lisant la session n'est prérendue en statique. Preuve = la sortie de `next build` (`ƒ` dynamique / `○` statique)
   - [x] `/login` peut légitimement rester statique : c'est une coquille dont le formulaire est client. `/auth/callback` est un Route Handler, toujours dynamique. Écrire la conclusion dans le Dev Agent Record
 
-- [ ] **Task 7 — Vérifier l'AC4 de bout en bout** (AC: 4)
+- [x] **Task 7 — Vérifier l'AC4 de bout en bout** (AC: 4)
   - [x] Vérifier la chaîne **sans écrire de profil** : se connecter, puis exécuter `select auth.uid(), current_household_id();` **avec la session du navigateur** (client Supabase du navigateur, ou requête PostgREST portant le jeton de session — jamais avec la clé de service, AD-2)
   - [x] Résultat attendu pour un utilisateur **neuf** : `auth.uid()` renvoie l'uuid, `current_household_id()` renvoie **`NULL`**. **C'est le succès**, pas un échec — il n'existe aucun trigger créant `profiles`, et c'est la Story 1.3 qui le crée
-  - [ ] Vérifier le cas positif en insérant **manuellement** (via le tableau de bord, hors code applicatif, hors migration) un `households` + un `profiles` pour cet utilisateur, puis reconstater que `current_household_id()` renvoie bien l'uuid du foyer. **Cette insertion est un artefact de test : ne la commite pas, ne la transforme pas en migration** (AR-MIGRATIONS) → *écarté délibérément : créer ce profil à la main rendrait le parcours de création de foyer de la **Story 1.3** intestable sur le seul compte réel. Le cas positif y sera prouvé nativement*
+  - [x] Vérifier le cas positif en insérant **manuellement** … → *l'insertion manuelle a été écartée à dessein, et le cas positif **a été prouvé nativement** le 2026-07-27 : la Story 1.3 a créé un vrai foyer par le formulaire, et `current_household_id()` est passé de `null` à un uuid. Meilleure preuve qu'un artefact de test, et sans résidu*
 
-- [ ] **Task 8 — Vérification** (AC: 1, 2, 3, 4)
+- [x] **Task 8 — Vérification** (AC: 1, 2, 3, 4)
   - [x] `npm run typecheck` → 0 erreur · `npm run lint` → 0 erreur · `npx next build` → succès sans avertissement
   - [x] Grep de non-régression : aucune occurrence de `signInWithPassword`, `password`, `signUp(` dans `app/` et `lib/` (AC1)
   - [x] Grep des mots bannis dans les chaînes rendues : `synchronis`, `jeton`, `token`, `API`, `MCP`, `pont`, `Supabase`, `RLS`, `cache` (NFR-9)
@@ -535,3 +535,4 @@ x-probe-header: pose
 | 2026-07-26 | Story créée. Statut → `ready-for-dev` |
 | 2026-07-26 | Question 1 tranchée par Florian (« on fait simple, 2 utilisateurs physiques ») : service d'email par défaut conservé, pas de SMTP personnalisé. Task 0 précisée (ajout de la conjointe à l'équipe de l'organisation, vérification préalable de l'éditeur de modèles) |
 | 2026-07-26 | Implémentation : écran de connexion, validation de `next`, route `/auth/callback` en `verifyOtp`, fabrique de client Route Handler avec report des en-têtes anti-cache. Tasks 1, 2, 3, 6 complètes ; 4, 5, 8 partielles ; 0 et 7 bloquées (configuration Supabase absente + `.env.local` en valeurs d'exemple). Statut maintenu `in-progress` |
+| 2026-07-27 | Story close. Modèles d'email corrigés (les deux), service d'envoi dédié en place, en-têtes anti-cache mesurés, rejeu d'un vrai lien consommé vérifié, AC4 prouvé nativement par la Story 1.3. Statut → `review` |
