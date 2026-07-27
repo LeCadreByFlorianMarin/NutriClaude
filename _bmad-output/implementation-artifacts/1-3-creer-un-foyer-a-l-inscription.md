@@ -4,7 +4,7 @@ baseline_commit: ac03895dbfb2fb22f99ee1a6dc1058d1cd068d47
 
 # Story 1.3: Créer un foyer à l'inscription
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -479,3 +479,4 @@ Aucune session ne voit 2 foyers ni 22 rayons, et **demander nommément la ligne 
 | 2026-07-27 | Task 0 débloquée par le `supabase login` de Florian : types générés (724 lignes, 7 fonctions), générique `<Database>` câblé sur les trois clients, `Profile` dérivé du schéma, conversions `as` retirées. Contre-épreuve du typage passée sur trois fautes injectées. Reste la vérification de bout en bout |
 | 2026-07-27 | Parcours vérifié de bout en bout en conditions réelles : foyer « Marin » créé via le formulaire, `current_household_id()` résout, 11 rayons amorcés, AC3 constaté. Modèles d'email conformes livrés dans `docs/email-templates/`. Reste le contrôle d'isolation à deux comptes, bloqué tant que le modèle d'inscription n'est pas remplacé |
 | 2026-07-27 | Contrôle d'isolation à deux comptes réalisé et concluant dans les deux sens. Toutes les tâches sont faites. Statut → `review` |
+| 2026-07-27 | PR #5 approuvée par Florian et fusionnée. Statut → `done`. **Aucune revue de code adversariale n'a été menée** sur cette story, contrairement à la 1.1 — écart assumé, traçable ici |
