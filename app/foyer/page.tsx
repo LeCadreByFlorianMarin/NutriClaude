@@ -48,11 +48,11 @@ export default async function FoyerPage() {
               {membres.map((membre) => (
                 <li
                   key={membre.id}
-                  className="flex min-h-11 items-center justify-between border-b border-current/15 text-base last:border-0"
+                  className="flex min-h-11 items-center justify-between border-b border-card-border text-base last:border-0"
                 >
                   <span>{membre.prenom}</span>
                   {membre.id === profile.id && (
-                    <span className="text-sm opacity-70">Toi</span>
+                    <span className="hint">Toi</span>
                   )}
                 </li>
               ))}
@@ -82,7 +82,7 @@ export default async function FoyerPage() {
         */}
         <section className="mt-12">
           <h2 className="text-lg font-semibold">Les appareils</h2>
-          <p className="mt-2 text-base opacity-70">
+          <p className="mt-2 text-base text-muted">
             L&apos;écran de la cuisine et les téléphones se rattacheront ici.
             Bientôt.
           </p>

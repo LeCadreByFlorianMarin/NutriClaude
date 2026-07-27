@@ -96,7 +96,7 @@ export function LoginForm({ next, error }: { next: string; error?: string }) {
         <button
           type="button"
           onClick={() => setStatus("idle")}
-          className="mt-6 min-h-11 rounded-lg border border-current/30 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+          className="btn mt-6"
         >
           Utiliser une autre adresse
         </button>
@@ -111,13 +111,13 @@ export function LoginForm({ next, error }: { next: string; error?: string }) {
         Pas de mot de passe ici. On t&apos;envoie un lien, tu cliques, tu es connecté.
       </p>
 
-      {/* Le message ne se distingue que par le texte : aucune couleur d'alerte
-          n'existe encore, et le rouge d'erreur est banni du produit (UX-DR1). */}
-      <p role="status" aria-live="polite" className="mt-4 min-h-6 text-base font-medium">
+      {/* Le message ne se distingue que par son texte et sa graisse : le rouge
+          d'erreur est banni du produit, la palette n'en contient aucun (UX-DR1). */}
+      <p role="status" aria-live="polite" className="notice mt-4">
         {message}
       </p>
 
-      <label htmlFor="email" className="block text-sm font-medium">
+      <label htmlFor="email" className="label">
         Ton adresse email
       </label>
       <input
@@ -130,13 +130,13 @@ export function LoginForm({ next, error }: { next: string; error?: string }) {
         autoFocus
         value={email}
         onChange={(event) => setEmail(event.target.value)}
-        className="mt-2 min-h-11 w-full rounded-lg border border-current/30 bg-transparent px-3 py-2 text-base focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+        className="input mt-2"
       />
 
       <button
         type="submit"
         disabled={status === "sending"}
-        className="mt-4 min-h-11 w-full rounded-lg border border-current/30 px-4 py-2 font-medium disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+        className="btn mt-4 w-full"
       >
         {status === "sending" ? "Un instant…" : "Envoie-moi un lien"}
       </button>

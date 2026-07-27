@@ -18,7 +18,7 @@ export function OnboardingChoice() {
   const [mode, setMode] = useState<"creer" | "rejoindre">("creer");
 
   const bascule =
-    "mt-6 min-h-11 w-full rounded-lg px-4 py-2 text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current";
+    "btn-quiet mt-6 w-full";
 
   if (mode === "rejoindre") {
     return (

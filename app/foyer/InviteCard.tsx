@@ -59,14 +59,14 @@ export function InviteCard({
     return (
       <div>
         <p className="text-base">Personne n&apos;est encore invité.</p>
-        <p role="status" aria-live="polite" className="mt-3 min-h-6 text-base font-medium">
+        <p role="status" aria-live="polite" className="notice mt-3">
           {message}
         </p>
         <button
           type="button"
           onClick={inviter}
           disabled={enCours}
-          className="mt-2 min-h-11 w-full rounded-lg border border-current/30 px-4 py-2 font-medium disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+          className="btn mt-2 w-full"
         >
           {enCours ? "Un instant…" : "Inviter quelqu'un"}
         </button>
@@ -77,9 +77,10 @@ export function InviteCard({
   return (
     <div>
       {/* Le code sera lu à voix haute ou recopié : taille et espacement font
-          tout le travail, aucune couleur n'est disponible avant la Story 1.7. */}
+          tout le travail. L'abricot serait disponible, mais il est réservé à
+          l'action courses (UX-DR2) — un code d'invitation n'en est pas une. */}
       <p
-        className="rounded-lg border border-current/30 px-4 py-6 text-center text-3xl font-semibold tabular-nums tracking-[0.25em] select-all"
+        className="card px-4 py-6 text-center text-3xl font-semibold tabular-nums tracking-[0.25em] select-all"
         aria-label={`Code d'invitation : ${code.split("").join(" ")}`}
       >
         {code}
@@ -89,14 +90,14 @@ export function InviteCard({
         {validite(joursRestants)} {usages(usagesRestants)}
       </p>
 
-      <p role="status" aria-live="polite" className="mt-3 min-h-6 text-base font-medium">
+      <p role="status" aria-live="polite" className="notice mt-3">
         {message ?? (copie ? "Copié !" : "")}
       </p>
 
       <button
         type="button"
         onClick={copier}
-        className="min-h-11 w-full rounded-lg border border-current/30 px-4 py-2 font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+        className="btn w-full"
       >
         Copier
       </button>
@@ -105,7 +106,7 @@ export function InviteCard({
         type="button"
         onClick={inviter}
         disabled={enCours}
-        className="mt-3 min-h-11 w-full rounded-lg px-4 py-2 text-sm underline underline-offset-4 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+        className="btn-quiet mt-3 w-full"
       >
         {enCours ? "Un instant…" : "Créer un autre code"}
       </button>

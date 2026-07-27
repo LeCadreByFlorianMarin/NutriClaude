@@ -76,10 +76,10 @@ export function DisplayNameForm({
 
   return (
     <form onSubmit={handleSubmit}>
-      <label htmlFor="prenom" className="block text-sm font-medium">
+      <label htmlFor="prenom" className="label">
         Ton prénom
       </label>
-      <p className="mt-1 text-sm opacity-70">C&apos;est ce que les autres voient.</p>
+      <p className="hint mt-1">C&apos;est ce que les autres voient.</p>
 
       <input
         id="prenom"
@@ -92,19 +92,19 @@ export function DisplayNameForm({
           setValeur(e.target.value);
           setCle(undefined);
         }}
-        className="mt-2 min-h-11 w-full rounded-lg border border-current/30 bg-transparent px-3 py-2 text-base focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+        className="input mt-2"
       />
 
-      {/* Le message ne se distingue que par le texte : la palette n'existe pas
-          encore, et le rouge d'erreur est banni du produit (UX-DR1). */}
-      <p role="status" aria-live="polite" className="mt-3 min-h-6 text-base font-medium">
+      {/* Le message ne se distingue que par son texte et sa graisse : le rouge
+          d'erreur est banni du produit, la palette n'en contient aucun (UX-DR1). */}
+      <p role="status" aria-live="polite" className="notice mt-3">
         {cle ? (MESSAGES[cle] ?? MESSAGES.echec) : ""}
       </p>
 
       <button
         type="submit"
         disabled={busy}
-        className="min-h-11 w-full rounded-lg border border-current/30 px-4 py-2 font-medium disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+        className="btn w-full"
       >
         {busy ? "Un instant…" : "Enregistrer"}
       </button>

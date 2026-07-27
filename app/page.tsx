@@ -26,13 +26,13 @@ export default async function HomePage() {
           {household?.name ?? "Chez toi"}
         </h1>
         <p className="mt-3 text-base">Salut {profile.display_name}.</p>
-        <p className="mt-6 text-sm opacity-70">
+        <p className="hint mt-6">
           Ton foyer est prêt. Les courses, les recettes et le menu arrivent.
         </p>
         <p className="mt-6">
           <Link
             href="/foyer"
-            className="inline-flex min-h-11 items-center px-2 text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+            className="btn-quiet"
           >
             Ton foyer
           </Link>

@@ -1,33 +1,229 @@
 @import "tailwindcss";
 
-/*
- * Socle minimal. Le système de tokens complet de DESIGN.md — double thème
- * clair/sombre, monochrome chaud et accent abricot unique — est posé par la
- * Story 1.7. On se contente ici de suivre le réglage système, sans câbler
- * aucun thème en dur (UX-DR1).
- */
+/* =========================================================================
+ * Tokens du produit — DESIGN.md fait foi.
+ *
+ * Toute valeur ci-dessous est recopiée du frontmatter de DESIGN.md, avec ses
+ * ratios de contraste déjà audités et arbitrés. ⚠️ `review-accessibility.md`
+ * propose d'AUTRES valeurs : ce sont celles d'avant l'arbitrage, elles ont été
+ * remplacées. Ne pas y puiser.
+ *
+ * Les valeurs brutes vivent ici, en `:root`, et basculent dans le media query
+ * plus bas. Elles ne sont exposées à Tailwind que via `@theme inline` — sans
+ * `inline`, Tailwind figerait la valeur claire dans l'utilitaire et le thème
+ * sombre n'arriverait jamais.
+ * ========================================================================= */
 
 :root {
   color-scheme: light dark;
-  --background: #ffffff;
-  --foreground: #171717;
+
+  /* ── Accent unique : abricot. RÉSERVÉ à l'action courses. ──
+     Ces quatre-là ne basculent pas : ce sont des rôles distincts, pas deux
+     versions d'une même couleur. Le choix se fait au point d'usage. */
+  --accent: #ffa94d; /* texte/aplat sur SOMBRE — 9,79:1 sur la base */
+  --accent-strong: #f5912b; /* APLATS sur clair uniquement — 2,08:1 en texte, sous AA */
+  --accent-text-light: #c2410c; /* TEXTE accent sur clair — 5,18:1 sur carte */
+  --accent-ink: #3a1e04; /* l'encre posée SUR un aplat abricot */
+
+  /* ── Thème clair (défaut sémantique) — blanc cassé chaud, pensé plein soleil ── */
+  --surface-base: #f4f1ea;
+  --surface-base-image:
+    radial-gradient(420px 320px at 15% 2%, rgba(255, 255, 255, 0.9), transparent 60%),
+    linear-gradient(160deg, #f7f4ee, #eef1ee 60%, #f3ece3);
+  --surface-card: #ffffff;
+  --card-border: rgba(20, 20, 20, 0.07);
+  --card-shadow: 0 6px 18px rgba(60, 50, 30, 0.06);
+  --text: #20211d;
+  --muted: #6a6f66; /* secondaire PORTEUR d'info — 5,15:1 sur carte. AA. */
+  --muted-2: #8b9083; /* non-essentiel SEULEMENT — jamais un texte porteur */
+  --checkbox-empty: #83887b; /* 3,64:1 sur carte blanche */
+  --checkbox-empty-fill: rgba(20, 20, 20, 0.03);
+  --offline-bg: #fbf3e2;
+  --offline-text: #7e6224; /* 5,20:1 sur offline-bg. AA. */
+  --offline-border: #f0e2c0;
+  --focus-ring: var(--accent-text-light); /* 5,18:1 sur blanc */
+  --accent-soft: rgba(245, 145, 43, 0.14); /* voile abricot sur clair */
+  --accent-fill: var(--accent-strong); /* aplat abricot, thème clair */
+  --accent-text: var(--accent-text-light); /* texte abricot, thème clair */
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* ── Thème sombre — aubergine/espresso chaud, cuisine du soir ──
+       Le fond n'est jamais plat : dégradé 160deg + deux halos radiaux
+       (terracotta en haut-gauche, prune en bas-droite). Valeurs reprises
+       telles quelles de mockups/liste-et-dashboard.html. */
+    --surface-base: #191016;
+    --surface-base-image:
+      radial-gradient(420px 320px at 18% 4%, rgba(180, 96, 60, 0.22), transparent 60%),
+      radial-gradient(440px 360px at 88% 96%, rgba(120, 50, 70, 0.3), transparent 60%),
+      linear-gradient(160deg, #211318, #191016 55%, #2a1512);
+    --surface-card: rgba(255, 255, 255, 0.055); /* verre translucide */
+    --card-border: rgba(255, 255, 255, 0.1);
+    --card-shadow: none; /* sur sombre, la profondeur vient du verre, pas de l'ombre */
+    --text: #eef1f8;
+    --muted: #aeb6c9; /* 8,06:1 sur le verre carte. AA. */
+    --muted-2: #8990a5;
+    --checkbox-empty: #828aa3; /* 4,77:1 sur le verre carte */
+    --checkbox-empty-fill: rgba(255, 255, 255, 0.04);
+    --offline-bg: rgba(255, 255, 255, 0.04);
+    --offline-text: #aeb6c9;
+    --offline-border: rgba(255, 255, 255, 0.08);
+    --focus-ring: var(--accent); /* 8,60:1 sur le verre */
+    --accent-soft: rgba(255, 169, 77, 0.16);
+    --accent-fill: var(--accent);
+    --accent-text: var(--accent);
   }
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+/* =========================================================================
+ * La palette par défaut de Tailwind est retirée.
+ *
+ * DESIGN.md bannit toute seconde couleur chromatique et le rouge d'erreur.
+ * Plutôt que de compter sur la vigilance à chaque revue, on retire les
+ * couleurs du build : `bg-red-500` n'existe tout simplement plus.
+ *
+ * ⚠️ `transparent` et `current` appartiennent au même espace de noms et
+ * partent avec le reste — d'où leur redéclaration immédiate.
+ * ========================================================================= */
+
+@theme {
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  /* Arrondis — registre « tiède » : ni angle vif, ni tout-rond. */
+  --radius-sm: 8px; /* coche */
+  --radius-md: 14px; /* cartes-rayon, tuiles, boutons, champs */
+  --radius-lg: 20px; /* grandes cartes */
+  --radius-xl: 22px; /* conteneur dashboard */
+  --radius-pill: 20px; /* pastilles, chips */
+
+  /* Deux familles, deux rôles. Aucune webfont : stack système seul
+     (décision de Florian, 2026-07-27 — NFR-11, légèreté PWA).
+     Conséquence assumée : `ui-rounded` n'existe pas sur Android, les titres
+     y retomberont sur la sans-serif système. */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-rounded: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, sans-serif;
+
+  /* L'échelle d'espacement de DESIGN.md (4/8/12/16/20/24) est déjà celle de
+     Tailwind par défaut (base 4px) : rien à redéclarer. Le plancher tactile
+     de 44px s'écrit `min-h-11`. */
 }
 
+@theme inline {
+  --color-surface-base: var(--surface-base);
+  --color-surface-card: var(--surface-card);
+  --color-card-border: var(--card-border);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-muted-2: var(--muted-2);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-text: var(--accent-text);
+  --color-accent-fill: var(--accent-fill);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-checkbox-empty: var(--checkbox-empty);
+  --color-checkbox-empty-fill: var(--checkbox-empty-fill);
+  --color-offline-bg: var(--offline-bg);
+  --color-offline-text: var(--offline-text);
+  --color-offline-border: var(--offline-border);
+  --color-focus-ring: var(--focus-ring);
+}
+
+/* =========================================================================
+ * Base
+ * ========================================================================= */
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family:
-    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: var(--surface-base);
+  background-image: var(--surface-base-image);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+/*
+ * Anneau de focus clavier — sur TOUT élément focusable, sans exception
+ * (plancher d'accessibilité). Une règle globale plutôt qu'une classe : c'est
+ * la seule forme qui ne puisse pas être oubliée sur un nouvel élément.
+ *
+ * L'abricot est légitime ici bien qu'aucune surface courses n'existe encore :
+ * DESIGN.md le nomme « le seul autre usage légitime de l'abricot ».
+ */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* =========================================================================
+ * Couche de composants
+ *
+ * Reconstruction de la couche perdue avec le prototype (dette tracée depuis
+ * la Story 1.1). Volontairement courte : seules les classes que les écrans
+ * livrés utilisent réellement. Une classe sans appelant est une dette.
+ * ========================================================================= */
+
+@layer components {
+  /* Bouton plein — neutre. PAS d'abricot : aucun écran de l'Epic 1 n'est une
+     action courses, et l'accent n'est pas un habillage (UX-DR2). */
+  .btn {
+    @apply inline-flex min-h-11 items-center justify-center rounded-md
+           border border-card-border bg-surface-card px-4 py-2 font-medium
+           text-text disabled:opacity-60;
+  }
+
+  /* Bouton discret — le second chemin, jamais l'action principale. */
+  .btn-quiet {
+    @apply inline-flex min-h-11 items-center justify-center rounded-md px-4 py-2
+           text-sm text-muted underline underline-offset-4 disabled:opacity-60;
+  }
+
+  .input {
+    @apply min-h-11 w-full rounded-md border border-card-border bg-surface-card
+           px-3 py-2 text-base text-text;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-text;
+  }
+
+  .card {
+    @apply rounded-lg border border-card-border bg-surface-card p-4;
+    box-shadow: var(--card-shadow);
+  }
+
+  /* Texte secondaire PORTEUR d'information. `muted` tient AA sur les fonds
+     réels — contrairement à une opacité réductrice, qui fait tomber n'importe
+     quel gris sous le seuil. */
+  .hint {
+    @apply text-sm text-muted;
+  }
+
+  /* Zone de message (échec ou confirmation). Aucune couleur d'alerte : le
+     rouge d'erreur est banni du produit, le message se distingue par son
+     texte et sa graisse. */
+  .notice {
+    @apply min-h-6 text-base font-medium text-text;
+  }
+}
+
+/* =========================================================================
+ * Mouvement
+ *
+ * Sous `prefers-reduced-motion`, les transitions non essentielles sont
+ * coupées. Le retour d'état d'un contrôle reste immédiat — dé-animé, jamais
+ * supprimé.
+ * ========================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

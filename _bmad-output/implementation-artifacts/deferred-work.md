@@ -97,3 +97,23 @@
 - **Le prénom est le seul champ de `profiles` exposé.** Les colonnes nutritionnelles héritées du prototype (`daily_calories`, `restrictions`, `preferences`…) restent sans surface — aucun FR de la v1 ne les appelle.
 - **Aucun lien de retour sur `/foyer`** (décision de Florian, 2026-07-27). On y arrive par l'accueil, on en repart par le bouton « précédent ».
 - **Le changement de prénom ne se propage pas en temps réel** : l'autre membre le voit à son prochain chargement. La propagation Realtime (AD-8) appartient à l'Epic 4.
+
+## Deferred from: story 1.7 (2026-07-27)
+
+**Exigence pour l'Epic 6 — la rondeur des titres n'existe pas sur Android :**
+
+- Décision de Florian (2026-07-27) : **aucun fichier de police n'est embarqué**, on s'en tient au stack système (NFR-11, légèreté PWA). `ui-rounded` rend nativement sur Apple mais **n'existe pas sur Android** : les titres et, plus tard, le gros compteur y retomberont sur la sans-serif système — plus plats, mais lisibles. DESIGN.md laissait la webfont de secours ouverte « à confirmer au *finalize* ». **À rouvrir à l'Epic 6**, quand la PWA sera réellement installée sur un Android et qu'on pourra juger sur pièce plutôt que sur principe. Ne pas compenser entre-temps par un `font-weight` plus lourd ou un `letter-spacing` bricolé.
+
+**Trou d'habillage assumé — l'erreur du layout racine reste nue :**
+
+- **`global-error.tsx` n'est pas posé**, et c'est un choix. Il remplace le layout racine, rend ses propres `<html>`/`<body>`, et **ne reçoit pas `globals.css`** : il ne verrait aucun token. L'habiller exigerait une seconde palette en styles inline, qui divergerait au premier changement. Conséquence : une erreur survenant dans le layout racine (ou la page 500 intégrée) s'affiche sans le thème du produit. Sans portée tant que le layout reste aussi mince qu'aujourd'hui ; à réveiller le jour où il portera de la logique.
+
+**Ce que la neutralisation de la palette implique pour la suite :**
+
+- `--color-*: initial` retire la palette par défaut de Tailwind du build. **Toute couleur employée à partir de maintenant doit être un token de DESIGN.md** — `bg-red-500`, `text-gray-400` ou `bg-white` ne génèrent plus rien et échoueront silencieusement (classe inconnue, aucun style). Ce n'est pas un bug : c'est la garde. Un besoin de couleur non couvert par DESIGN.md est un sujet de design, pas un contournement CSS. `--color-transparent` et `--color-current` sont redéclarés explicitement.
+
+**Choix assumés, à ne pas prendre pour des oublis en revue :**
+
+- **Deux écrans n'ont pas été vus dans les deux thèmes** : `/login` (le proxy renvoie l'utilisateur connecté ailleurs) et `/onboarding` (exige une session sans profil). Leur balisage a été contrôlé sans session et n'emploie que des classes de la couche déjà vues rendues ailleurs — c'est une déduction, pas une observation.
+- **L'échelle typographique de DESIGN.md n'est pas appliquée aux écrans existants.** Seules les familles le sont. Les tailles nommées (`counter` 48px, `title` 19px, `eyebrow` 11px…) décrivent des composants de liste et de dashboard qui n'existent pas encore ; DESIGN.md place d'ailleurs explicitement les écrans d'authentification, d'invitation et de profil **hors de son périmètre**. Les forcer aurait été une refonte, pas une substitution.
+- **Les tokens sans appelant sont volontaires** : `checkbox-*`, `offline-*`, `accent-soft`, `accent-ink`, `muted-2` attendent les Epics 2 à 5. L'AC2 demande que l'accent soit « disponible », pas employé.
