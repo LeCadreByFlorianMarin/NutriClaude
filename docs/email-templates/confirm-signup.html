@@ -1,0 +1,86 @@
+<!--
+  Modèle « Confirm sign up » — Supabase → Authentication → Emails.
+  Coller TOUT ce fichier dans le corps du modèle, en remplaçant l'existant.
+  Sujet suggéré : Bienvenue dans NutriClaude
+
+  ⚠️ Ce modèle-ci est celui qu'une PREMIÈRE connexion déclenche : une adresse
+  inconnue crée un compte, et Supabase envoie « Confirm sign up », pas
+  « Magic Link ». L'oublier casse l'entrée de chaque nouvelle personne — et ça
+  ne se voit pas en retestant avec un compte qui existe déjà.
+
+  Seule différence avec magic-link.html : `type=signup` et le texte.
+-->
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">Un clic et ta cuisine est prête. Le lien est valable une heure.</div>
+
+<style>
+  :root { color-scheme: light dark; supported-color-schemes: light dark; }
+  @media (prefers-color-scheme: dark) {
+    .nc-base   { background: #191016 !important; }
+    .nc-card   { background: #211318 !important; border-color: rgba(255,255,255,.10) !important; }
+    .nc-title  { color: #EEF1F8 !important; }
+    .nc-text   { color: #EEF1F8 !important; }
+    .nc-muted  { color: #AEB6C9 !important; }
+    .nc-btn    { background: #FFA94D !important; }
+    .nc-rule   { border-color: rgba(255,255,255,.10) !important; }
+  }
+</style>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="nc-base" style="background:#F4F1EA;margin:0;padding:0;">
+  <tr>
+    <td align="center" style="padding:40px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;">
+
+        <tr>
+          <td class="nc-muted" style="padding:0 4px 16px;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-size:13px;line-height:1.5;color:#6A6F66;letter-spacing:.08em;text-transform:uppercase;">
+            NutriClaude
+          </td>
+        </tr>
+
+        <tr>
+          <td class="nc-card" style="background:#FFFFFF;border:1px solid rgba(20,20,20,.07);border-radius:20px;padding:36px 32px;">
+
+            <p class="nc-title" style="margin:0 0 12px;font-family:ui-rounded,'SF Pro Rounded',Nunito,system-ui,sans-serif;font-size:26px;font-weight:700;line-height:1.2;color:#20211D;">
+              Bienvenue.
+            </p>
+
+            <p class="nc-text" style="margin:0 0 28px;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-size:16px;line-height:1.5;color:#20211D;">
+              Un dernier clic et ta cuisine est prête. Il n'y a rien à installer, et pas de mot de passe à choisir.
+            </p>
+
+            <!-- Le seul élément coloré de l'email : une action, une couleur. -->
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td class="nc-btn" align="center" bgcolor="#F5912B" style="background:#F5912B;border-radius:14px;">
+                  <a href="{{ .RedirectTo }}&amp;token_hash={{ .TokenHash }}&amp;type=signup"
+                     style="display:inline-block;padding:15px 30px;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-size:16px;font-weight:600;line-height:1.2;color:#3A1E04;text-decoration:none;border-radius:14px;">
+                    C'est parti
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <p class="nc-muted" style="margin:28px 0 0;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-size:13px;line-height:1.6;color:#6A6F66;">
+              Ce lien ne marche qu'une fois et il expire dans l'heure.<br>
+              Si tu n'as rien demandé, tu peux ignorer ce message.
+            </p>
+
+            <hr class="nc-rule" style="border:none;border-top:1px solid rgba(20,20,20,.07);margin:24px 0 16px;">
+
+            <p class="nc-muted" style="margin:0;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-size:12px;line-height:1.6;color:#6A6F66;word-break:break-all;">
+              Le bouton ne fonctionne pas ? Colle cette adresse dans ton navigateur :<br>
+              {{ .RedirectTo }}&amp;token_hash={{ .TokenHash }}&amp;type=signup
+            </p>
+
+          </td>
+        </tr>
+
+        <tr>
+          <td class="nc-muted" align="center" style="padding:20px 8px 0;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-size:12px;line-height:1.5;color:#6A6F66;">
+            La liste de courses du foyer, triée par les rayons de ton magasin.
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>

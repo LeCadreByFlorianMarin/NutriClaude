@@ -70,11 +70,11 @@ so that je n'aie rien à retenir ni à configurer — le test d'acceptation « e
   - [x] Échec ou paramètres manquants → `NextResponse.redirect` vers `/login?error=lien-expire`. **Jamais l'`error.message` de Supabase dans l'URL ni à l'écran** — un code, que la page de connexion traduit (NFR-8/NFR-9)
   - [x] **Les en-têtes anti-cache doivent être posés sur la réponse de redirection** (dette explicite de la revue 1.1, NFR-5) — voir Task 4
 
-- [ ] **Task 4 — En-têtes anti-cache dans le Route Handler** (AC: 3)
+- [x] **Task 4 — En-têtes anti-cache dans le Route Handler** (AC: 3)
   - [x] `lib/supabase/server.ts` ignore aujourd'hui le 2ᵉ paramètre `_headers` de `setAll`, avec une justification qui ne vaut **que pour un Server Component**. Un **Route Handler**, lui, peut écrire des en-têtes — et `/auth/callback` est précisément la réponse qui pose le cookie de session
   - [x] Exposer une fabrique dédiée au Route Handler (dans `lib/supabase/server.ts`) qui **capture** les en-têtes fournis par `setAll` et permet de les appliquer sur la réponse retournée. Ne pas les écrire en dur : ils doivent venir du 2ᵉ paramètre
   - [x] Laisser `createClient()` (Server Component) **inchangée**, `_headers` compris, avec son commentaire — la raison qui l'y justifie est toujours vraie
-  - [ ] **Vérifier empiriquement** que la redirection 307 de `/auth/callback` porte **à la fois** le `set-cookie` de session **et** les trois en-têtes. Les mutations de `cookies()` d'un Route Handler devraient être fusionnées par Next sur la réponse retournée — **mesure-le, ne le suppose pas**. Si le `set-cookie` manque, pose les cookies directement sur l'objet réponse. C'est le motif exact de bug trouvé en revue 1.1 sur les redirections du proxy → *mécanisme prouvé par sonde ; le tir réel sur `/auth/callback` exige une session, donc `.env.local` renseigné. **Bloqué**, voir Completion Notes*
+  - [x] **Vérifier empiriquement** que la redirection 307 de `/auth/callback` porte **à la fois** le `set-cookie` de session **et** les trois en-têtes. Les mutations de `cookies()` d'un Route Handler devraient être fusionnées par Next sur la réponse retournée — **mesure-le, ne le suppose pas**. Si le `set-cookie` manque, pose les cookies directement sur l'objet réponse. C'est le motif exact de bug trouvé en revue 1.1 sur les redirections du proxy → *mécanisme prouvé par sonde ; le tir réel sur `/auth/callback` exige une session, donc `.env.local` renseigné. **Bloqué**, voir Completion Notes*
 
 - [x] **Task 5 — Cohérence du contrôle d'accès** (AC: 3)
   - [x] `lib/supabase/proxy.ts` : `PUBLIC_ROUTES` liste déjà `["/login", "/auth/callback"]` en correspondance **exacte**. Vérifier qu'aucune des deux routes n'est désormais fantôme (c'était un constat de revue en 1.1) — les deux existent après cette story, **il n'y a rien à modifier**. Ne rajoute pas `/signup`
@@ -95,7 +95,7 @@ so that je n'aie rien à retenir ni à configurer — le test d'acceptation « e
   - [x] Grep de non-régression : aucune occurrence de `signInWithPassword`, `password`, `signUp(` dans `app/` et `lib/` (AC1)
   - [x] Grep des mots bannis dans les chaînes rendues : `synchronis`, `jeton`, `token`, `API`, `MCP`, `pont`, `Supabase`, `RLS`, `cache` (NFR-9)
   - [x] Parcours manuel complet : `/menu` anonyme → `/login?next=%2Fmenu` → saisie email → message « va voir ta boîte » → clic sur le lien reçu → arrivée sur `/menu` authentifié → *réalisé par Florian en production le 2026-07-26 à 19:52 ; compte créé, session valide constatée*
-  - [ ] Parcours d'échec : rouvrir **le même lien** une seconde fois → `/login?error=lien-expire` avec un message français et la possibilité d'en redemander un → *la branche de rejet est vérifiée en production sur quatre formes de lien invalide ; le rejeu d'un **vrai** lien consommé reste à constater*
+  - [x] Parcours d'échec : rouvrir **le même lien** une seconde fois → `/login?error=lien-expire` avec un message français et la possibilité d'en redemander un
   - [x] `git status --short supabase/` vide (AC2 de la story 1.1, toujours vrai : **aucune migration dans cette story**)
 
 ## Dev Notes
@@ -448,6 +448,32 @@ La configuration externe ayant été faite par Florian, l'essentiel des points b
 **Un défaut découvert par cette mesure, et corrigé.** Le `429` a révélé que le message « Attends une minute avant d'en redemander un. » **ment quand le plafond horaire est atteint** — l'attente réelle peut aller jusqu'à une heure. Deux limites distinctes (60 s entre deux demandes, quelques envois par heure) remontent sous le même code `over_email_send_rate_limit`, sans moyen de les distinguer. Le message ne promet donc plus de délai qu'il ne peut pas tenir.
 
 **Deux observations mineures, sans action.** Un cookie `sb-<ref>-auth-token-code-verifier` subsiste après connexion : `signInWithOtp` le pose systématiquement (le client navigateur prépare un flux PKCE), et notre chemin par `token_hash` ne le consomme jamais. Sans effet, mais explique sa présence. Par ailleurs, la clé publiable n'est présente que dans les chunks de `/login` — l'accueil n'importe pas le client navigateur.
+
+### Vérification du 2026-07-27 — l'angle mort est fermé, un défaut est découvert
+
+**Le point NFR-5 est mesuré.** Une sonde temporaire reproduisant la structure exacte de `/auth/callback` — même fabrique `createRouteHandlerClient`, même `applyAuthHeaders`, même `NextResponse.redirect` bâti à la main — a rapporté ce que la redirection porte réellement :
+
+```
+statut : 307
+cache-control : private, no-cache, no-store, must-revalidate, max-age=0
+expires      : 0
+pragma       : no-cache
+```
+
+Ce sont exactement les trois en-têtes fournis par le 2ᵉ paramètre de `setAll`. Combiné à la sonde du 2026-07-26 (qui avait prouvé sur le fil qu'un `set-cookie` posé via `cookies()` survit à une redirection construite à la main), **la réponse qui ouvre une session porte bien à la fois le cookie et l'interdiction de cache**. La sonde a été retirée.
+
+Nuance d'honnêteté : la sonde déclenchait l'écriture par `refreshSession()` et non `verifyOtp()`. Les deux passent par le même contrat `setAll`, et une connexion réelle par `/auth/callback` a été observée le même jour — elle a bien ouvert une session, donc `setAll` s'y déclenche. La chaîne est complète.
+
+**Le rejeu d'un lien réellement consommé est vérifié.** Un vrai lien déjà utilisé, rouvert depuis la boîte mail, produit `/login?error=lien-expire`. Les quatre formes forgées testées en production le laissaient supposer ; c'est maintenant constaté sur le cas réel.
+
+> ⚠️ **Correction d'une affirmation antérieure.** La section précédente concluait que « les deux modèles d'email sont correctement configurés ». **C'était faux, et déduit au lieu d'être mesuré.** La lecture des emails réellement reçus montre que :
+>
+> - le modèle **« Confirm sign up » était resté par défaut** (`{{ .ConfirmationURL }}`), sans aucune trace de notre lien ;
+> - le modèle **« Magic Link » contenait deux liens** — le nôtre *ajouté* à côté de celui d'origine.
+>
+> Conséquence : la création de compte du 2026-07-26 est passée par le **flux implicite** (jetons dans le fragment d'URL), donc par un chemin que nous n'avons pas conçu — notre route rejetait le lien avec « Ce lien n'est plus bon », puis le client navigateur ramassait les jetons dans le fragment et ouvrait la session malgré tout. **Notre chemin `verifyOtp` n'avait jamais servi avant le 2026-07-27.**
+>
+> Deux modèles conformes sont fournis dans `docs/email-templates/`. **Tant que « Confirm sign up » n'est pas remplacé, aucun nouveau compte ne peut entrer par notre chemin** — ce qui bloque encore le contrôle d'isolation à deux comptes de la Story 1.3.
 
 ### Completion Notes List
 

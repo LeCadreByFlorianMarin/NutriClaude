@@ -52,16 +52,20 @@ C'est le point le plus délicat de toute la configuration. **Deux modèles doive
 
 ### Ce qu'il faut y mettre
 
-**Magic link :**
+Deux modèles complets, à l'identité visuelle du produit, sont versionnés dans **[`email-templates/`](email-templates/)** :
+
+| Modèle Supabase | Fichier | Sujet suggéré |
+|---|---|---|
+| Magic Link | [`email-templates/magic-link.html`](email-templates/magic-link.html) | Ton lien pour entrer |
+| Confirm sign up | [`email-templates/confirm-signup.html`](email-templates/confirm-signup.html) | Bienvenue dans NutriClaude |
+
+**Coller tout le fichier en remplaçant le corps existant** — ne pas ajouter à la suite. Un modèle qui garde son lien d'origine en propose deux : celui par défaut emprunte un autre chemin d'authentification que le nôtre, et c'est celui-là que l'utilisateur clique une fois sur deux.
+
+L'essentiel tient dans le `href`, identique dans les deux au `type` près :
 
 ```html
-<p><a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=magiclink">Se connecter à NutriClaude</a></p>
-```
-
-**Confirm sign up :**
-
-```html
-<p><a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=signup">Se connecter à NutriClaude</a></p>
+{{ .RedirectTo }}&amp;token_hash={{ .TokenHash }}&amp;type=magiclink   <!-- Magic Link -->
+{{ .RedirectTo }}&amp;token_hash={{ .TokenHash }}&amp;type=signup      <!-- Confirm sign up -->
 ```
 
 Trois choses à ne pas modifier :
