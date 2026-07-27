@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireProfile } from "@/lib/supabase/queries";
 import { createClient } from "@/lib/supabase/server";
 
@@ -27,6 +28,14 @@ export default async function HomePage() {
         <p className="mt-3 text-base">Salut {profile.display_name}.</p>
         <p className="mt-6 text-sm opacity-70">
           Ton foyer est prêt. Les courses, les recettes et le menu arrivent.
+        </p>
+        <p className="mt-6">
+          <Link
+            href="/foyer"
+            className="inline-flex min-h-11 items-center px-2 text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+          >
+            Inviter quelqu&apos;un chez toi
+          </Link>
         </p>
       </div>
     </main>

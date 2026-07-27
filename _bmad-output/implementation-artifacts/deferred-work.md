@@ -48,3 +48,19 @@
 - **Le nom du foyer n'est modifiable nulle part.** La Story 1.6 ne couvre que le prénom affiché. « Marin » restera tel quel jusqu'à ce qu'une story ouvre le sujet.
 - **Un cookie `sb-<ref>-auth-token-code-verifier` subsiste** après connexion : le client navigateur le pose systématiquement en préparant un flux PKCE, que notre chemin par `token_hash` ne consomme jamais. Sans effet.
 - **Piège d'outillage** : après suppression d'une route, `npm run typecheck` échoue sur un validateur périmé sous `.next/dev/types/`. Purger `.next` avant de conclure à une régression.
+
+## Deferred from: story 1.4 (2026-07-27)
+
+**Exigence dure pour l'Epic 5 — ne pas la découvrir en chemin :**
+
+- **`generate_household_invite` devra vérifier explicitement que l'appelant est un humain.** L'AC3 de la story 1.4 exige qu'une identité d'appareil ne puisse pas émettre d'invitation. Aujourd'hui c'est vrai **par effet de bord** : `current_household_id()` ne résout le foyer que depuis `profiles`, donc une identité non-humaine obtient `NULL` et la fonction lève. Or AD-9 prévoit d'étendre cette fonction au **claim du jeton** (`auth.jwt()`). Le jour où l'Epic 5 le fera, un appareil obtiendra un `household_id` et pourra **émettre des invitations** — exactement ce que l'AC3 interdit. La garde devra alors être explicite, par exemple `exists (select 1 from profiles where id = auth.uid())`.
+
+**Résidu de test à retirer de la base :**
+
+- Compte `flomarin88+nc2@gmail.com`, foyer « Foyer temoin 2 », ses 11 rayons et son invitation `4A1EA59C`. Créés pour prouver l'isolation des invitations. Aucune politique n'autorise leur suppression depuis l'application : *Authentication → Users*, supprimer l'utilisateur, puis le foyer orphelin.
+
+**Choix assumés, à ne pas prendre pour des oublis en revue :**
+
+- **Aucune annulation d'invitation** (décision de Florian, 2026-07-27). `invites_delete_own` reste inutilisé. Conséquence : générer un nouveau code **n'invalide pas l'ancien**, et plusieurs codes peuvent rester valables sept jours en parallèle.
+- **Rien ne purge les invitations expirées.** Sans conséquence à cette échelle.
+- Le commentaire du schéma décrit le code comme « 8-char base32 » : **c'est faux**, il est hexadécimal. Le commentaire vit dans une migration appliquée, donc non modifiable.
