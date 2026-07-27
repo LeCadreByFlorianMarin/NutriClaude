@@ -80,3 +80,20 @@
 - **« Code inconnu » et « code plus valable » donnent deux messages distincts** (question laissée sans réponse, implémentée selon la recommandation). Les deux appellent des gestes différents — re-saisir, ou redemander un code. Révèle marginalement qu'un code existe ; facile à fusionner si l'arbitrage change.
 - **Deux branches d'erreur ne sont pas vérifiées** : « code expiré » demanderait d'attendre sept jours, « code épuisé » cinq comptes. Écartées explicitement plutôt que simulées.
 - **« Créer » reste le chemin par défaut** à l'entrée du foyer, « J'ai un code » le second. L'inverse ferait buter tout nouvel arrivant sur un champ qu'il ne peut pas remplir.
+
+## Deferred from: story 1.6 (2026-07-27)
+
+**Trou d'isolation dans la politique d'écriture de `profiles` — discipline applicative, pas garde en base :**
+
+- `profiles_update_own` est déclarée `using (id = auth.uid())` **sans `with check`**. En PostgreSQL, l'expression `using` sert alors aussi de contrôle sur la ligne écrite : le contrôle ne porte donc que sur `id`, et **toutes les autres colonnes de sa propre ligne restent librement modifiables — `household_id` compris**. Un membre qui connaîtrait l'uuid d'un autre foyer pourrait s'y déplacer par un simple `update`. Sans portée réelle à cette échelle (les uuid ne se devinent pas, et il n'y a qu'un foyer), mais **rien en base n'empêche l'écriture** : c'est la discipline du code applicatif qui tient, en n'envoyant jamais que `display_name` dans le payload. Corriger exige un `with check (id = auth.uid())` dans la politique, donc une **migration sur une base gelée**. À traiter le jour où un second foyer existera, ou avant toute story qui écrirait d'autres colonnes de `profiles`.
+
+**Piège d'outillage, pour ne pas le redécouvrir :**
+
+- Sur un champ `autoComplete="given-name"`, la liste de suggestions du gestionnaire de mots de passe du navigateur se dessine **par-dessus le bouton de soumission** et **avale le premier clic**. Deux vérifications ont paru échouer avant que la cause soit identifiée. `Échap` referme la liste ; `Entrée` dans le champ soumet directement. Sans effet pour un utilisateur réel, mais toute vérification pilotée par navigateur sur un formulaire de ce type s'y fera prendre.
+
+**Choix assumés, à ne pas prendre pour des oublis en revue :**
+
+- **Deux branches d'affichage ne sont pas observées** : l'état « un seul membre » (demanderait la session d'un compte seul dans son foyer) et « connecté sans profil → `/onboarding` » (demanderait un compte neuf, que la story interdisait de créer). Écartées explicitement plutôt que cochées.
+- **Le prénom est le seul champ de `profiles` exposé.** Les colonnes nutritionnelles héritées du prototype (`daily_calories`, `restrictions`, `preferences`…) restent sans surface — aucun FR de la v1 ne les appelle.
+- **Aucun lien de retour sur `/foyer`** (décision de Florian, 2026-07-27). On y arrive par l'accueil, on en repart par le bouton « précédent ».
+- **Le changement de prénom ne se propage pas en temps réel** : l'autre membre le voit à son prochain chargement. La propagation Realtime (AD-8) appartient à l'Epic 4.
