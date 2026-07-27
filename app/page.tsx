@@ -22,7 +22,7 @@ export default async function HomePage() {
     <main className="flex-1 flex items-center justify-center p-6">
       <div className="max-w-md text-center">
         <h1 className="text-2xl font-semibold">
-          {(household as { name: string } | null)?.name ?? "Chez toi"}
+          {household?.name ?? "Chez toi"}
         </h1>
         <p className="mt-3 text-base">Salut {profile.display_name}.</p>
         <p className="mt-6 text-sm opacity-70">

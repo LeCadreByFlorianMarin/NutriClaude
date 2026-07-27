@@ -50,14 +50,29 @@ npx supabase migration new add_device_credentials   # crée le fichier horodaté
 
 ## Appliquer
 
-**Prérequis, à faire une fois.** Le CLI doit être authentifié et le projet relié :
+**Prérequis, à faire une fois par poste.** Le CLI doit être authentifié :
 
 ```bash
 npx supabase login                              # ouvre le navigateur
+```
+
+**Le projet est déjà relié** — l'état vit dans `supabase/.temp/` (ignoré par git, il contient le `project-ref`). Si ce cache disparaît, le rétablir avec :
+
+```bash
 npx supabase link --project-ref <ref>           # <ref> est lisible dans NEXT_PUBLIC_SUPABASE_URL
 ```
 
-`link` écrit `supabase/config.toml` (aucun secret) et un cache sous `supabase/.temp/` (ignoré par git).
+L'authentification, elle, est **par poste et non versionnée** : un `login` est nécessaire sur chaque machine, et son absence se manifeste par une erreur trompeuse — `LegacyGenTypesUnexpectedStatusError`, « your account does not have the necessary privileges ». Ce n'est pas un problème de droits sur le projet, c'est simplement l'absence de jeton.
+
+## Régénérer les types TypeScript
+
+Le schéma est la source de vérité ; `lib/supabase/types.ts` en est le reflet, **généré, jamais écrit à la main** :
+
+```bash
+npx supabase gen types typescript --linked > lib/supabase/types.ts
+```
+
+**À rejouer après chaque migration**, dans le même commit. C'est ce qui fait qu'un nom de table, de colonne ou de fonction inexistant échoue au `typecheck` au lieu de casser à l'exécution. Contrôle rapide après génération : le bloc `Functions` doit lister les sept fonctions du schéma — s'il est vide, la génération a échoué et il ne faut pas commiter le résultat.
 
 **Le cycle.**
 

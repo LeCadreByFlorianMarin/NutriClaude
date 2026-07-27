@@ -1,12 +1,16 @@
 import { redirect } from "next/navigation";
 import { createClient } from "./server";
+import type { Database } from "./types";
 
-/** Sous-ensemble du profil dont les surfaces ont besoin aujourd'hui. */
-export type Profile = {
-  id: string;
-  household_id: string;
-  display_name: string;
-};
+/**
+ * Sous-ensemble du profil dont les surfaces ont besoin aujourd'hui, **dérivé du
+ * schéma** plutôt que réécrit : une colonne renommée en base casse le typage
+ * ici, au lieu de diverger en silence.
+ */
+export type Profile = Pick<
+  Database["public"]["Tables"]["profiles"]["Row"],
+  "id" | "household_id" | "display_name"
+>;
 
 /**
  * État d'appartenance du visiteur courant. Les trois cas sont distincts et
@@ -35,7 +39,7 @@ export async function getMembership(): Promise<{
     .eq("id", user.id)
     .maybeSingle();
 
-  return { signedIn: true, profile: (data as Profile) ?? null };
+  return { signedIn: true, profile: data ?? null };
 }
 
 /**

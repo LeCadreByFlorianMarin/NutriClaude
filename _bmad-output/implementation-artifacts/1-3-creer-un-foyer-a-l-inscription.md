@@ -39,14 +39,14 @@ so that je dispose d'un espace partagé où vivront la liste, les recettes, les 
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0 — Générer les types de la base** (AC: 1)
-  - [ ] Décidé par Florian le 2026-07-26 : **on arrête d'écrire `lib/supabase/types.ts` à la main.** Cette story est la première à appeler une fonction Postgres — sans types générés, `supabase.rpc(…)` n'est vérifié par rien, ni le nom, ni les paramètres, ni le retour
-  - [ ] Prérequis : `npx supabase login`, puis `npx supabase link --project-ref <ref>` (le ref est lisible dans `NEXT_PUBLIC_SUPABASE_URL`). Le projet **n'est pas encore relié** — aucun `supabase/config.toml` n'existe. Ce lien sert aussi à la Task 5
-  - [ ] `npx supabase gen types typescript --linked > lib/supabase/types.ts` — **remplace** le fichier écrit à la main, ne le complète pas
-  - [ ] Vérifier que le fichier généré contient bien `Functions` avec `create_household_with_profile`, ses deux arguments et son retour `string`. **Si `Functions` est vide, la génération a échoué** — arrête-toi plutôt que de continuer sans filet
-  - [ ] Câbler le type sur les trois clients : `createBrowserClient<Database>`, `createServerClient<Database>` dans `server.ts` (les deux fabriques) et dans `proxy.ts`. C'est ce qui rend la RPC de la Task 4 réellement typée
-  - [ ] **Ne commite pas de secret** : `supabase link` écrit `supabase/config.toml` (sans secret) et peut créer `supabase/.temp/` — déjà ignoré par git. Vérifier `git status` avant de commiter
-  - [ ] ⚠️ **Aucune migration, aucune écriture en base.** `gen types` est en lecture seule. `git status --short supabase/migrations/` doit rester vide
+- [x] **Task 0 — Générer les types de la base** (AC: 1)
+  - [x] Décidé par Florian le 2026-07-26 : **on arrête d'écrire `lib/supabase/types.ts` à la main.** Cette story est la première à appeler une fonction Postgres — sans types générés, `supabase.rpc(…)` n'est vérifié par rien, ni le nom, ni les paramètres, ni le retour
+  - [x] Prérequis : `npx supabase login`, puis `npx supabase link --project-ref <ref>` (le ref est lisible dans `NEXT_PUBLIC_SUPABASE_URL`). Le projet **n'est pas encore relié** — aucun `supabase/config.toml` n'existe. Ce lien sert aussi à la Task 5 → *le `login` a été fait par Florian ; le `link` s'est révélé inutile, le projet l'étant déjà depuis mai (état dans `supabase/.temp/`)*
+  - [x] `npx supabase gen types typescript --linked > lib/supabase/types.ts` — **remplace** le fichier écrit à la main, ne le complète pas
+  - [x] Vérifier que le fichier généré contient bien `Functions` avec `create_household_with_profile`, ses deux arguments et son retour `string`. **Si `Functions` est vide, la génération a échoué** — arrête-toi plutôt que de continuer sans filet
+  - [x] Câbler le type sur les trois clients : `createBrowserClient<Database>`, `createServerClient<Database>` dans `server.ts` (les deux fabriques) et dans `proxy.ts`. C'est ce qui rend la RPC de la Task 4 réellement typée
+  - [x] **Ne commite pas de secret** : `supabase link` écrit `supabase/config.toml` (sans secret) et peut créer `supabase/.temp/` — déjà ignoré par git. Vérifier `git status` avant de commiter
+  - [x] ⚠️ **Aucune migration, aucune écriture en base.** `gen types` est en lecture seule. `git status --short supabase/migrations/` doit rester vide
 
 - [x] **Task 1 — Garde d'appartenance au foyer** (AC: 2, 3)
   - [x] Recréer `lib/supabase/queries.ts` avec `requireProfile()` — dette explicitement différée par la revue 1.1 aux « stories 1.3+ », et c'est ici qu'elle échoit
@@ -88,7 +88,7 @@ so that je dispose d'un espace partagé où vivront la liste, les recettes, les 
 - [ ] **Task 7 — Vérification** (AC: 1, 2, 3)
   - [x] `npm run typecheck` · `npm run lint` · `npm run build` → tous en succès, sans avertissement
   - [x] `git status --short supabase/migrations/` vide — **aucune migration**. *(Le contrôle porte sur `migrations/`, plus sur `supabase/` : la Task 0 y ajoute légitimement `config.toml`.)*
-  - [ ] Preuve que le typage mord réellement : introduire volontairement une faute dans l'appel RPC (paramètre mal nommé) et vérifier que `npm run typecheck` **échoue**, puis rétablir. Sans cette contre-épreuve, rien ne dit que les types générés sont branchés → *dépend de la Task 0. **Bloqué***
+  - [x] Preuve que le typage mord réellement : introduire volontairement une faute dans l'appel RPC (paramètre mal nommé) et vérifier que `npm run typecheck` **échoue**, puis rétablir. Sans cette contre-épreuve, rien ne dit que les types générés sont branchés
   - [x] Grep des mots bannis dans les chaînes rendues (NFR-9) et absence de `force-dynamic`
   - [ ] Parcours manuel : nouveau compte → connexion → arrivée sur `/onboarding` → saisie des deux noms → arrivée sur `/` nommant le foyer → *exige une session sur l'origine testée. **Bloqué** (quota d'emails épuisé)*
   - [ ] Parcours AC3 : se déconnecter puis se reconnecter → arrivée **directe** sur `/`, aucun appel de création. Et `/onboarding` visité à la main → renvoi vers `/` → *idem. **Bloqué***
@@ -360,22 +360,36 @@ claude-opus-5 (Claude Code) — 2026-07-26
 
 **Greps de non-régression** : aucun mot banni dans les chaînes rendues (NFR-9) ; aucun `force-dynamic` (AD-13) ; aucun `outline-none`/`outline-hidden`/`tap-highlight` (UX-DR11) ; **aucune écriture directe dans `households` ou `profiles`** — tout passe par la fonction Postgres.
 
-**Tentatives de génération des types** (Task 0), toutes deux en échec :
+**Génération des types** (Task 0). Deux premières tentatives en échec :
 
 ```
 LegacyGenTypesUnexpectedStatusError
 "Your account does not have the necessary privileges to access this endpoint"
 ```
 
-Diagnostic : le CLI (2.109.1) est installé et `supabase/.temp/project-ref` porte bien `ywoubvebmlhtomwgouci`, mais **aucun jeton d'accès n'existe** (`~/.supabase/` ne contient que de la télémétrie). `gen types --linked` passe par l'API de gestion, qui exige `supabase login` — une commande interactive qui ouvre un navigateur, hors de portée d'un agent.
+Diagnostic — message **trompeur** : ce n'est pas un défaut de droits sur le projet, mais l'**absence de jeton d'accès** (`~/.supabase/` ne contenait que de la télémétrie). `gen types --linked` passe par l'API de gestion, qui exige `supabase login`, commande interactive hors de portée d'un agent. Après le `login` de Florian, la génération passe : **724 lignes, exit 0**.
+
+Contenu vérifié : 10 tables, la vue `grocery_list_by_aisle`, et les 7 fonctions — dont `create_household_with_profile` avec exactement `{ p_display_name: string; p_household_name: string }` et `Returns: string`.
+
+À noter : `supabase link` **n'a pas eu à être rejoué**. Le projet était relié depuis mai, l'état persistant dans `supabase/.temp/` (ignoré par git). Aucun `config.toml` n'a donc été créé, et `git status --short supabase/` reste vide — la Task 0 n'a laissé aucune trace dans ce répertoire.
+
+**Contre-épreuve du typage** — trois fautes introduites volontairement, chacune rétablie ensuite :
+
+| Faute injectée | Résultat |
+|---|---|
+| `p_household_nam` (paramètre mal nommé) | `TS2561` — « does not exist in type `{ p_display_name: string; p_household_name: string }` » |
+| `create_household_typo` (fonction inexistante) | `TS2345` — l'union des 7 fonctions réelles est énumérée |
+| `dispay_name` (colonne inexistante) | `TS2322` — « column 'dispay_name' does not exist on 'profiles' » |
+
+`typecheck` sort en **1** dans les trois cas, et en **0** après rétablissement. Le générique n'est pas décoratif : il est branché et il mord.
 
 **Tentatives d'obtention d'un lien de connexion**, à 20:47 et 20:51 UTC : `429 over_email_send_rate_limit` les deux fois. Le compte ayant été créé à 19:52, la fenêtre de reconstitution est **plus longue qu'une heure** — bon à savoir pour les stories suivantes.
 
 ### Completion Notes List
 
-**Livré : les tasks 1 à 5 en entier. Bloquées : la task 0, la task 6, et trois contrôles de la task 7.** Deux verrous, tous deux hors de portée d'un agent.
+**Livré : les tasks 0 à 5 en entier. Bloquées : la task 6 et deux contrôles de la task 7.** Un seul verrou subsiste.
 
-**Verrou n°1 — `supabase login` est interactif.** La Task 0 (types générés) exige un jeton d'accès que seule une authentification par navigateur peut produire. Conséquence en cascade : les trois clients ne sont pas typés `<Database>`, l'appel à la fonction Postgres n'est vérifié par rien, et la contre-épreuve de typage de la Task 7 est sans objet. **Le code écrit est prêt à recevoir le générique** — c'est un ajout mécanique, sans réécriture.
+**Le verrou n°1 est levé.** `supabase login` étant interactif, la Task 0 avait dû être laissée de côté ; Florian l'a exécuté et la génération a suivi immédiatement. Les trois clients sont désormais typés `<Database>`, et le type `Profile` est **dérivé du schéma** (`Pick<…["profiles"]["Row"], …>`) plutôt que réécrit : une colonne renommée en base casse le typage au lieu de diverger en silence. Les deux conversions `as` devenues inutiles ont été retirées.
 
 **Verrou n°2 — le quota d'envoi d'emails.** Tester le parcours exige une session **sur l'origine testée**. La session existante vit sur le domaine de production ; ni `localhost` ni un déploiement de prévisualisation ne la partagent. Obtenir une session ailleurs suppose un nouveau lien, refusé par le quota.
 
@@ -391,11 +405,10 @@ Diagnostic : le CLI (2.109.1) est installé et `supabase/.temp/project-ref` port
 
 **Écart de méthode assumé — pas de TDD.** Le workflow impose un cycle red-green-refactor ; la story l'interdit explicitement (aucun framework de test, planifiés en Story 4.15, NFR-10 proscrit tout outil supplémentaire). La story fait autorité. Vérification exécutable et manuelle, comme prescrit. **Aucune dépendance ajoutée.**
 
-**Ce qui reste à faire, dans l'ordre :**
+**Ce qui reste à faire :**
 
-1. `npx supabase login`, puis reprendre la Task 0 — c'est le prérequis de tout le reste
-2. Un lien de connexion vers l'origine à tester, quand le quota le permettra
-3. Les tasks 6 et 7 : parcours complet, parcours de non-répétition, et **surtout** le contrôle d'isolation à deux comptes, qui est la seule preuve de NFR-5
+1. Une session sur l'origine à tester — soit un lien de connexion quand le quota le permettra, soit un déploiement en production, où la session existe déjà
+2. Les tasks 6 et 7 : parcours complet, parcours de non-répétition, et **surtout** le contrôle d'isolation à deux comptes, qui est la seule preuve de NFR-5
 
 ### File List
 
@@ -409,9 +422,14 @@ Diagnostic : le CLI (2.109.1) est installé et `supabase/.temp/project-ref` port
 - `app/page.tsx` — contenu intégralement remplacé (le texte d'attente du socle disparaît)
 - `README.md` — renvoi vers `docs/migrations.md`
 
+**Modifiés (Task 0)**
+- `lib/supabase/types.ts` — **remplacé par la sortie de `supabase gen types`** (724 lignes). N'est plus à éditer à la main
+- `lib/supabase/client.ts` — `createBrowserClient<Database>`
+- `lib/supabase/server.ts` — `createServerClient<Database>` sur les deux fabriques
+- `lib/supabase/proxy.ts` — `createServerClient<Database>`. **Seule modification apportée à ce fichier** : la garde d'appartenance n'y a pas été mise, conformément à la story
+
 **Inchangés, vérifiés**
-- `lib/supabase/{client,server,proxy}.ts`, `proxy.ts` — `git diff` vide. Les clients recevront `<Database>` avec la Task 0
-- `lib/supabase/types.ts` — toujours écrit à la main, en attente de génération
+- `proxy.ts` (racine) — `git diff` vide
 - `package.json`, `package-lock.json` — **aucune dépendance ajoutée**
 - `supabase/migrations/` — **aucune migration**
 
@@ -422,3 +440,4 @@ Diagnostic : le CLI (2.109.1) est installé et `supabase/.temp/project-ref` port
 | 2026-07-26 | Story créée. Statut → `ready-for-dev` |
 | 2026-07-26 | Deux questions tranchées par Florian : le nom du foyer est demandé à l'inscription (deux champs), et `supabase gen types` entre dans le périmètre — nouvelle Task 0, clients typés `<Database>`, contrôle de non-régression sur `supabase/migrations/` resserré. État vérifié de l'environnement consigné |
 | 2026-07-26 | Implémentation : garde d'appartenance, accueil qui aiguille, écran d'inscription au foyer, appel de la fonction Postgres, discipline de migrations. Tasks 1 à 5 complètes ; task 0 bloquée (`supabase login` interactif), tasks 6 et 7 partiellement bloquées (quota d'emails). Statut maintenu `in-progress` |
+| 2026-07-27 | Task 0 débloquée par le `supabase login` de Florian : types générés (724 lignes, 7 fonctions), générique `<Database>` câblé sur les trois clients, `Profile` dérivé du schéma, conversions `as` retirées. Contre-épreuve du typage passée sur trois fautes injectées. Reste la vérification de bout en bout |
