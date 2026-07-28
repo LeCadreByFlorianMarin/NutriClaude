@@ -111,8 +111,9 @@ export function LoginForm({ next, error }: { next: string; error?: string }) {
     <form onSubmit={handleSubmit} className="w-full max-w-sm">
       <h1 className="titre-ecran">NutriClaude</h1>
       <p className="mt-2 text-base">
-        Pas de mot de passe ici. On t&apos;envoie un lien, tu cliques, tu es
-        connecté.
+        {/* « tu y es » plutôt que « tu es connecté » : la phrase s'adresse au
+            lecteur, dont le produit ne sait rien. */}
+        Pas de mot de passe ici. On t&apos;envoie un lien, tu cliques, tu y es.
       </p>
 
       <Notice reserve className="mt-4">{message}</Notice>
@@ -120,6 +121,9 @@ export function LoginForm({ next, error }: { next: string; error?: string }) {
       <label htmlFor="email" className="label">
         Ton adresse email
       </label>
+      {/* Pas d'`autoFocus` : il place le curseur virtuel après le `<h1>` et
+          l'intro, qui ne sont donc jamais restitués, et sur mobile le clavier
+          recouvre immédiatement cette même zone. */}
       <input
         id="email"
         name="email"
@@ -127,7 +131,6 @@ export function LoginForm({ next, error }: { next: string; error?: string }) {
         required
         autoComplete="email"
         inputMode="email"
-        autoFocus
         value={email}
         onChange={(event) => setEmail(event.target.value)}
         className="input mt-2"

@@ -128,12 +128,14 @@ export function CreateHouseholdForm({
       <label htmlFor="household" className="label">
         Le nom de chez toi
       </label>
+      {/* Pas d'`autoFocus` : il place le curseur virtuel après le `<h1>` et
+          l'intro, qui ne sont donc jamais restitués, et sur mobile le clavier
+          recouvre immédiatement cette même zone. */}
       <input
         id="household"
         name="household"
         type="text"
         required
-        autoFocus
         placeholder="Chez les Marin"
         maxLength={MAX_NOM_FOYER}
         value={householdName}

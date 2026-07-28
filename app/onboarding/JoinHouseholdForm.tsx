@@ -118,12 +118,14 @@ export function JoinHouseholdForm({
       <label htmlFor="code" className="label">
         Le code qu&apos;on t&apos;a donné
       </label>
+      {/* Pas d'`autoFocus` : il place le curseur virtuel après le `<h1>` et
+          l'intro, qui ne sont donc jamais restitués, et sur mobile le clavier
+          recouvre immédiatement cette même zone. */}
       <input
         id="code"
         name="code"
         type="text"
         required
-        autoFocus
         autoComplete="off"
         autoCapitalize="characters"
         spellCheck={false}

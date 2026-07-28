@@ -56,12 +56,13 @@ development_status:
   1-4-generer-un-code-d-invitation: done
   1-5-rejoindre-un-foyer-via-un-code-d-invitation: done
   1-6-ecran-profil-membres-du-foyer: done
-  # Close sur décision de Florian (2026-07-28). Deux contrôles restent ouverts et
-  # sont tracés dans deferred-work.md — la clôture ne les annule pas :
-  #   1. la relecture visuelle des SEPT écrans dans les DEUX thèmes n'a pas eu
-  #      lieu ; la preuve d'origine portait sur six écrans et un /foyer qui a
-  #      changé trois fois depuis. Aucun test ne peut porter ce contrôle.
-  #   2. `20260728152418_require_non_blank_household_name.sql` n'est pas appliquée.
+  # Close sur décision de Florian (2026-07-28). Les deux contrôles alors ouverts
+  # ont été menés le 2026-07-29 ; il en reste un morceau :
+  #   1. relecture visuelle : SIX écrans sur sept vus dans les DEUX thèmes. Elle a
+  #      trouvé trois défauts qu'aucune des quatre portes ne voyait, dont deux
+  #      consignés « traités » par la passe 3 sans l'être. /onboarding reste à
+  #      voir : il exige un compte sans profil, donc l'environnement de test.
+  #   2. `20260728152418_require_non_blank_household_name.sql` : appliquée.
   1-7-fondations-de-theme-clair-sombre-de-ton: done
   epic-1-retrospective: done
 
@@ -153,12 +154,12 @@ action_items:
   - epic: 1
     action: "Pousser 20260728152418_require_non_blank_household_name.sql (requête de contrôle en en-tête du fichier)"
     owner: "Florian"
-    status: open
+    status: done
   # Avant de clore l'Epic 1 pour de bon
   - epic: 1
-    action: "Relire les sept écrans dans les deux thèmes, /auth/bascule compris — jamais fait, et la preuve d'origine portait sur six écrans"
+    action: "Relire les sept écrans dans les deux thèmes, /auth/bascule compris — 6/7 faits le 2026-07-29 (3 défauts trouvés et corrigés) ; /onboarding exige un compte sans profil, donc l'environnement de test"
     owner: "Florian"
-    status: open
+    status: in-progress
   - epic: 1
     action: "Nettoyer les trois comptes témoins abandonnés en production (+nc1, +nc2, +nc3) et leurs foyers"
     owner: "Florian"

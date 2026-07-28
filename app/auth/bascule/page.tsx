@@ -79,8 +79,13 @@ export default async function BasculePage({
          * censé prévenir.
          */
         <Link href="/" className="btn-primaire w-full">
+          {/*
+           * « laisser X ici », et non « laisser X connecté » : le libellé
+           * s'accorde avec une personne dont le produit ne connaît que le
+           * prénom. « Laisser Marie connecté » se lit sur un foyer de deux.
+           */}
           {prenomEnPlace
-            ? `Non, laisser ${prenomEnPlace} connecté`
+            ? `Non, laisser ${prenomEnPlace} ici`
             : "Non, ne pas changer de compte"}
         </Link>
       }

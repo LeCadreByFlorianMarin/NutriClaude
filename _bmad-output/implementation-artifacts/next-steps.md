@@ -4,14 +4,18 @@ _Journal opérationnel, tenu à jour à la main. Source : rétrospective Epic 1 
 (`epic-1-retro-2026-07-28.md`) et les trois rapports de revue `epic-1-code-review-pass{1,2,3}-*.md`._
 
 **État au 2026-07-28** — Epic 1 clos (7/7 stories). `test` 49/49 · `typecheck` ✅ ·
-`lint --max-warnings 0` ✅ · `build` ✅. Branche `feat/story-1-7-theme`, **67 fichiers non commités**.
+`lint --max-warnings 0` ✅ · `build` ✅. Branche `feat/story-1-7-theme`, travail des trois passes
+commité (`fa0ccbf`, 79 fichiers), **non poussée**.
 
 ---
 
 ## 0. À faire d'abord, indépendamment du reste
 
-- [ ] **Commiter le travail des trois passes de revue.** 67 fichiers touchés, dont 27 nouveaux, non commités. Tant que ça reste dans l'arbre de travail, une erreur de manipulation efface trois
-      passes de revue.
+- [x] **Commiter le travail des trois passes de revue.** Fait le 2026-07-28 — `fa0ccbf`, 79 fichiers,
+      +4139/-724, un seul commit. Les passes ne sont pas séparables : chacune a rouvert les fichiers
+      de la précédente (`app/foyer/page.tsx` est touché par les trois), et aucun état intermédiaire
+      ne compile. Les quatre portes ont été rejouées sur l'arbre avant de commiter.
+      La branche n'est pas poussée.
 
 - [ ] **Pousser la dernière migration.** Les quatre autres sont appliquées ; celle-ci a été écrite
       après le dernier `db push`.
@@ -33,11 +37,28 @@ _Journal opérationnel, tenu à jour à la main. Source : rétrospective Epic 1 
 Ces deux points sont les seuls contrôles de l'Epic 1 qu'aucun test ne peut porter. L'epic est marqué
 `done`, ce qui ne les annule pas.
 
-- [ ] **Relire les sept écrans dans les deux thèmes** — clair *puis* sombre.
-      `/` · `/login` · `/onboarding` · `/foyer` · `/auth/bascule` · `error` · `not-found`
-      À regarder en priorité : `/foyer` (trois groupes au lieu de cinq sections, carte d'invitation
-      remaniée), `/login` (le bouton principal existe enfin visuellement), et `/auth/bascule` —
-      **jamais vu dans aucun thème**.
+- [x] **Relire les sept écrans dans les deux thèmes** — fait le 2026-07-29, **six sur sept**.
+      `/` · `/login` · `/foyer` · `/auth/bascule` · `error` · `not-found` vus en clair **et** en
+      sombre, en basculant l'apparence macOS (le thème suit `prefers-color-scheme`,
+      `globals.css:68` — donc la bascule système est le vrai contrôle, pas une simulation).
+
+      **`/onboarding` n'a pas pu être relu**, dans aucun thème. Il exige l'état `sans-foyer` :
+      connecté avec un profil il redirige vers `/` (`onboarding/page.tsx:19`), déconnecté il
+      redirige vers `/login` (307 mesuré). Le voir demande un compte sans profil — c'est-à-dire
+      exactement l'environnement de test du §2. **À reprendre dès qu'il existe.**
+
+      Trois défauts trouvés, tous corrigés et tous invisibles à la lecture du code :
+      1. `/foyer` affichait **« Ton prénom » deux fois** — la passe 3 a ajouté un `<h2>` au-dessus
+         d'un `<label>` qui portait déjà ces mots. Le `<label>` passe en `.sr-only`.
+      2. **`autoFocus` était encore sur les trois champs** (`LoginForm`, `CreateHouseholdForm`,
+         `JoinHouseholdForm`) alors que la passe 3 le consigne « traité ». Zéro sur trois. Vu à
+         l'anneau de focus abricot posé sur le champ email au chargement de `/login`.
+      3. **« tu cliques, tu es connecté »** était toujours à l'écran (passe 3 : « traité » ; seul
+         le `/foyer` l'était). Et la passe avait **introduit** le même défaut dans l'écran qu'elle
+         écrivait : `Non, laisser ${prénom} connecté` sur `/auth/bascule`.
+
+      Ce que ça confirme du §4 : les deux constats faussement « traités » sont le motif que la
+      rétrospective a nommé, et aucune des quatre portes ne pouvait les voir.
       ```bash
       npm run dev   # port 3333
       ```
