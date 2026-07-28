@@ -1,21 +1,31 @@
 import { createServerClient } from "@supabase/ssr";
 import type { Database } from "./types";
 import { cookies } from "next/headers";
+import { supabaseEnv } from "./env";
 
 /**
- * Client Supabase côté serveur, pour les Server Components, Route Handlers et
- * Server Actions. En Next 16, `cookies()` est asynchrone : cette fabrique l'est
- * donc aussi, et tout appelant doit faire `await createClient()`.
+ * Client Supabase pour un **Server Component ou une Server Action** — c'est-à-dire
+ * un contexte qui lit les cookies mais n'écrit pas d'en-têtes de réponse. Pour
+ * un Route Handler, qui lui le peut, voir `createRouteHandlerClient()` plus bas.
+ *
+ * Nommée par son contexte d'exécution, et non `createClient` : un homonyme du
+ * client navigateur (`lib/supabase/client.ts`) ne se distinguait que par le
+ * chemin d'import, si bien qu'une erreur d'import était un bug silencieux plutôt
+ * qu'une erreur de typage.
+ *
+ * En Next 16, `cookies()` est asynchrone : cette fabrique l'est donc aussi, et
+ * tout appelant doit faire `await createServerComponentClient()`.
  *
  * Les Server Actions restent réduites à l'irréductible serveur (AD-13) :
  * callback magic-link, émission de jetons d'appareil et d'invitations.
  */
-export async function createClient() {
+export async function createServerComponentClient() {
   const cookieStore = await cookies();
+  const { url: supabaseUrl, anonKey: supabaseAnonKey } = supabaseEnv();
 
   return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -41,7 +51,7 @@ export async function createClient() {
 
 /**
  * Client Supabase pour un **Route Handler**, qui lui peut écrire des en-têtes de
- * réponse — contrairement au Server Component servi par `createClient()`.
+ * réponse — contrairement au Server Component servi par `createServerComponentClient()`.
  *
  * C'est toute la raison d'être de cette seconde fabrique : `/auth/callback` est
  * la réponse qui **pose le cookie de session**, et une telle réponse ne doit
@@ -56,11 +66,12 @@ export async function createClient() {
  */
 export async function createRouteHandlerClient() {
   const cookieStore = await cookies();
+  const { url: supabaseUrl, anonKey: supabaseAnonKey } = supabaseEnv();
   const authHeaders: Record<string, string> = {};
 
   const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {

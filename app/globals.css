@@ -32,9 +32,27 @@
     linear-gradient(160deg, #f7f4ee, #eef1ee 60%, #f3ece3);
   --surface-card: #ffffff;
   --card-border: rgba(20, 20, 20, 0.07);
+  /*
+   * Bordure d'un CONTRÔLE (champ, bouton secondaire) — distincte de
+   * `--card-border`, et c'est délibéré. WCAG 1.4.11 exige 3:1 pour la frontière
+   * qui *identifie* un contrôle ; une carte, elle, se reconnaît à son
+   * remplissage et à son ombre, et une bordure à 3:1 l'alourdirait pour rien.
+   * Avant cette distinction, la bordure d'un champ était à **1,02:1** contre la
+   * page : mathématiquement invisible, et rien ne distinguait un champ d'un
+   * bouton. 3,41:1 contre la page, 3,84:1 contre la carte.
+   */
+  --control-border: rgba(20, 20, 20, 0.53);
   --card-shadow: 0 6px 18px rgba(60, 50, 30, 0.06);
   --text: #20211d;
-  --muted: #6a6f66; /* secondaire PORTEUR d'info — 5,15:1 sur carte. AA. */
+  /*
+   * Secondaire PORTEUR d'info. Audité sur la surface où la classe vit
+   * RÉELLEMENT — `.hint` et `.btn-quiet` sont posés sur la page, pas sur une
+   * carte. Sur les trois arrêts du dégradé : 5,20 / 5,02 / 4,87:1. AA partout.
+   * (L'ancienne valeur #6a6f66 était auditée sur carte seule et tombait à
+   * 4,39:1 sur l'arrêt chaud, c'est-à-dire au bas de page — exactement où vit
+   * « Se déconnecter ».)
+   */
+  --muted: #63685f;
   --muted-2: #8b9083; /* non-essentiel SEULEMENT — jamais un texte porteur */
   --checkbox-empty: #83887b; /* 3,64:1 sur carte blanche */
   --checkbox-empty-fill: rgba(20, 20, 20, 0.03);
@@ -60,6 +78,7 @@
       linear-gradient(160deg, #211318, #191016 55%, #2a1512);
     --surface-card: rgba(255, 255, 255, 0.055); /* verre translucide */
     --card-border: rgba(255, 255, 255, 0.1);
+    --control-border: rgba(255, 255, 255, 0.38); /* 3,57:1 sur la base. Voir le thème clair. */
     --card-shadow: none; /* sur sombre, la profondeur vient du verre, pas de l'ombre */
     --text: #eef1f8;
     --muted: #aeb6c9; /* 8,06:1 sur le verre carte. AA. */
@@ -92,12 +111,22 @@
   --color-transparent: transparent;
   --color-current: currentColor;
 
-  /* Arrondis — registre « tiède » : ni angle vif, ni tout-rond. */
+  /*
+   * Arrondis — registre « tiède » : ni angle vif, ni tout-rond.
+   *
+   * `--radius-*: initial` pour la même raison que les couleurs : sans lui, les
+   * pas non redéclarés gardaient leur valeur Tailwind, et l'échelle cessait
+   * d'être monotone — `rounded-2xl` valait 16px, soit MOINS que `rounded-xl`
+   * (22px). Un `rounded-2xl` écrit par distraction produisait un arrondi plus
+   * petit qu'un `rounded-xl`. Désormais il n'existe tout simplement pas.
+   */
+  --radius-*: initial;
   --radius-sm: 8px; /* coche */
   --radius-md: 14px; /* cartes-rayon, tuiles, boutons, champs */
   --radius-lg: 20px; /* grandes cartes */
   --radius-xl: 22px; /* conteneur dashboard */
   --radius-pill: 20px; /* pastilles, chips */
+  --radius-full: 9999px;
 
   /* Deux familles, deux rôles. Aucune webfont : stack système seul
      (décision de Florian, 2026-07-27 — NFR-11, légèreté PWA).
@@ -106,20 +135,59 @@
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-rounded: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, sans-serif;
 
-  /* L'échelle d'espacement de DESIGN.md (4/8/12/16/20/24) est déjà celle de
-     Tailwind par défaut (base 4px) : rien à redéclarer. Le plancher tactile
-     de 44px s'écrit `min-h-11`. */
+  /*
+   * Espacement — les six pas de DESIGN.md sont bien ceux de Tailwind (base 4px),
+   * mais les **invariants tactiles** n'y sont pas : ils ne tombent pas sur
+   * l'échelle, et c'est précisément ce qui en fait des tokens nommés.
+   * Les déclarer ici les rend écrivables (`min-h-touch`, `gap-gutter`…) au lieu
+   * d'être approximés au pixel le plus proche.
+   */
+  --spacing-touch: 44px; /* plancher tactile absolu (NFR / a11y) */
+  --spacing-gutter: 14px; /* espace inter-cartes */
+  --spacing-card: 12px; /* padding interne d'une carte */
+  --spacing-screen: 8px; /* marge latérale de l'écran liste (téléphone une main) */
+  --spacing-item: 46px; /* hauteur de ligne-article, téléphone */
+
+  /*
+   * Échelle typographique de DESIGN.md. Seuls les rôles que l'Epic 1 emploie
+   * sont posés — `counter`, `clock` et les variantes dashboard arriveront avec
+   * les écrans qui les portent (Epics 2 et 5).
+   */
+  --text-eyebrow: 11px;
+  --text-eyebrow--line-height: 1.4;
+  --text-eyebrow--letter-spacing: 0.05em;
+  --text-eyebrow--font-weight: 700;
+  --text-meta: 12px;
+  --text-meta--line-height: 1.5;
+  --text-body: 15px;
+  --text-body--line-height: 1.4;
+  --text-title: 19px;
+  --text-title--line-height: 1.25;
+  --text-title--letter-spacing: -0.01em;
+  --text-title--font-weight: 700;
 }
 
+/*
+ * Pont vers Tailwind. Volontairement **restreint** : un token publié ici devient
+ * écrivable comme utilitaire, donc une surface d'erreur.
+ *
+ * ⚠️ `--accent` et `--accent-strong` ne sont PAS publiés, alors qu'ils
+ * l'étaient. Ils ne basculent pas entre les thèmes — c'est un choix documenté
+ * plus haut — si bien que `text-accent` rendait de l'abricot clair sur une carte
+ * blanche, soit **1,90:1**. Publier un token hors-thème contredisait la thèse
+ * même de ce fichier. Seuls les alias qui basculent sont exposés
+ * (`accent-fill`, `accent-text`, `accent-ink`) ; les valeurs brutes restent
+ * disponibles en `var(--accent)` pour la couche composants, là où le thème est
+ * décidé en connaissance de cause.
+ */
 @theme inline {
   --color-surface-base: var(--surface-base);
   --color-surface-card: var(--surface-card);
   --color-card-border: var(--card-border);
+  --color-control-border: var(--control-border);
   --color-text: var(--text);
   --color-muted: var(--muted);
   --color-muted-2: var(--muted-2);
-  --color-accent: var(--accent);
-  --color-accent-strong: var(--accent-strong);
   --color-accent-text: var(--accent-text);
   --color-accent-fill: var(--accent-fill);
   --color-accent-ink: var(--accent-ink);
@@ -129,7 +197,6 @@
   --color-offline-bg: var(--offline-bg);
   --color-offline-text: var(--offline-text);
   --color-offline-border: var(--offline-border);
-  --color-focus-ring: var(--focus-ring);
 }
 
 /* =========================================================================
@@ -139,9 +206,23 @@
 body {
   background-color: var(--surface-base);
   background-image: var(--surface-base-image);
-  background-attachment: fixed;
   color: var(--text);
   font-family: var(--font-sans);
+}
+
+/*
+ * Le fond est épinglé au viewport — mais pas via `background-attachment: fixed`,
+ * qui force un repaint plein à chaque image de défilement et fait se ré-ancrer
+ * les halos quand la barre d'URL d'iOS Safari se rétracte. Un pseudo-élément
+ * `position: fixed` obtient le même rendu, composé sur sa propre couche.
+ */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image: var(--surface-base-image);
+  pointer-events: none;
 }
 
 /*
@@ -166,27 +247,114 @@ body {
  * ========================================================================= */
 
 @layer components {
-  /* Bouton plein — neutre. PAS d'abricot : aucun écran de l'Epic 1 n'est une
-     action courses, et l'accent n'est pas un habillage (UX-DR2). */
-  .btn {
-    @apply inline-flex min-h-11 items-center justify-center rounded-md
-           border border-card-border bg-surface-card px-4 py-2 font-medium
-           text-text disabled:opacity-60;
+  /* Gabarit d'écran centré — 7 copies de la même chaîne avant extraction. */
+  .ecran-centre {
+    @apply flex flex-1 items-center justify-center p-6;
   }
 
-  /* Bouton discret — le second chemin, jamais l'action principale. */
+  /*
+   * Titres — c'est ici que la famille arrondie entre en scène. DESIGN.md en
+   * fait « le registre *sans y penser*, familier, chaleureux », et elle était
+   * déclarée sans aucun appelant : le produit n'avait pas la voix que son
+   * design system lui écrit, et le token était tree-shaké du CSS compilé.
+   */
+  .titre-ecran {
+    @apply text-2xl font-bold;
+    font-family: var(--font-rounded);
+    letter-spacing: -0.01em;
+  }
+
+  .titre-section {
+    @apply text-base font-semibold;
+    font-family: var(--font-rounded);
+  }
+
+  /*
+   * Bouton PRINCIPAL — aplat neutre inversé.
+   *
+   * PAS d'abricot : aucun écran de l'Epic 1 n'est une action courses, et
+   * l'accent n'est pas un habillage (UX-DR2). L'inversion donne 14,36:1 en
+   * clair et 16,48:1 en sombre, là où l'ancien bouton « plein » était à
+   * **1,13:1** contre la page — indistinguable d'un champ de saisie.
+   */
+  .btn-primaire {
+    @apply inline-flex min-h-11 cursor-pointer items-center justify-center
+           rounded-md px-4 py-2 font-medium;
+    background-color: var(--text);
+    color: var(--surface-base);
+  }
+  .btn-primaire:hover:not(:disabled) {
+    opacity: 0.88;
+  }
+  .btn-primaire:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  /* Bouton SECONDAIRE — surface bordée. La bordure est celle des contrôles
+     (3:1), pas celle des cartes : c'est elle qui dit « ceci se presse ». */
+  .btn {
+    @apply inline-flex min-h-11 cursor-pointer items-center justify-center
+           rounded-md border border-control-border bg-surface-card px-4 py-2
+           font-medium text-text;
+  }
+  .btn:hover:not(:disabled) {
+    border-color: var(--text);
+  }
+  .btn:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  /*
+   * Bouton discret — le second chemin, jamais l'action principale.
+   * Pas de `w-full` : c'est un lien, et l'étirer sur toute la largeur avec
+   * `min-h-11` produisait un texte souligné flottant dans une zone vide de
+   * 44px — ni bouton, ni lien.
+   */
   .btn-quiet {
-    @apply inline-flex min-h-11 items-center justify-center rounded-md px-4 py-2
-           text-sm text-muted underline underline-offset-4 disabled:opacity-60;
+    @apply inline-flex min-h-11 cursor-pointer items-center justify-center
+           px-2 py-2 text-sm text-muted underline underline-offset-4;
+  }
+  .btn-quiet:hover:not(:disabled) {
+    color: var(--text);
+  }
+
+  /*
+   * État désactivé — un ton plus clair, jamais une opacité réductrice.
+   * Le libellé « Un instant… » est la seule indication qu'une soumission est
+   * en cours : le passer à 60 % d'opacité le faisait tomber à ≈4,3:1, alors que
+   * la story bannit explicitement l'opacité sur un texte porteur.
+   */
+  .btn-primaire:disabled,
+  .btn:disabled,
+  .btn-quiet:disabled {
+    @apply cursor-default;
+    filter: saturate(0.6);
+  }
+  .btn-primaire:disabled {
+    background-color: var(--muted);
   }
 
   .input {
-    @apply min-h-11 w-full rounded-md border border-card-border bg-surface-card
-           px-3 py-2 text-base text-text;
+    @apply min-h-11 w-full rounded-md border border-control-border
+           bg-surface-card px-3 py-2 text-base text-text;
+  }
+  .input::placeholder {
+    color: var(--muted);
+  }
+  /*
+   * Chrome repeint un champ auto-rempli avec SON fond opaque et son encre
+   * quasi noire : en thème sombre, un bloc clair au milieu de l'aubergine.
+   * L'ombre interne est le seul levier qui reprenne la main sur ce fond.
+   */
+  .input:-webkit-autofill,
+  .input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--text);
+    box-shadow: 0 0 0 1000px var(--surface-card) inset;
+    caret-color: var(--text);
   }
 
   .label {
-    @apply block text-sm font-medium text-text;
+    @apply block text-sm font-medium text-muted;
   }
 
   .card {
@@ -206,6 +374,24 @@ body {
      texte et sa graisse. */
   .notice {
     @apply min-h-6 text-base font-medium text-text;
+  }
+
+  /*
+   * Réservé aux lecteurs d'écran. Nécessaire parce qu'`aria-label` est ignoré
+   * sur un `<p>` (le rôle `paragraph` est *name-prohibited* en ARIA 1.2) : le
+   * code d'invitation épelé n'atteignait aucun lecteur, alors que c'est la
+   * seule donnée du produit qui existe pour être dictée à voix haute.
+   */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border-width: 0;
   }
 }
 

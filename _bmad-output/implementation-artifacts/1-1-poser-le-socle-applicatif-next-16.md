@@ -448,3 +448,17 @@ _Corrigée en revue (2026-07-26) : trois entrées étaient mal classées — `cl
 | 2026-07-26 | Story redéfinie en « Poser le socle applicatif Next 16 » — Sprint Change Proposal du 2026-07-26 |
 | 2026-07-26 | Implémentation : scaffold Next 16.2.12 neuf, prototype retiré (tag `prototype-2026-05-02`), clients Supabase et contrôle d'accès `proxy.ts` posés. Statut → `review` |
 | 2026-07-26 | Revue de code adversariale (3 couches) : 21 constats retenus. 11 correctifs appliqués — contrôle d'accès durci (correspondance exacte, matcher ancré, cookies et en-têtes préservés sur les redirections, timeout 3 s + bascule hors-ligne), `engines` Node ≥22, `target` ES2022, `strictRouteTypes` activé, 7 inexactitudes du Dev Agent Record corrigées. 10 constats différés dans `deferred-work.md`. Statut → `done` |
+
+---
+
+## Amendement du 2026-07-27 — revue de code Epic 1, passe 1
+
+_Ajouté après coup. La story reste `done` : ce qui suit ne rouvre pas le travail, il empêche la story d'affirmer ce qui s'est révélé faux._
+
+**Les preuves de gating de l'AC3 n'ont jamais rencontré de backend.** La story 1.2 a établi que `NEXT_PUBLIC_SUPABASE_URL` valait littéralement `https://your-project-ref.supabase.co` (NXDOMAIN) pendant toute la durée de cette story : « **l'application n'a jamais été connectée au projet Supabase déployé** ». Les `307` du tableau de vérification venaient donc de la branche `cannotVerify` du proxy, et non de `!user && !isPublic`. Le résultat observé était juste ; **le chemin emprunté n'était pas celui qui était annoncé**. Les huit chemins au curl restent valides comme contrôle du *matcher*, pas comme preuve du contrôle d'accès.
+
+**L'AC3 décrivait trois routes publiques, le code en avait deux.** `epics.md` citait `/login`, `/signup` et `/auth/callback` ; `/signup` n'existait plus. La story avait prescrit l'alignement d'`epics.md` puis a été close sans que la ligne bouge. **Corrigé le 2026-07-27** — `epics.md` liste désormais `/login`, `/auth/callback` et `/auth/bascule`.
+
+**`.github/workflows/ci.yml` a été livré par cette story sans figurer dans aucune tâche, aucun AC, ni la File List.** Constat de méthode, sans action : la CI est documentée depuis la story 1.3 et le README.
+
+**Ce que la revue a trouvé dans le code de cette story** — un open redirect dans `safeNext` contournable par tabulation (corrigé, avec test de régression), un `hasSessionCookie` acceptant le cookie PKCE d'un navigateur jamais authentifié (corrigé, avec test), et une CI épinglée sur Node 22 quand Vercel sert du Node 25 (corrigé). Détail complet : `epic-1-code-review-pass1-infra.md`.

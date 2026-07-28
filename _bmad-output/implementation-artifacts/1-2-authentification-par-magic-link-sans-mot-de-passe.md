@@ -43,7 +43,7 @@ so that je n'aie rien à retenir ni à configurer — le test d'acceptation « e
 ## Tasks / Subtasks
 
 - [x] **Task 0 — Prérequis de configuration Supabase (hors code, à faire AVANT de tester)** (AC: 2, 3)
-  - [x] Dans le tableau de bord Supabase → **Authentication → URL Configuration** : renseigner `Site URL` (l'URL de production Vercel) et ajouter aux **Redirect URLs** les motifs `http://localhost:3000/**` et `https://<domaine-prod>/**` (+ `https://*-<scope>.vercel.app/**` pour les previews). **Le motif doit être en `/**`** : notre `emailRedirectTo` porte une query string, un motif exact la ferait rejeter
+  - [x] Dans le tableau de bord Supabase → **Authentication → URL Configuration** : renseigner `Site URL` (l'URL de production Vercel) et ajouter aux **Redirect URLs** les motifs `http://localhost:3333/**` (le serveur de dev écoute sur 3333 depuis `6acbb04` — un motif en 3000 ne sera jamais satisfait en local) et `https://<domaine-prod>/**` (+ `https://*-<scope>.vercel.app/**` pour les previews). **Le motif doit être en `/**`** : notre `emailRedirectTo` porte une query string, un motif exact la ferait rejeter
   - [x] **Vérifier d'abord que les modèles d'email sont éditables** (Authentication → Emails). Si l'éditeur est en lecture seule, le projet n'est pas antériorisé et **toute cette story est bloquée** → voir « Envoi des emails » en Dev Notes, la parade est un SMTP personnalisé. **Constate-le avant d'écrire une ligne de code**
   - [x] Éditer **les DEUX modèles d'email** (voir Dev Notes « Le piège n°2 ») : *Magic Link* **et** *Confirm sign up*
   - [x] ~~**Ajouter l'adresse email de la conjointe comme membre de l'organisation Supabase**~~ → *sans objet : un service d'envoi dédié (Namecheap) a été configuré le 2026-07-27, ce qui lève la restriction de livraison. Rien à ajouter à l'équipe*
@@ -537,3 +537,20 @@ x-probe-header: pose
 | 2026-07-26 | Implémentation : écran de connexion, validation de `next`, route `/auth/callback` en `verifyOtp`, fabrique de client Route Handler avec report des en-têtes anti-cache. Tasks 1, 2, 3, 6 complètes ; 4, 5, 8 partielles ; 0 et 7 bloquées (configuration Supabase absente + `.env.local` en valeurs d'exemple). Statut maintenu `in-progress` |
 | 2026-07-27 | Story close. Modèles d'email corrigés (les deux), service d'envoi dédié en place, en-têtes anti-cache mesurés, rejeu d'un vrai lien consommé vérifié, AC4 prouvé nativement par la Story 1.3. Statut → `review` |
 | 2026-07-27 | PR #5 approuvée par Florian et fusionnée. Statut → `done`. **Aucune revue de code adversariale n'a été menée** sur cette story, contrairement à la 1.1 — écart assumé, traçable ici |
+
+---
+
+## Amendement du 2026-07-27 — revue de code Epic 1, passe 1
+
+_Ajouté après coup. La story reste `done`._
+
+**Le contrôle NFR-5 des en-têtes anti-cache est rétabli comme ouvert.** Cette story se déclarait close sur leur vérification, tout en reconnaissant que « la sonde déclenchait l'écriture par `refreshSession()` et non `verifyOtp()` » ; `docs/configuration.md` maintenait de son côté que « leur émission effective lors d'une vraie connexion n'a jamais pu être observée ». Deux documents, deux verdicts opposés sur le seul angle mort de sécurité de l'epic. **C'est `docs/configuration.md` qui fait foi** : le contrôle reste à faire, en inspectant les en-têtes de la redirection `/auth/callback` au premier passage réussi.
+
+La revue a par ailleurs confirmé, en lisant `@supabase/ssr`, que la librairie *fournit bien* aujourd'hui `Cache-Control: private, no-cache, no-store…` au second paramètre de `setAll`. Le mécanisme fonctionne donc — mais par le jeu des internes d'une dépendance, non par quelque chose que ce dépôt affirme. `applyAuthHeaders` reste un no-op silencieux si `setAll` ne se déclenche pas.
+
+**Task 0 corrigée :** elle prescrivait `http://localhost:3000/**` en Redirect URL. Le serveur de développement écoute sur **3333** depuis `6acbb04`. Qui appliquait la story telle qu'elle était close configurait un motif que `emailRedirectTo` ne pouvait jamais satisfaire en local.
+
+**Trois défauts trouvés dans le code de cette story, tous corrigés le 2026-07-27** :
+- `ACCEPTED_TYPES` refusait `type=email`, la valeur des modèles Supabase par défaut. Un modèle restauré au défaut depuis le tableau de bord provoquait une **panne totale de connexion**, indiscernable d'un lien expiré — et l'erreur de `verifyOtp` était détruite par destructuration, sans un seul `console.error`. Le type est accepté, l'erreur est journalisée.
+- Aucun `try/catch` : une levée à l'écriture du cookie s'échappait du handler et servait la page 500 de Next, en anglais, sur le seul chemin qui ouvre une session (NFR-8).
+- Un lien magique ouvert sur un navigateur **déjà connecté** écrasait la session en place sans confirmation — le scénario de la tablette de cuisine. Un écran `/auth/bascule` demande désormais confirmation, **sans consommer le jeton** avant le clic.

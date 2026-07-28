@@ -69,7 +69,7 @@
 
 **Course non traitée dans `redeem_household_invite` — l'AC3 n'est vraie qu'en séquentiel :**
 
-- La fonction lit `uses_remaining` **sans verrou** (`for update` absent), contrôle `<= 0`, insère le profil, puis décrémente. Deux personnes rachetant le **dernier** usage au même instant lisent toutes deux `1`, passent toutes deux le contrôle, et décrémentent : le compteur tombe à **-1**, ce que l'AC3 interdit. Vérifié en séquentiel (5 → 4) ; la concurrence reste ouverte. Corriger exige un `for update` dans la fonction, donc une **migration sur une base gelée**. Sans portée à l'échelle d'un foyer de deux personnes ; à traiter le jour où le produit sortirait de la famille.
+- ~~La fonction lit `uses_remaining` **sans verrou**~~ — **CLOS le 2026-07-28** par `20260727161200_guard_invite_use_count.sql`, appliquée en production : contrôle et décrément fusionnés en `update … where uses_remaining > 0 returning household_id`. L'AC3 de la story 1.5 (« le compteur d'usages ne devient jamais négatif ») est donc satisfaite **y compris sous concurrence**. L'argument « irréparable sans migration sur une base gelée » qui fondait ce report ne tient plus : voir la réécriture d'AR-MIGRATIONS ci-dessous.
 
 **Résidu de test à retirer de la base :**
 
@@ -85,7 +85,7 @@
 
 **Trou d'isolation dans la politique d'écriture de `profiles` — discipline applicative, pas garde en base :**
 
-- `profiles_update_own` est déclarée `using (id = auth.uid())` **sans `with check`**. En PostgreSQL, l'expression `using` sert alors aussi de contrôle sur la ligne écrite : le contrôle ne porte donc que sur `id`, et **toutes les autres colonnes de sa propre ligne restent librement modifiables — `household_id` compris**. Un membre qui connaîtrait l'uuid d'un autre foyer pourrait s'y déplacer par un simple `update`. Sans portée réelle à cette échelle (les uuid ne se devinent pas, et il n'y a qu'un foyer), mais **rien en base n'empêche l'écriture** : c'est la discipline du code applicatif qui tient, en n'envoyant jamais que `display_name` dans le payload. Corriger exige un `with check (id = auth.uid())` dans la politique, donc une **migration sur une base gelée**. À traiter le jour où un second foyer existera, ou avant toute story qui écrirait d'autres colonnes de `profiles`.
+- ~~`profiles_update_own` est déclarée `using (id = auth.uid())` **sans `with check`**~~ — **CLOS le 2026-07-28** par `20260727154504_restrict_profile_household_update.sql`, appliquée en production : la politique porte désormais `with check (id = auth.uid() and household_id = current_household_id())`, ce qui gèle `household_id`. La garde n'est plus « la discipline du code applicatif » mais Postgres. `app/foyer/DisplayNameForm.tsx` a été corrigé en conséquence — son commentaire affirmait encore le contraire, et la migration le citait comme preuve que son correctif était sûr : les deux documents se contredisaient.
 
 **Piège d'outillage, pour ne pas le redécouvrir :**
 
@@ -117,3 +117,129 @@
 - **Deux écrans n'ont pas été vus dans les deux thèmes** : `/login` (le proxy renvoie l'utilisateur connecté ailleurs) et `/onboarding` (exige une session sans profil). Leur balisage a été contrôlé sans session et n'emploie que des classes de la couche déjà vues rendues ailleurs — c'est une déduction, pas une observation.
 - **L'échelle typographique de DESIGN.md n'est pas appliquée aux écrans existants.** Seules les familles le sont. Les tailles nommées (`counter` 48px, `title` 19px, `eyebrow` 11px…) décrivent des composants de liste et de dashboard qui n'existent pas encore ; DESIGN.md place d'ailleurs explicitement les écrans d'authentification, d'invitation et de profil **hors de son périmètre**. Les forcer aurait été une refonte, pas une substitution.
 - **Les tokens sans appelant sont volontaires** : `checkbox-*`, `offline-*`, `accent-soft`, `accent-ink`, `muted-2` attendent les Epics 2 à 5. L'AC2 demande que l'accent soit « disponible », pas employé.
+
+## Deferred from: code review of Epic 1 — passe 1/3 (infrastructure) (2026-07-27)
+
+**Décision d'environnement, à trancher avant l'Epic 2 :**
+
+- **Ouvrir une branche Supabase ou un `supabase start` local.** Il n'existe qu'un seul projet Supabase, et il *est* la production. Conséquence : **aucun test d'isolation RLS n'est possible** sans écrire dans la base réelle — et c'est précisément la famille de tests qui aurait attrapé le trou `profiles_update_own` corrigé ce jour. La preuve du coût est déjà au dossier : trois comptes témoins (`+nc1`, `+nc2`, `+nc3`), deux foyers et onze rayons chacun, abandonnés en production parce qu'aucune politique RLS ne permet de les supprimer depuis l'application. NFR-5 est l'exigence non négociable du produit, et c'est la seule qu'on ne sait pas vérifier.
+
+**Reporté, avec la raison :**
+
+- **Les liens de connexion peuvent être consommés par un analyseur d'emails avant le clic humain** (`app/auth/callback/route.ts`). Outlook SafeLinks, la prévisualisation Gmail/Proton, une passerelle d'entreprise, ou un simple double-tap : le premier GET consomme l'OTP, l'humain reçoit `lien-expire` et redemande un lien qui sera scanné à son tour. *Reporté : la parade (fenêtre d'idempotence, ou interstitiel de sécurité GET) n'est pas triviale, et le risque est marginal sur des boîtes personnelles.*
+- **`AuthRetryableFetchError` est reconnu par son nom de chaîne** (`lib/auth/panne.ts`). C'est un nom de classe interne à `@supabase/auth-js` : renommé dans une version mineure, le mode hors-ligne retomberait silencieusement en « pas de session » et déconnecterait tout le foyer à chaque incident. *Reporté : c'est le seul signal que la librairie expose. Le test `panne.test.ts` épingle la chaîne pour qu'une montée de version le fasse voir.*
+- **Le proxy traverse tous les assets, y compris `public/`** (`proxy.ts`). *Reporté — décision assumée et documentée, mais **à rouvrir avant l'Epic 6** : `/manifest.webmanifest` est déjà proxifié, et un jeu d'icônes PWA fera payer un aller-retour `getUser()` par fichier, plafonné à 3 s. Le test `proxy-matcher.test.ts` fige la conséquence et échouera le jour où l'exclusion sera ajoutée.*
+- **La destination est perdue à la toute première connexion.** Lien profond capturé par le proxy, honoré par le callback, puis `requireProfile` n'y trouve pas de profil et part vers `/onboarding`, qui ne porte pas le `next` et dont les deux formulaires codent `router.replace("/")` en dur. *Reporté : ne concerne que le tout premier passage d'un membre.*
+- **`next` est capturé depuis les requêtes RSC** (`lib/supabase/proxy.ts`). Le matcher n'exclut que `_next/static/` et `_next/image/`, donc un `?_rsc=…` finit dans l'URL de connexion et survit à l'aller-retour email. *Reporté : cosmétique.*
+- **Les en-têtes anti-cache ne couvrent pas les Server Actions** (`lib/supabase/server.ts`). La fabrique de Server Component ignore le second paramètre de `setAll`. *Reporté : Next n'expose pas d'API pour poser des en-têtes de réponse depuis une Server Action, et leurs réponses sont des POST — non mises en cache par un CDN. Le commentaire du fichier reste à corriger le jour où l'API existera.*
+- **Pas de `Content-Security-Policy`** (`next.config.ts`). Les quatre autres en-têtes de sécurité sont posés. *Reporté : Next 16 exige un nonce par requête pour ses scripts inline, ce qui se règle dans le proxy et demande une vérification en conditions réelles. À traiter avec l'epic qui introduit du contenu libre saisi par le membre (recettes, articles), là où la surface XSS apparaît.*
+- **Rien ne détecte la dérive entre `lib/supabase/types.ts` et le schéma déployé.** *Reporté : l'étape CI (`supabase gen types --linked` puis `git diff --exit-code`) suppose un `SUPABASE_ACCESS_TOKEN` en secret du dépôt, donc une décision d'infrastructure. En attendant, le rappel « régénérer dans le même commit » vit dans `.github/pull_request_template.md`.*
+
+**Corrections d'entrées devenues fausses :**
+
+- ~~« `lib/supabase/types.ts` est écrit à la main »~~ — **faux depuis la story 1.3** : le fichier est généré (en-tête `__InternalSupabase / PostgrestVersion`, 724 lignes). Ce qui reste vrai, c'est l'absence de contrôle de dérive, tracée ci-dessus.
+- ~~« `postcss` n'est plus que transitif »~~ — **faux** : `package.json` le redéclare en devDependency directe (`postcss: 8.5.23`).
+- ~~« Rétablir `PUBLIC_ROUTES` en cohérence (`/signup` listée mais n'existe plus) »~~ — **clos** : `epics.md` est aligné sur `/login`, `/auth/callback`, `/auth/bascule`.
+- ~~« Valider les variables d'environnement au démarrage »~~ — **clos** : `lib/supabase/env.ts`.
+- ~~« `getUser()` n'a aucun timeout »~~ — **clos** : `withTimeout` dans `lib/auth/panne.ts`, appliqué au proxy **et** à la couche données. Le timer perdant est désormais annulé.
+- ~~« Aucune revue de code adversariale sur les stories 1.2 et 1.3 »~~ — **en cours** : la passe 1/3 de cette revue les couvre côté infrastructure. Les passes 2 et 3 (métier, UI) restent à mener.
+
+**Constats renvoyés à la passe 2 (couche métier) :**
+
+- **Les messages d'exception plpgsql, en anglais, sont l'API** — `JoinHouseholdForm.tsx` fait du `String.includes` sur `Invalid invite code`, `Invite expired`, `no uses remaining` ; deux fichiers le font sur `Profile already exists`. `docs/migrations.md` bénit `create or replace function` comme mécanisme d'évolution normal, sans mentionner le texte des messages comme contrat consommé. Une reformulation anodine fait retomber trois erreurs distinctes sur « Ça n'a pas marché », invisible au `typecheck` comme en CI.
+- **La validité d'une invitation est définie deux fois, avec deux horloges** — `app/foyer/invitation.ts` refait `expires_at > now` et `uses_remaining > 0` en JS (`new Date()`), là où `redeem_household_invite` les évalue en `now()` Postgres.
+
+## Deferred from: code review of Epic 1 — passe 2/3 (couche métier) (2026-07-28)
+
+### AR-MIGRATIONS réécrit — la prémisse « base gelée » n'existe plus
+
+L'énoncé cité comme contrainte dure dans les stories 1.1 à 1.6 — « schéma **déployé et gelé**, aucune
+migration, `git status --short supabase/` doit rester vide » — est **caduc depuis le 2026-07-28** :
+quatre migrations existent, dont deux appliquées en production.
+
+**Nouvel énoncé.** Le schéma évolue par migrations **strictement additives et disciplinées**, au sens
+de `docs/migrations.md` : un fichier déjà appliqué ne se modifie jamais, une correction est une
+nouvelle migration, et toute PR qui touche `supabase/migrations/` répond aux quatre questions du
+template de pull request. « Gelé » voulait dire « on ne touche pas au schéma pendant l'Epic 1 » ;
+cela ne voulait pas dire « le schéma ne peut plus changer », et `docs/migrations.md` décrivait déjà
+la discipline réelle.
+
+**Renoncements qui s'adossaient à cette prémisse — à rouvrir ou à confirmer explicitement :**
+
+- ~~Course sur `uses_remaining`~~ — **rouvert et corrigé** (voir plus haut).
+- ~~`profiles_update_own` sans `with check`~~ — **rouvert et corrigé** (voir plus haut).
+- **`households_insert` autorise tout utilisateur authentifié** à insérer une ligne sans profil
+  rattaché, ce qui permet des foyers orphelins invisibles. Le renoncement invoquait « une migration
+  sur une base gelée ». **Toujours ouvert**, mais l'argument doit changer : c'est désormais un
+  arbitrage de valeur, pas une impossibilité.
+- **Le nom du foyer n'est modifiable nulle part.** Aucune story ne le couvre. Sans rapport avec les
+  migrations, mais le constat prend du poids maintenant qu'un nom de foyer est borné à 60 caractères
+  et qu'une saisie malheureuse est définitive pour tout le foyer.
+
+### Reporté, avec la raison
+
+- ~~Le `as never` dans `lib/foyer/invitation.ts`~~ — **CLOS le 2026-07-28** : migrations poussées,
+  types régénérés, contournement retiré. Un enseignement en est sorti : **Postgres perd l'information
+  `not null` à travers une vue**, si bien que les types générés de `household_invites_valides`
+  déclarent les trois colonnes nullables. Le type écrit à la main le masquait ; le type généré l'a
+  révélé, et `invitation.ts` teste désormais explicitement. À savoir pour toute vue future.
+- **Les SQLSTATE personnalisés.** `lib/foyer/erreurs.ts` lit déjà `error.code` en priorité, mais les
+  fonctions plpgsql lèvent encore sans `errcode`. La bascule est prête côté application (table
+  `PAR_CODE`, vide aujourd'hui) et ne demandera aucune coordination le jour venu.
+- **Aucun test ne couvre les Server Actions ni les lectures de `lib/foyer/`.** Elles prennent
+  désormais leur client en paramètre, donc un faux client suffirait. Ce qui manque, c'est le faux
+  lui-même (`lib/supabase/faux.ts`). ⚠️ Il devra porter en tête un avertissement : **il ne modélise
+  pas la RLS**, et un test de `membresDuFoyer` avec ce faux prouve le mapping, jamais l'isolation.
+- **Le glob de test s'arrête à `lib/`.** Décision assumée et désormais écrite : **les tests vivent
+  sous `lib/`**. C'est ce qui a motivé le déplacement de `invitation.ts` et `membres.ts`. Un test
+  déposé sous `app/` ne s'exécuterait pas et la CI resterait verte — à savoir.
+- **`app/error.tsx` est le seul écran d'une panne Supabase.** Les trois routes lèvent désormais de
+  façon cohérente sur `inverifiable`, mais « Ça a coincé » ne dit pas *ce qui* a coincé. Un état
+  hors-ligne explicite est du ressort de la passe 3 (UI) ou de l'Epic 4.
+
+## Deferred from: code review of Epic 1 — passe 3/3 (UI & thème) (2026-07-28)
+
+### À faire à la main, et que rien n'automatise
+
+- **Reparcourir les sept écrans dans les deux thèmes.** La vérification visuelle de la story 1.7
+  portait sur six écrans et sur un `/foyer` qui a depuis changé trois fois. `/auth/bascule` n'a
+  jamais été vu. Aucun test ne peut porter ce contrôle — il reste manuel, et c'est le dernier de
+  l'Epic 1 dans ce cas.
+- **UNE migration reste à contrôler puis pousser** — `20260728152418_require_non_blank_household_name.sql`
+  (écrite après le dernier `db push`). Requête de contrôle en en-tête du fichier :
+  `select id, name from households where btrim(name) = '';`
+  Elle ne change pas la forme du schéma : pas de régénération de types nécessaire.
+  Les quatre autres migrations sont appliquées en production.
+
+### Reporté, avec la raison
+
+- **Pas de `Content-Security-Policy`.** Les quatre autres en-têtes de sécurité sont posés depuis la
+  passe 1. Next 16 exige un nonce par requête pour ses scripts inline, ce qui se règle dans le proxy
+  et demande une vérification en conditions réelles. À traiter avec l'epic qui introduit du contenu
+  libre saisi par le membre.
+- **`maxLength` tronque un collage en silence.** Ni compteur, ni message, alors qu'une région de
+  statut est juste en dessous. Corriger proprement suppose de décider ce qu'on affiche (« 40
+  caractères maximum » avant ou après la troncature) — c'est un choix de copie, pas un correctif.
+- **La redirection automatique de 1500 ms après « Tu as déjà un foyer ».** Ni lisible par un lecteur
+  d'écran, ni annulable (WCAG 2.2.1). La bonne forme est un bouton « Aller à mon foyer » plutôt qu'un
+  minuteur — à faire quand cet écran sera retravaillé.
+- **`app/error.tsx` ne distingue pas les causes.** Il a gagné une seconde sortie et le focus sur son
+  titre, mais « Ça a coincé » couvre aussi bien une panne d'authentification qu'une erreur de
+  lecture. Un état hors-ligne explicite relève de l'Epic 4.
+- **Tokens `accent-*`, `checkbox-*`, `offline-*` sans appelant.** Ils attendent les écrans listes de
+  l'Epic 2, qui les nomme. Les alias qui basculent restent publiés ; les valeurs brutes ne le sont
+  plus.
+- **`--font-rounded` n'existe pas sur Android.** Reporté à l'Epic 6 depuis la story 1.7 — et
+  désormais **réel** : jusqu'à cette passe, aucun titre ne demandait la famille arrondie, donc la
+  dégradation n'avait lieu nulle part, y compris sur Apple.
+- **Aucun test ne couvre le JSX.** Décision inchangée : tester des composants exigerait une
+  dépendance, ce que NFR-10 interdit. La parade reste d'extraire le pur — ce que cette passe a fait
+  pour `versCleMessage` et `lienDeConfirmation`, les deux dernières fonctions pures qui vivaient dans
+  des `.tsx`.
+
+### Corrections d'entrées devenues fausses
+
+- ~~« Seules les familles typographiques sont posées »~~ — les familles **et** l'échelle
+  typographique le sont désormais, ainsi que les tokens d'espacement nommés.
+- ~~« `households.name` protégé par le client »~~ — jamais écrit tel quel, mais un commentaire du
+  code l'affirmait à l'envers. Une contrainte `check` existe maintenant en base.

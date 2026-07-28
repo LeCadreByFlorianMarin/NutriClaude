@@ -5,10 +5,14 @@ on:
     branches: [main]
   pull_request:
 
-# Une seule exécution par branche : un nouveau push annule la précédente.
+# Une seule exécution par branche. L'annulation ne vaut QUE pour les pull
+# requests : sur `main`, deux merges rapprochés feraient annuler le run du
+# premier commit par le second, et un run annulé se rapporte comme neutre — pas
+# comme échoué. Le commit atterrirait sur la branche déployée sans avoir jamais
+# terminé sa vérification.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:
@@ -18,12 +22,17 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          # Plancher imposé par @supabase/supabase-js (engines: node >=22).
-          node-version: 22
+          # Source unique : `.node-version`, que Vercel lit aussi pour construire
+          # et servir la production. Épingler un numéro ici ferait valider par la
+          # CI un runtime que personne n'exécute — et `node --test` a besoin de
+          # l'exécution native de TypeScript, absente avant Node 23.6.
+          node-version-file: .node-version
           cache: npm
 
-      # `npm ci` échoue si package-lock.json et package.json divergent :
-      # c'est aussi la garantie que les versions d'AR-STACK sont respectées.
+      # `npm ci` échoue si package-lock.json et package.json divergent, et
+      # installe exactement les versions verrouillées. Il ne contrôle PAS le
+      # respect d'AR-STACK : une montée de `next` faite dans les deux fichiers
+      # passerait sans broncher. Ce contrôle-là reste humain, en revue.
       - run: npm ci
 
       - name: Typecheck
@@ -31,6 +40,12 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      # Sans réseau ni base : uniquement les prédicats purs dont dépend le
+      # contrôle d'accès. Aucune dépendance ajoutée — `node --test` est dans le
+      # runtime (NFR-10).
+      - name: Test
+        run: npm test
 
       # Le build a besoin des variables Supabase pour instancier le client.
       # Valeurs factices : rien n'appelle le réseau à la compilation.

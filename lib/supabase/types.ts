@@ -561,6 +561,38 @@ export type Database = {
           },
         ]
       }
+      household_invites_valides: {
+        Row: {
+          code: string | null
+          created_at: string | null
+          expires_at: string | null
+          household_id: string | null
+          uses_remaining: number | null
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          household_id?: string | null
+          uses_remaining?: number | null
+        }
+        Update: {
+          code?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          household_id?: string | null
+          uses_remaining?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "household_invites_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       create_household_with_profile: {

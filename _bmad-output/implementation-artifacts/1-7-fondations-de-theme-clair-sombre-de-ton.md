@@ -467,3 +467,59 @@ La chaîne technique n'est **nulle part dans le DOM**, pas seulement invisible �
 | 2026-07-27 | Story créée. Statut → `ready-for-dev` |
 | 2026-07-27 | Questions tranchées par Florian : aucun fichier de police (stack système, rondeur perdue sur Android assumée) ; base = `main` après fusion des Stories 1.5 et 1.6. `baseline_commit` → `2a5b73a` |
 | 2026-07-27 | Implémentation et vérification : tokens des deux thèmes posés d'après DESIGN.md, palette Tailwind neutralisée, couche de composants reconstruite, 41 classes ad hoc substituées, `error.tsx` et `not-found.tsx` ajoutés. Bascule clair/sombre vérifiée au réglage système sur quatre écrans ; message technique prouvé absent du DOM. Deux écrans d'authentification écartés explicitement. Statut → `review` |
+
+---
+
+## Amendement du 2026-07-28 — revue de code Epic 1, passe 3
+
+_La story reste `done`. Ce qui suit corrige ce qu'elle affirmait à tort, et trace ce que la revue a livré._
+
+**L'AC1 était fausse sur deux familles de tokens sur quatre.** Elle annonce « couleurs, typo,
+espacement, arrondis » ; seules les couleurs et les arrondis étaient posés. La justification écrite
+dans `globals.css` — « l'échelle d'espacement de DESIGN.md est déjà celle de Tailwind, rien à
+redéclarer » — est **factuellement fausse** : quatre des cinq tokens nommés (`gutter` 14px,
+`card-padding` 12px, `screen-margin` 8px, `item-min-height` 46px) ne tombent pas sur l'échelle 4px,
+et c'est précisément ce qui en fait des tokens nommés. L'échelle typographique (`title`, `eyebrow`,
+`body`, `meta`) était absente elle aussi. Les deux familles sont désormais posées ; les rôles
+`counter`, `clock` et les variantes dashboard arriveront avec les écrans qui les portent.
+
+**`--font-rounded` était déclaré sans aucun appelant.** Le token était tree-shaké du CSS compilé, et
+les huit `<h1>` du produit rendaient en sans-serif système : le produit n'avait pas la voix que
+DESIGN.md lui écrit. Deux classes (`.titre-ecran`, `.titre-section`) le portent maintenant, et
+l'entrée de `deferred-work.md` qui reportait « la rondeur des titres n'existe pas sur Android » à
+l'Epic 6 décrit enfin une dégradation réelle — jusqu'ici elle n'avait lieu nulle part, y compris sur
+Apple.
+
+**Deux mesures de contraste étaient justes mais prises sur la mauvaise surface.**
+- `--muted` était audité « 5,15:1 sur carte », ce qui est exact — mais `.hint` et `.btn-quiet` vivent
+  sur la page, jamais sur une carte. Sur les trois arrêts réels du dégradé : 4,69 / 4,52 / **4,39:1**.
+  L'arrêt fautif est le coin bas-droit, c'est-à-dire l'emplacement exact de « Se déconnecter » et de
+  son avertissement. Token assombri à `#63685f` — 5,20 / 5,02 / 4,87:1.
+- `.btn` et `.input` partageaient remplissage et bordure : **1,02:1** contre la page pour la bordure,
+  1,13:1 pour le remplissage, quand WCAG 1.4.11 exige 3:1 pour la frontière qui identifie un
+  contrôle. Il n'existait aucun bouton principal visuellement. Un `--control-border` distinct de
+  `--card-border` (3,41:1) et un `.btn-primaire` inversé neutre (14,36:1 clair, 16,48:1 sombre) le
+  corrigent, sans toucher à l'abricot — UX-DR2 tient.
+
+**Le namespace `--radius-*` n'avait pas été neutralisé comme `--color-*`.** Les pas non redéclarés
+gardaient leur valeur Tailwind, si bien que `rounded-2xl` valait 16px, soit **moins** que
+`rounded-xl` (22px). L'échelle est redevenue monotone.
+
+**Deux tokens hors-thème étaient exposés à Tailwind.** `--color-accent` et `--color-accent-strong` ne
+basculent pas — c'est un choix documenté — mais les publier rendait `text-accent` écrivable, soit
+1,90:1 sur carte blanche. Cela contredisait la thèse même du fichier, qui retire la palette Tailwind
+pour que « `bg-red-500` n'existe tout simplement plus ». Seuls les alias qui basculent sont désormais
+publiés ; vérifié dans le CSS compilé, `.text-accent` n'est plus émis.
+
+**La preuve visuelle de la Task 6 était périmée avant même cette passe.** `/foyer` était déclaré
+« le contrôle qui compte (carte, champ, trois boutons, séparateur) » ; les passes 1 et 2 lui avaient
+ajouté deux contrôles, une région de statut et une section de déconnexion. Et un **septième écran**
+(`/auth/bascule`) n'avait jamais été parcouru dans aucun des deux thèmes. La vérification visuelle
+des deux thèmes est donc **à refaire** — elle reste manuelle, et c'est le seul contrôle de cette
+story qu'aucun test ne peut porter.
+
+**Ce que la revue a livré au-delà des corrections** — `.ecran-centre`, `.titre-ecran`,
+`.titre-section`, `.btn-primaire`, `.sr-only`, les états `:hover`/`:active`/`:disabled` (le produit
+ne réagissait à aucun pointeur), `cursor: pointer` (retiré du preflight par Tailwind 4), la couleur
+de placeholder (perdue lors de la réécriture de `.input`), et une règle `:-webkit-autofill` sans
+laquelle Chrome repeignait les champs hors des deux thèmes.

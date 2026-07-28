@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { EcranMessage } from "@/app/_lib/EcranMessage";
+
+export const metadata = { title: "Page introuvable · NutriClaude" };
 
 /**
  * Page introuvable.
@@ -9,19 +12,22 @@ import Link from "next/link";
  * connecté pour arriver ici. Ne pas « réparer » ça en ouvrant les routes
  * inconnues dans le proxy — ce serait affaiblir le contrôle d'accès pour
  * embellir un écran d'erreur.
+ *
+ * Le lien est en `.btn-primaire` : c'est la seule action de l'écran — le
+ * « chemin de sortie » qu'exige l'AC3 — et `.btn-quiet` s'annonce lui-même
+ * « jamais l'action principale ».
  */
 export default function NotFound() {
   return (
-    <main className="flex-1 flex items-center justify-center p-6">
-      <div className="max-w-sm text-center">
-        <h1 className="text-2xl font-semibold">Il n&apos;y a rien ici.</h1>
-        <p className="mt-3 text-base">Cette adresse ne mène nulle part.</p>
-        <p className="mt-6">
-          <Link href="/" className="btn-quiet">
-            Revenir chez toi
-          </Link>
-        </p>
-      </div>
-    </main>
+    <EcranMessage
+      titre="Il n'y a rien ici."
+      action={
+        <Link href="/" className="btn-primaire w-full">
+          Revenir chez toi
+        </Link>
+      }
+    >
+      Cette adresse ne mène nulle part.
+    </EcranMessage>
   );
 }

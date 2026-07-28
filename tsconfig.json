@@ -6,6 +6,10 @@
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
+    // `node --test` exécute les `*.test.ts` sans transpileur : Node résout les
+    // spécificateurs tels quels, donc les imports entre modules testés portent
+    // l'extension `.ts`. Sans cette option, `tsc --noEmit` les refuse.
+    "allowImportingTsExtensions": true,
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",

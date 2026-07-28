@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import Link from "next/link";
+import { useEffect, useRef } from "react";
+import { EcranMessage } from "@/app/_lib/EcranMessage";
 
 /**
  * Filet de dernier recours. Il attrape ce qui casse dans les pages et leurs
@@ -18,29 +20,56 @@ import { useEffect } from "react";
  * là où `reset` se contente de vider l'état du périmètre. Sur une page qui lit
  * le foyer en base, c'est la différence entre réessayer et réafficher la même
  * erreur.
+ *
+ * Nommée `FrontiereErreur` et non `Error` : l'export par défaut portait le nom
+ * du constructeur global et le masquait dans tout le module.
  */
-export default function Error({
+export default function FrontiereErreur({
   error,
   unstable_retry,
 }: {
   error: Error & { digest?: string };
   unstable_retry: () => void;
 }) {
+  const titre = useRef<HTMLHeadingElement>(null);
+
   useEffect(() => {
     console.error(error);
   }, [error]);
 
+  /*
+   * Remplacer la page sans déplacer le focus laissait un utilisateur au clavier
+   * ou au lecteur d'écran avec le curseur retombé sur `<body>`, sans savoir que
+   * quoi que ce soit avait changé.
+   */
+  useEffect(() => {
+    titre.current?.focus();
+  }, []);
+
   return (
-    <main className="flex-1 flex items-center justify-center p-6">
-      <div className="max-w-sm text-center">
-        <h1 className="text-2xl font-semibold">Ça a coincé.</h1>
-        <p className="mt-3 text-base">
-          On ne sait pas trop pourquoi. Tu peux réessayer.
-        </p>
-        <button type="button" onClick={() => unstable_retry()} className="btn mt-6 w-full">
+    <EcranMessage
+      titre="Ça a coincé."
+      titreRef={titre}
+      role="alert"
+      action={
+        <button
+          type="button"
+          onClick={() => unstable_retry()}
+          className="btn-primaire w-full"
+        >
           Réessayer
         </button>
-      </div>
-    </main>
+      }
+      secondaire={
+        /* Une seconde sortie : cet écran est aussi celui qu'on atteint quand le
+           service d'authentification est injoignable, cas où réessayer échouera
+           tout autant. Sans elle, l'utilisateur était enfermé. */
+        <Link href="/" className="btn-quiet">
+          Revenir à l&apos;accueil
+        </Link>
+      }
+    >
+      On ne sait pas trop pourquoi. Tu peux réessayer.
+    </EcranMessage>
   );
 }

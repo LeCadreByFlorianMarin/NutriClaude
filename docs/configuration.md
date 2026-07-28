@@ -159,8 +159,8 @@ Dans l'ordre. Chaque étape suppose la précédente.
 
 Tracé pour ne pas être redécouvert comme un oubli. Le détail vit dans `_bmad-output/implementation-artifacts/deferred-work.md`.
 
-- **Pas de validation des variables d'environnement au démarrage** — absentes, tout retourne 500 sans page de secours.
-- **Aucun framework de test** — la vérification est manuelle et exécutable. Les tests d'isolation et de convergence sont planifiés en story 4.15.
+- ~~Pas de validation des variables d'environnement au démarrage~~ — **clos** (revue Epic 1, passe 1) : `lib/supabase/env.ts` nomme la variable manquante au lieu de laisser `createServerClient` lever dans le proxy.
+- **Tests unitaires : `node --test`**, sans aucune dépendance ajoutée (NFR-10 respecté). Couvre aujourd'hui les prédicats purs dont dépend le contrôle d'accès (`lib/auth/*.test.ts`). Les tests **d'isolation RLS** restent hors de portée tant qu'il n'existe qu'un seul projet Supabase, qui est la production — voir la décision d'environnement de test dans `deferred-work.md`. Convergence planifiée en story 4.15.
 - **Les liens de connexion peuvent être consommés par les analyseurs d'emails** de certains fournisseurs, qui préchargent les URL. Marginal sur des boîtes personnelles ; le message « on t'en envoie un autre ? » est la porte de sortie prévue.
-- **`lib/supabase/types.ts` est écrit à la main** et divergera silencieusement du schéma. `supabase gen types` reste la bonne réponse, à traiter dans une story dédiée.
+- **`lib/supabase/types.ts` est généré** (`npx supabase gen types typescript --linked`), et non plus écrit à la main — cette dette est close. Ce qui reste ouvert : **rien ne détecte sa dérive** avec le schéma déployé. Une migration poussée sans régénération laisse `tsc` valider contre un schéma qui n'existe plus, et la garantie s'inverse : les types ne peuvent pas casser, précisément parce que rien ne les contrôle. Le contrôle en CI suppose un `SUPABASE_ACCESS_TOKEN` en secret du dépôt ; en attendant, le rappel vit dans `.github/pull_request_template.md`.
 - **Vulnérabilités `npm audit`**, toutes transitives et en dépendances de développement, jamais expédiées en production.
