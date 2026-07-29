@@ -66,15 +66,19 @@ development_status:
   1-7-fondations-de-theme-clair-sombre-de-ton: done
   epic-1-retrospective: done
 
-  # ── Epic 2 : Le classement par rayon qui apprend ──
+  # ── Epic 2 : Les rayons — les rendre visibles, modifiables et ordonnables ──
+  # Révisé le 2026-07-29 : 7 stories → 4. Constat et arbitrages dans
+  # `planning-artifacts/epic-2-revision-2026-07-29.md`.
+  #   · l'ancienne 2.1 « Amorcer un jeu de rayons » est SUPPRIMÉE — 3 de ses 4
+  #     critères sont tenus en production depuis le squelette ; son critère
+  #     restant est absorbé par la nouvelle 2.1.
+  #   · les anciennes 2.5, 2.6, 2.7 sont DÉPLACÉES en Epic 4 (4.16 à 4.18) :
+  #     leurs critères s'énoncent sur la liste de courses, donc indémontrables ici.
   epic-2: backlog
-  2-1-amorcer-un-jeu-de-rayons-par-defaut: backlog
-  2-2-gerer-ses-rayons: backlog
-  2-3-reordonner-le-parcours-par-manipulation-directe: backlog
-  2-4-definir-des-regles-mot-cle-rayon: backlog
-  2-5-resoudre-automatiquement-le-rayon-d-un-article-ajoute: backlog
-  2-6-groupe-a-classer-toujours-visible: backlog
-  2-7-correction-de-rayon-apprenante-en-silence: backlog
+  2-1-gerer-ses-rayons: backlog
+  2-2-reordonner-le-parcours-par-manipulation-directe: backlog
+  2-3-definir-des-regles-mot-cle-rayon: backlog
+  2-4-composant-carte-rayon: backlog
   epic-2-retrospective: optional
 
   # ── Epic 3 : Recettes & menu — les affluents de la liste ──
@@ -104,6 +108,10 @@ development_status:
   4-13-coche-reelle-plancher-d-accessibilite-de-la-liste: backlog
   4-14-etats-hors-ligne-et-differe-a-l-ecran: backlog
   4-15-filet-de-verification-tests-d-isolation-de-convergence: backlog
+  # Reçues de l'Epic 2 le 2026-07-29 (ex-2.5, 2.6, 2.7)
+  4-16-resoudre-automatiquement-le-rayon-d-un-article-ajoute: backlog
+  4-17-groupe-a-classer-toujours-visible: backlog
+  4-18-correction-de-rayon-apprenante-en-silence: backlog
   epic-4-retrospective: optional
 
   # ── Epic 5 : Le dashboard de la cuisine ──
@@ -154,7 +162,12 @@ action_items:
   - epic: 1
     action: "Réviser la story 2.1 et son recouvrement avec la 2.2 — seed_default_aisles existe déjà et amorce 11 rayons ; aucun code applicatif ne lit les rayons"
     owner: "John + Winston"
-    status: in-progress  # analyse faite : epic-2-revision-2026-07-29.md. 4 décisions en attente d'arbitrage
+    status: done  # 2026-07-29 — 4 décisions arbitrées par Florian, epics.md révisé
+  # Ouverte par la révision de l'Epic 2
+  - epic: 2
+    action: "Trancher la distinction Florian / conjointe : aucune colonne de rôle sur profiles, RLS par foyer et non par membre. Retirée de la story 2.3, à décider avec son coût (schéma + RLS + 11 tests d'isolation à rejouer)"
+    owner: "John + Florian"
+    status: open
   - epic: 1
     action: "Pousser 20260728152418_require_non_blank_household_name.sql (requête de contrôle en en-tête du fichier)"
     owner: "Florian"
