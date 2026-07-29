@@ -71,20 +71,42 @@ Ces deux points sont les seuls contrôles de l'Epic 1 qu'aucun test ne peut port
 
 ## 2. Préalable bloquant à l'Epic 2
 
-- [ ] **Ouvrir un environnement de test Supabase** — branche Supabase, ou `supabase start` local.
+- [x] **Ouvrir un environnement de test Supabase** — fait le 2026-07-29, `supabase start` local
+      (gratuit, isolé, repart de zéro à chaque `db reset` ; pas de branche Supabase, qui suppose un
+      plan payant). `supabase/config.toml` est versionné, **ports décalés en 5532x** : les valeurs
+      par défaut heurtaient un autre stack Supabase local déjà en service.
 
-      C'est le seul angle mort qu'aucune revue ne couvre. **NFR-5 — l'isolation entre foyers, la
-      seule chose que ce produit ne peut pas se permettre de casser — n'est vérifiable par aucun
-      test** tant qu'il n'existe qu'un projet et qu'il *est* la production. Le trou `with check` sur
-      `profiles_update_own` a vécu tout l'Epic 1 ; un test à deux comptes l'aurait vu le premier
-      jour. Le coût de son absence est déjà au dossier : trois comptes témoins abandonnés en
-      production, précisément parce qu'il fallait des comptes réels pour contrôler l'isolation.
+- [x] **Écrire les tests d'isolation à deux comptes** — fait, `supabase/tests/isolation.test.ts`,
+      **11 tests, 11 au vert**, lancés par `npm run test:isolation`. Zéro dépendance ajoutée :
+      `@supabase/supabase-js` était déjà là, le reste est du `node:test`.
 
-- [ ] **Écrire les tests d'isolation à deux comptes**, une fois l'environnement disponible.
-      Critère de fin : un membre du foyer A ne lit aucune ligne du foyer B, prouvé par un test.
-      ⚠️ Le faux client Supabase (`lib/supabase/faux.ts`, à écrire) **ne modélise pas la RLS** — un
-      test de `membresDuFoyer` avec un faux prouve le mapping, jamais l'isolation. Le noter en tête
-      du fichier.
+      Le critère de fin est tenu : A ne lit aucune ligne de B — foyers, profils, rayons,
+      invitations — y compris en nommant l'UUID cible, et ne peut ni s'y déplacer, ni renommer, ni
+      y écrire, ni y supprimer. Le chemin légitime reste couvert (un troisième compte rejoint A par
+      son code et ne voit que A).
+
+      **Dents vérifiées** : le `with check` de `profiles_update_own` retiré à la main sur la base
+      locale, la suite tombe de 11/11 à **6/11**. Cinq tests, pas un — c'est le rayon de souffle
+      décrit en passe 1, `current_household_id()` suivant la colonne réécrite.
+
+      ⚠️ Hors du glob de `npm test`, délibérément : ces tests exigent un stack debout, et ils
+      **lèvent** quand il est absent au lieu de passer en silence.
+
+- [ ] **Pousser `20260729094500_grant_table_privileges.sql`** — la découverte du jour, et elle
+      seule justifie le §2 en entier. **Aucune migration n'accordait de privilège de table.** Le
+      schéma s'en remettait aux privilèges par défaut de Supabase, permissifs quand le projet a été
+      créé et qui ne le sont plus : sur un stack neuf, `anon`/`authenticated`/`service_role`
+      n'obtiennent que `Dxtm` (ni SELECT, ni INSERT, ni UPDATE, ni DELETE). Chaque lecture directe
+      rendait `42501 permission denied` ; seules les fonctions `security definer` répondaient, ce
+      qui masquait le trou — l'inscription marchait, et rien d'autre.
+
+      Autrement dit : **la chaîne de migrations ne reproduisait pas la production.** Une branche,
+      un nouveau projet, une restauration de sauvegarde auraient rendu une application morte.
+      Invisible tant qu'il n'existait qu'un environnement.
+
+      La migration devrait être un **no-op sur la production**, qui possède déjà ces privilèges —
+      sa requête de contrôle, en en-tête du fichier, sert précisément à le confirmer avant de
+      pousser.
 
 ---
 

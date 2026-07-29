@@ -142,10 +142,14 @@ action_items:
   - epic: 1
     action: "Ouvrir un environnement de test Supabase (branche ou supabase start local) — NFR-5 n'est vérifiable par aucun test tant qu'il n'existe qu'un projet, qui est la production"
     owner: "Florian"
-    status: open
+    status: done
   - epic: 1
     action: "Écrire les tests d'isolation à deux comptes (NFR-5) une fois l'environnement disponible"
     owner: "Amelia"
+    status: done
+  - epic: 1
+    action: "Pousser 20260729094500_grant_table_privileges.sql — aucune migration n'accordait de privilège de table, la chaîne ne reproduisait pas la production (requête de contrôle en en-tête ; no-op attendu en prod)"
+    owner: "Florian"
     status: open
   - epic: 1
     action: "Réviser la story 2.1 et son recouvrement avec la 2.2 — seed_default_aisles existe déjà et amorce 11 rayons ; aucun code applicatif ne lit les rayons"

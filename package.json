@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "eslint --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "test": "node --test \"lib/**/*.test.ts\""
+    "test": "node --test \"lib/**/*.test.ts\"",
+    "test:isolation": "node --test \"supabase/tests/**/*.test.ts\""
   },
   "dependencies": {
     "@supabase/ssr": "0.12.3",

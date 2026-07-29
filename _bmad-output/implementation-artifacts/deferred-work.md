@@ -36,7 +36,7 @@
 
 **Résidu de test à retirer de la base :**
 
-- Le contrôle d'isolation NFR-5 a laissé un compte `flomarin88+nc1@gmail.com`, son foyer « Foyer temoin » et ses 11 rayons. Aucune politique RLS n'autorise la suppression de `households` ni de `profiles` — le ménage se fait depuis le tableau de bord (*Authentication → Users*, puis le foyer orphelin). Sans conséquence tant que ça reste.
+- ~~Le contrôle d'isolation NFR-5 a laissé un compte `flomarin88+nc1@gmail.com`, son foyer « Foyer temoin » et ses 11 rayons. Aucune politique RLS n'autorise la suppression de `households` ni de `profiles` — le ménage se fait depuis le tableau de bord (*Authentication → Users*, puis le foyer orphelin). Sans conséquence tant que ça reste.~~ **— SUPPRIMÉ en production le 2026-07-29.** Plus aucun compte témoin ne subsiste : le nettoyage laisse le seul foyer « Marin » et le seul compte de Florian. Les contrôles d'isolation se font désormais sur le stack local (`npm run test:isolation`), plus jamais en production.
 
 **Dette de vérification :**
 
@@ -57,7 +57,7 @@
 
 **Résidu de test à retirer de la base :**
 
-- Compte `flomarin88+nc2@gmail.com`, foyer « Foyer temoin 2 », ses 11 rayons et son invitation `4A1EA59C`. Créés pour prouver l'isolation des invitations. Aucune politique n'autorise leur suppression depuis l'application : *Authentication → Users*, supprimer l'utilisateur, puis le foyer orphelin.
+- ~~Compte `flomarin88+nc2@gmail.com`, foyer « Foyer temoin 2 », ses 11 rayons et son invitation `4A1EA59C`. Créés pour prouver l'isolation des invitations. Aucune politique n'autorise leur suppression depuis l'application : *Authentication → Users*, supprimer l'utilisateur, puis le foyer orphelin.~~ **— SUPPRIMÉ en production le 2026-07-29.** Plus aucun compte témoin ne subsiste : le nettoyage laisse le seul foyer « Marin » et le seul compte de Florian. Les contrôles d'isolation se font désormais sur le stack local (`npm run test:isolation`), plus jamais en production.
 
 **Choix assumés, à ne pas prendre pour des oublis en revue :**
 
@@ -73,7 +73,7 @@
 
 **Résidu de test à retirer de la base :**
 
-- Compte `flomarin88+nc3@gmail.com`, profil « Temoin3 ». ⚠️ **Différent des précédents** : il n'a pas son propre foyer, il est **membre du foyer « Marin »**. Le supprimer depuis *Authentication → Users* emporte son profil par cascade sans toucher au foyer. Le compteur de l'invitation `388B626A` restera à 4 — sans conséquence.
+- ~~Compte `flomarin88+nc3@gmail.com`, profil « Temoin3 ». ⚠️ **Différent des précédents** : il n'a pas son propre foyer, il est **membre du foyer « Marin »**. Le supprimer depuis *Authentication → Users* emporte son profil par cascade sans toucher au foyer. Le compteur de l'invitation `388B626A` restera à 4 — sans conséquence.~~ **— SUPPRIMÉ en production le 2026-07-29.** Plus aucun compte témoin ne subsiste : le nettoyage laisse le seul foyer « Marin » et le seul compte de Florian. Les contrôles d'isolation se font désormais sur le stack local (`npm run test:isolation`), plus jamais en production.
 
 **Choix assumés, à ne pas prendre pour des oublis :**
 
@@ -120,9 +120,13 @@
 
 ## Deferred from: code review of Epic 1 — passe 1/3 (infrastructure) (2026-07-27)
 
-**Décision d'environnement, à trancher avant l'Epic 2 :**
+**Décision d'environnement — ~~à trancher avant l'Epic 2~~ CLOSE le 2026-07-29 :**
 
-- **Ouvrir une branche Supabase ou un `supabase start` local.** Il n'existe qu'un seul projet Supabase, et il *est* la production. Conséquence : **aucun test d'isolation RLS n'est possible** sans écrire dans la base réelle — et c'est précisément la famille de tests qui aurait attrapé le trou `profiles_update_own` corrigé ce jour. La preuve du coût est déjà au dossier : trois comptes témoins (`+nc1`, `+nc2`, `+nc3`), deux foyers et onze rayons chacun, abandonnés en production parce qu'aucune politique RLS ne permet de les supprimer depuis l'application. NFR-5 est l'exigence non négociable du produit, et c'est la seule qu'on ne sait pas vérifier.
+- ~~**Ouvrir une branche Supabase ou un `supabase start` local.**~~ **Fait** : `supabase start` local, `supabase/config.toml` versionné (ports décalés en 5532x, les défauts heurtaient un autre stack local). Les tests d'isolation existent — `supabase/tests/isolation.test.ts`, 11 au vert, `npm run test:isolation`, hors du glob unitaire parce qu'ils exigent un stack debout. Dents vérifiées : le `with check` de `profiles_update_own` retiré à la main fait tomber la suite à 6/11. **NFR-5 est désormais prouvé par un test, et non plus par un contrôle manuel qui laissait des débris en production.**
+
+  Le texte d'origine reste sous cette ligne, parce que ce qu'il annonçait s'est vérifié au-delà de la prédiction. Il disait qu'un second environnement aurait attrapé le trou `profiles_update_own`. Il en a attrapé un autre, que personne n'avait vu : **aucune migration n'accordait de privilège de table**. Le schéma s'en remettait aux privilèges par défaut de Supabase, permissifs à la création du projet et qui ne le sont plus — sur un stack neuf, `anon`/`authenticated`/`service_role` n'obtiennent que `Dxtm`, et chaque lecture directe rend `42501 permission denied`. Seules les fonctions `security definer` répondaient, ce qui masquait le trou. La chaîne de migrations ne reproduisait donc pas la production : une branche, un nouveau projet ou une restauration de sauvegarde auraient rendu une application morte. Fermé par `20260729094500_grant_table_privileges.sql`.
+
+  > _Texte d'origine (2026-07-27)_ — Il n'existe qu'un seul projet Supabase, et il *est* la production. Conséquence : **aucun test d'isolation RLS n'est possible** sans écrire dans la base réelle — et c'est précisément la famille de tests qui aurait attrapé le trou `profiles_update_own` corrigé ce jour. La preuve du coût est déjà au dossier : trois comptes témoins (`+nc1`, `+nc2`, `+nc3`), deux foyers et onze rayons chacun, abandonnés en production parce qu'aucune politique RLS ne permet de les supprimer depuis l'application. NFR-5 est l'exigence non négociable du produit, et c'est la seule qu'on ne sait pas vérifier.
 
 **Reporté, avec la raison :**
 
