@@ -1,0 +1,41 @@
+-- Interdit un nom de rayon vide ou fait uniquement d'espaces.
+--
+-- ⚠️ À CONTRÔLER AVANT `db push` — cette migration ÉCHOUERA si une ligne
+-- existante ne respecte pas la contrainte. Exécuter d'abord, dans le SQL
+-- Editor :
+--
+--   select id, household_id, name from aisles where btrim(name) = '';
+--
+-- Attendu : zéro ligne. Les seuls rayons existants viennent de
+-- `seed_default_aisles`, dont les onze noms sont écrits en dur — aucun chemin
+-- n'a jamais permis d'en créer un à la main. Si la requête rend malgré tout des
+-- lignes : les corriger avant de pousser, et ne pas assouplir la contrainte
+-- pour les accommoder.
+--
+-- LE DÉFAUT
+-- `name` est `not null`, ce qui n'interdit pas la chaîne vide. La story 2.1
+-- ouvre le premier chemin de création de rayon par saisie libre ; sans cette
+-- contrainte, la seule protection vivrait côté navigateur — et
+-- `String.prototype.trim()` ne retire pas les caractères invisibles (U+200B et
+-- voisins) qu'un copier-coller depuis une messagerie transporte.
+--
+-- Conséquence visible : une ligne muette dans la liste des rayons, un en-tête
+-- de carte-rayon vide sur la liste de courses à l'Epic 4, et un rayon que
+-- personne ne peut plus désigner pour le corriger.
+--
+-- C'est la TROISIÈME contrainte de cette forme, après
+-- `20260728133836_require_non_blank_display_name` et
+-- `20260728152418_require_non_blank_household_name`. Même motif, même raison :
+-- un champ libre partagé par tout le foyer descend en base, là où le projet a
+-- décidé que vivent les règles (AD-1/AD-2). Elle couvre aussi les appels
+-- directs à l'API REST, que le contrôle navigateur ne voit pas.
+--
+-- `btrim` seul ne retire pas U+200B : la normalisation applicative
+-- (`lib/rayons/saisie.ts`) reste nécessaire en amont. Les deux se complètent —
+-- la base refuse le vide franc, le client refuse le vide déguisé.
+--
+-- Ne change pas la forme du schéma : pas de régénération de types nécessaire.
+
+alter table aisles
+  add constraint aisles_name_non_vide
+  check (btrim(name) <> '');

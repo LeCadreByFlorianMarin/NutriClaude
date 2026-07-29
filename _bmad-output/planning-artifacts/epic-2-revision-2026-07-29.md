@@ -122,8 +122,16 @@ c'est ce qui a permis d'écrire trois stories indémontrables sans que ça se vo
 ## 6. Ce que ça ne change pas
 
 - Aucune migration à écrire pour ces décisions : elles portent sur `epics.md`, pas sur la base.
-- `seed_default_aisles`, `resolve_aisle_id`, `product_aisle_map` et la vue **restent tels quels**.
-  Ils sont en production et couverts par les tests d'isolation depuis le 2026-07-29.
+- ~~`seed_default_aisles`, `resolve_aisle_id`, `product_aisle_map` et la vue **restent tels quels**.
+  Ils sont en production et couverts par les tests d'isolation depuis le 2026-07-29.~~
+
+  **Corrigé le 2026-07-29, à la création de la story 2.1.** `seed_default_aisles` ne reste pas telle
+  quelle, et l'affirmation « couverts par les tests d'isolation » était trop large : les 11 tests
+  couvrent les chemins de **table**, aucun ne couvre un appel **RPC**. Or la fonction est
+  `security definer`, prend le `household_id` en paramètre sans le contrôler, et est appelable par
+  tout compte authentifié — le foyer A peut y écrire les rayons du foyer B (mesuré). La story 2.1
+  porte la garde et étend les tests d'isolation aux appels RPC. Les trois autres objets restent bien
+  inchangés.
 - L'Epic 2 reste le prochain epic. Il devient plus petit et entièrement démontrable.
 
 ## 7. Une observation mineure, hors décisions

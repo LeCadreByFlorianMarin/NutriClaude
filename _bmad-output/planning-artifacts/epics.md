@@ -498,7 +498,19 @@ blanche ni un message technique (NFR-8)
 **When** Florian demande à restaurer le jeu par défaut
 **Then** `seed_default_aisles()` — qui existe déjà, est idempotente
 (`on conflict (household_id, name) do nothing`) et amorce 11 rayons français — est appelée, sans
-dupliquer aucun rayon déjà présent (FR-11). **Rien n'est à écrire côté base** : seul l'appel manque.
+dupliquer aucun rayon déjà présent (FR-11).
+
+> **Correction du 2026-07-29 — « Rien n'est à écrire côté base : seul l'appel manque » était faux.**
+> Mesuré sur le stack local à la création de la story 2.1, pas déduit : `seed_default_aisles` est
+> `security definer`, prend le `household_id` **en paramètre**, ne le confronte à rien, et
+> `20260729094500_grant_table_privileges.sql` accorde `execute` à `authenticated`. Un membre du foyer
+> A appelant la fonction sur le foyer B y insère les 11 rayons — **écriture inter-foyers, NFR-5**. La
+> RLS n'est pas en cause (`aisles_all` porte `using` et `with check` ; un `insert` direct est refusé
+> en `42501`) : c'est `security definer` qui la contourne, par conception. Le trou est **antérieur à
+> cet epic** et vit déjà en production ; la story 2.1 est celle qui l'expose à une surface, donc celle
+> qui le referme, **par une migration additive** posant une garde d'identité dans la fonction, à
+> signature identique. Correctif éprouvé par exécution avant d'être prescrit. Détail et mesures :
+> `implementation-artifacts/2-1-gerer-ses-rayons.md`, « Le piège n°1 ».
 
 ### Story 2.2 : Réordonner le parcours par manipulation directe
 

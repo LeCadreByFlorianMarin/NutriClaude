@@ -1,18 +1,18 @@
+import { INVISIBLES, normaliserTexte } from "../texte.ts";
+
 /**
- * Normalisation des saisies libres, avant de les envoyer à la base.
+ * Normalisation des saisies libres du foyer, avant de les envoyer à la base.
  *
  * Ces fonctions existaient en trois copies inline dans autant de composants.
  * Rassemblées ici, elles sont testables — et il n'y a plus qu'un endroit où
  * corriger le jour où un caractère inattendu passe.
+ *
+ * La règle générique (retrait des invisibles, `trim`, borne) a migré dans
+ * `lib/texte.ts` quand les rayons sont devenus le troisième champ libre du
+ * produit : le même raisonnement valait d'un domaine à l'autre. Ce qui reste
+ * ici est ce qui appartient au foyer — les bornes, et la tolérance de saisie
+ * du code d'invitation.
  */
-
-/**
- * Caractères invisibles que `String.prototype.trim()` **ne retire pas** :
- * espace de largeur nulle, liant/antiliant, séparateur de mots, et les marques
- * directionnelles. Ils arrivent en collant depuis une application de messagerie
- * et produisent un prénom qui passe tous les contrôles tout en s'affichant vide.
- */
-const INVISIBLES = /[\u200B-\u200F\u2060\uFEFF]/g;
 
 /** Longueurs maximales. Génereuses, mais bornées : un champ libre partagé par
  * tout le foyer et qu'aucun autre membre ne peut corriger ne doit pas pouvoir
@@ -26,14 +26,12 @@ export const MAX_NOM_FOYER = 60;
  * faire plutôt que d'envoyer une chaîne vide à la base.
  */
 export function normaliserPrenom(saisie: string): string | null {
-  const net = saisie.replace(INVISIBLES, "").trim();
-  return net === "" ? null : net.slice(0, MAX_PRENOM);
+  return normaliserTexte(saisie, MAX_PRENOM);
 }
 
 /** Même règle pour le nom du foyer, avec sa propre borne. */
 export function normaliserNomFoyer(saisie: string): string | null {
-  const net = saisie.replace(INVISIBLES, "").trim();
-  return net === "" ? null : net.slice(0, MAX_NOM_FOYER);
+  return normaliserTexte(saisie, MAX_NOM_FOYER);
 }
 
 /**
