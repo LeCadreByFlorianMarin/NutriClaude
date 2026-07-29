@@ -20,7 +20,11 @@ Si tu n'as pas exécuté le chemin, dis-le plutôt que de le supposer.
 ## Si la PR touche `supabase/migrations/`
 
 > Ces quatre questions viennent de `docs/migrations.md`. Elles sont obligatoires :
-> il n'y a **qu'un seul projet Supabase, et c'est la production.**
+> il n'y a **qu'un seul projet Supabase distant, et c'est la production.**
+>
+> ⚠️ **Fusionner cette PR applique la migration** (déploiement Vercel, depuis le
+> 2026-07-29). Il n'y a plus de geste manuel entre l'approbation et la
+> production : cette revue est le dernier contrôle humain.
 
 - [ ] La migration est-elle **additive** au sens de `docs/migrations.md` ? Sinon,
       pourquoi, et avec quelle sauvegarde vérifiée ?
@@ -37,5 +41,9 @@ exactement ce qu'une revue a trouvé cassé sur `profiles_update_own`.
 -->
 
 - [ ] `lib/supabase/types.ts` a été **régénéré dans le même commit**
-      (`npx supabase gen types typescript --linked > lib/supabase/types.ts`),
-      ou la migration ne change pas la forme du schéma.
+      (`npx supabase gen types typescript --local > lib/supabase/types.ts`,
+      après `npx supabase db reset`), ou la migration ne change pas la forme du
+      schéma. ⚠️ `--local` et non `--linked` : le distant n'a pas encore la
+      migration au moment où tu génères.
+- [ ] La migration a été **rejouée depuis zéro en local** (`npx supabase db reset`),
+      pas seulement appliquée par-dessus un état existant.

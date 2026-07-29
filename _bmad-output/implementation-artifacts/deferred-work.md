@@ -247,3 +247,111 @@ la discipline réelle.
   typographique le sont désormais, ainsi que les tokens d'espacement nommés.
 - ~~« `households.name` protégé par le client »~~ — jamais écrit tel quel, mais un commentaire du
   code l'affirmait à l'envers. Une contrainte `check` existe maintenant en base.
+
+## Deferred from: story 2.1 (2026-07-29)
+
+**Exigence dure pour la story 2.3 — supprimer un rayon détruit ses règles :**
+
+- `product_aisle_map.aisle_id` est `references aisles(id) **on delete cascade**`
+  (`20260502000000_initial_schema.sql:120`). Supprimer un rayon efface donc **en silence toutes ses
+  règles mot-clé**. Sans portée aujourd'hui : aucune règle n'existe, la story 2.3 les crée. Le jour
+  où elle existera, la phrase de confirmation de suppression (« Ce rayon disparaît de ton
+  parcours. ») devra le dire — sans quoi Florian perdra un apprentissage sans jamais l'avoir su.
+  ⚠️ Ce n'est pas un défaut du schéma : c'est le bon comportement (une règle qui pointe vers un rayon
+  disparu n'a pas de sens). C'est l'**information** qui manque, pas la cascade.
+
+**Reporté, avec la raison :**
+
+- **`resolve_aisle_id` reste la seule fonction du schéma sans `set search_path = public`.** Constat de
+  `epic-2-revision-2026-07-29.md` §7. Elle n'est pas `security definer` — elle s'exécute avec les
+  droits de l'appelant, donc **aucune escalade de privilège** n'est à la clé ; la portée est une
+  résolution de nom inattendue. *Non corrigée ici : cette story ne touche pas cette fonction, et la
+  révision réserve la correction « à la story qui la touche » — ce sera la 2.3 ou la 4.16.*
+- **`docs/migrations.md` est périmé sur un point.** Sa section « Ce que ce projet n'a pas » affirme
+  encore *« `supabase db reset` ne doit jamais servir sur ce projet … il n'y a pas d'environnement de
+  développement séparé : un seul projet, qui est la production »*. **Faux depuis le 2026-07-29** : le
+  stack local existe, et `db reset` y est l'outil normal — il a servi trois fois pendant cette story.
+  L'interdiction ne vaut que pour le distant. *Non corrigé ici pour ne pas mêler une réécriture de
+  documentation à une story de fonctionnalité ; à reprendre dans une passe propre.*
+- **Le bouton « Remettre les rayons de départ » n'existe que dans l'état vide** (décision de la
+  story, AC5). L'ouvrir à un parcours déjà personnalisé est une ligne de code, mais inviterait à
+  réintroduire onze rayons qu'on vient de supprimer. À rouvrir si l'usage le demande.
+
+**Pièges d'outillage, pour ne pas les redécouvrir :**
+
+- **Next 16 bloque ses ressources de développement en cross-origin.** Servir sur `localhost:3333` et
+  naviguer sur `127.0.0.1:3333` fait refuser `/_next/webpack-hmr` et les fragments clients : **la
+  page ne s'hydrate pas**, les formulaires partent en GET natif, et rien ne le dit à l'écran. Le
+  message n'apparaît que dans la sortie du serveur de développement. Utiliser `localhost` — surtout
+  **ne pas** ajouter `allowedDevOrigins` à `next.config.ts`, qui est l'un des trois fichiers dont
+  toute modification exige un contrôle sur le déploiement de la PR.
+- **Le stack local utilise les modèles d'email par défaut de Supabase.** Les modèles du produit
+  (`docs/email-templates/`, qui concatènent `&token_hash={{ .TokenHash }}&type=magiclink`) vivent dans
+  le tableau de bord de **production**. En local, le lien reçu dans Mailpit (`:55324`) pointe vers
+  `/auth/v1/verify` avec le `site_url` par défaut : il faut récupérer le `token=` et construire à la
+  main `http://localhost:3333/auth/callback?token_hash=<jeton>&type=magiclink&next=%2F`.
+- **Basculer `.env.local` vers le stack local est nécessaire pour toute vérification à l'écran.** Les
+  variables passées en préfixe de commande **ne suffisent pas** : `NEXT_PUBLIC_*` est figé à la
+  compilation depuis le fichier d'environnement chargé, et le bundle continuait de porter la
+  référence de production. Sauvegarder, remplacer, **restaurer** — et le contrôler par un `diff`.
+
+**Choix assumés, à ne pas prendre pour des oublis en revue :**
+
+- **Aucune mise à jour optimiste sur cet écran.** Écriture puis `router.refresh()`, donc un temps de
+  latence entre le geste et son reflet. L'optimisme et l'outbox d'AD-5 concernent les surfaces liste,
+  au supermarché ; un écran de configuration au calme n'en a pas besoin, et une copie locale de la
+  liste divergerait dès que l'autre membre écrit (pas de Realtime avant l'Epic 4).
+- **Un rayon créé se place APRÈS « Autre »** (`sort_order` 1009 contre 999). C'est la lecture
+  littérale de l'AC1 (« en fin de parcours ») ; la story 2.2 rendra le déplacement trivial. Question
+  ouverte posée à Florian dans le fichier de story.
+- **L'écran est visible des deux membres du foyer.** EXPERIENCE.md le classe « surface de Florian
+  uniquement », mais `profiles` n'a aucune colonne de rôle et toute la RLS passe par
+  `current_household_id()`, qui est par foyer. Aucun contrôle applicatif n'a été inventé : il serait
+  faux (contournable à un appel direct près) et contredirait AD-2. Décision de produit ouverte,
+  tracée dans `sprint-status.yaml`.
+- **L'état vide n'a été vu qu'en thème clair.** La liste, le panneau d'édition et l'anneau de focus
+  l'ont été dans les deux. Que l'état vide tienne en sombre est une **déduction** — il n'emploie que
+  `.btn`, `text-base` et `.hint`, tous vus rendus en sombre sur le même écran — et non une
+  observation. Écrit comme tel plutôt que coché.
+
+## Deferred from: migrations appliquées au déploiement (2026-07-29)
+
+**Décision de Florian :** plus aucune migration poussée à la main. Le déploiement Vercel de `main`
+les applique ; en local, on ne joue que sur le stack `supabase start`. Mécanisme : `vercel.json` →
+`scripts/migrer-au-deploiement.mjs`, exécuté **après** `next build`.
+
+**À contrôler au premier déploiement — ce n'est pas encore prouvé :**
+
+- **La connexion depuis un conteneur de construction Vercel vers Supabase n'a jamais été jouée.**
+  Le script a été éprouvé de bout en bout contre le stack **local** (gardes, chemin nominal, et
+  rattrapage réel d'une migration rembobinée à la main), jamais contre le distant. Le point de rupture
+  probable est l'URI : il faut celle du **pooler de session** (port `5432`), pas du pooler de
+  transaction (`6543`), qui ne tient pas les instructions de définition de schéma. *« Les quatre
+  portes ne voient pas le déploiement »* — c'est le journal de construction de la PR qui fait foi.
+
+**Ce que ce mécanisme ne rattrape pas, et qu'il faut savoir :**
+
+- **Une restauration Vercel ne défait pas une migration.** Elle remet le code, jamais le schéma.
+  L'additivité stricte (AR-MIGRATIONS) passe de bonne manière à **condition de sûreté** : elle est ce
+  qui rend une restauration survivable.
+- **Fusionner une PR applique sa migration.** Il n'y a plus de geste entre l'approbation et la
+  production : la revue est le dernier contrôle humain. Une migration qu'on ne veut pas appliquer
+  tout de suite ne se retient plus en ne la poussant pas — elle se retient en ne fusionnant pas.
+- **Deux déploiements de production simultanés** pourraient tenter la même migration ; la clé de la
+  table d'historique en ferait échouer un, donc il ne serait pas promu. Sans portée à ce rythme.
+
+**Conséquence non évidente, déjà appliquée :** `gen types` passe de `--linked` à `--local`. Le distant
+n'a plus les migrations au moment où l'on génère, si bien que `--linked` rendrait les types du schéma
+*d'avant* et `tsc` validerait contre un schéma que la production n'aura plus. Corrigé dans
+`docs/migrations.md` et dans le gabarit de PR.
+
+**Reporté, avec la raison :**
+
+- **La CLI Supabase est épinglée dans le script (`2.110.0`), pas en dépendance de développement.**
+  L'ajouter à `package.json` ferait télécharger son binaire à chaque `npm ci` de la CI, pour un outil
+  dont seuls le déploiement et le poste de Florian ont besoin (NFR-10). Conséquence assumée : un
+  `npx supabase` local non versionné peut différer de celle du déploiement. Monter le numéro est un
+  commit délibéré.
+- **Rien ne vérifie en CI qu'une migration déjà appliquée n'a pas été modifiée.** La règle reste
+  humaine, portée par le gabarit de PR. Elle prend du poids maintenant que la fusion applique : une
+  migration éditée après coup ne serait pas rejouée sur le distant, et le dépôt mentirait en silence.

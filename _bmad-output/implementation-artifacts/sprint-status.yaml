@@ -41,7 +41,10 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
-last_updated: 2026-07-29  # PR #12 mergée (4ee719a), 7/7 migrations en prod, révision Epic 2 analysée
+last_updated: 2026-07-29  # Story 2.1 contextualisée ; Epic 2 ouvert. Sa création a mesuré un trou
+                          # d'isolation dans `seed_default_aisles` (security definer à household_id
+                          # en paramètre, sans contrôle) : un membre peut écrire dans les rayons d'un
+                          # autre foyer. Correctif prescrit et éprouvé en local, porté par la story.
 project: nutriclaude
 project_key: NOKEY
 tracking_system: file-system
@@ -74,8 +77,8 @@ development_status:
   #     restant est absorbé par la nouvelle 2.1.
   #   · les anciennes 2.5, 2.6, 2.7 sont DÉPLACÉES en Epic 4 (4.16 à 4.18) :
   #     leurs critères s'énoncent sur la liste de courses, donc indémontrables ici.
-  epic-2: backlog
-  2-1-gerer-ses-rayons: backlog
+  epic-2: in-progress
+  2-1-gerer-ses-rayons: review
   2-2-reordonner-le-parcours-par-manipulation-directe: backlog
   2-3-definir-des-regles-mot-cle-rayon: backlog
   2-4-composant-carte-rayon: backlog
