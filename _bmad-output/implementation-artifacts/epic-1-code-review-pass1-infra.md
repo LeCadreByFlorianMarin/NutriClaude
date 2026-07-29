@@ -47,7 +47,7 @@ Vérification finale : `npm test` **18/18** · `typecheck` ✅ · `lint --max-wa
 | `next.config.ts` | 4 en-têtes de sécurité |
 | `.github/workflows/ci.yml` | étape `Test` · `node-version-file` · annulation limitée aux PR · commentaire corrigé |
 | `.github/pull_request_template.md` | **nouveau** — porte enfin la checklist de `docs/migrations.md` |
-| `package.json` | `test`, `lint --max-warnings 0`, `engines >=25` |
+| `package.json` | `test`, `lint --max-warnings 0`, ~~`engines >=25`~~ → `>=24` (2026-07-29) |
 | `lib/dates.ts` | **supprimé** — aucun importeur |
 | `epics.md`, `docs/configuration.md`, stories 1.1 et 1.2, `deferred-work.md` | affirmations périmées ou fausses corrigées |
 
@@ -74,11 +74,19 @@ Dents vérifiées : réintroduire les défauts de `safeNext` et `estCookieDeSess
 les corriger les rend verts.
 
 **Deux effets de bord assumés, à connaître :**
-- `.github/workflows/ci.yml` passe de `node-version: 22` à `node-version-file: .node-version` (= 25).
+- `.github/workflows/ci.yml` passe de `node-version: 22` à `node-version-file: .node-version`.
   Ce n'était plus optionnel : `node --test` n'exécute TypeScript nativement qu'à partir de Node 23.6.
-  Bénéfice collatéral — la CI valide enfin le runtime que Vercel exécute réellement.
-- `package.json` `engines` passe de `>=22.0.0` à `>=25.0.0`, par cohérence avec ce qui précède.
-  L'ancien plancher venait de `@supabase/supabase-js` ; le nouveau vient du harnais de test.
+  ~~Bénéfice collatéral — la CI valide enfin le runtime que Vercel exécute réellement.~~
+  **FAUX, corrigé le 2026-07-29.** Vercel ne servait pas 25 : il résolvait `engines: >=22.0.0`
+  en **24.x**, ce que le journal de build énonce mot pour mot (« Node.js version changed from
+  "24.x" »). L'affirmation était une déduction présentée comme un constat.
+- ~~`package.json` `engines` passe de `>=22.0.0` à `>=25.0.0`, par cohérence avec ce qui précède.~~
+  **Rectifié le 2026-07-29 en `>=24.0.0`, avec `.node-version` ramené à 24.** `>=25.0.0` a fait
+  **échouer le déploiement Vercel** (« Found invalid or discontinued Node.js Version ») : Vercel
+  plafonne à 24.x. Le plancher invoqué n'existait pas — vérifié par exécution sur Node 24.15.0,
+  `npm test` 49/49, `npm run typecheck` et `npm run build` au vert, sans aucun drapeau. Le
+  dépouillement de types est actif par défaut depuis 23.6, donc 24 suffisait depuis le début.
+  La montée « par cohérence » n'a rien acheté et a coûté la production.
 - `tsconfig.json` gagne `allowImportingTsExtensions` — Node résout les spécificateurs tels quels,
   donc les tests importent en `.ts`, ce que `tsc --noEmit` refusait.
 

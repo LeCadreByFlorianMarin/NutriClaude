@@ -461,4 +461,6 @@ _Ajouté après coup. La story reste `done` : ce qui suit ne rouvre pas le trava
 
 **`.github/workflows/ci.yml` a été livré par cette story sans figurer dans aucune tâche, aucun AC, ni la File List.** Constat de méthode, sans action : la CI est documentée depuis la story 1.3 et le README.
 
-**Ce que la revue a trouvé dans le code de cette story** — un open redirect dans `safeNext` contournable par tabulation (corrigé, avec test de régression), un `hasSessionCookie` acceptant le cookie PKCE d'un navigateur jamais authentifié (corrigé, avec test), et une CI épinglée sur Node 22 quand Vercel sert du Node 25 (corrigé). Détail complet : `epic-1-code-review-pass1-infra.md`.
+**Ce que la revue a trouvé dans le code de cette story** — un open redirect dans `safeNext` contournable par tabulation (corrigé, avec test de régression), un `hasSessionCookie` acceptant le cookie PKCE d'un navigateur jamais authentifié (corrigé, avec test), et une CI épinglée sur Node 22 quand ~~Vercel sert du Node 25~~ **Vercel servait du Node 24.x**
+(la CI est corrigée ; l'affirmation « Node 25 » était fausse — rectifiée le 2026-07-29, voir
+`epic-1-code-review-pass1-infra.md`). Détail complet : `epic-1-code-review-pass1-infra.md`.
