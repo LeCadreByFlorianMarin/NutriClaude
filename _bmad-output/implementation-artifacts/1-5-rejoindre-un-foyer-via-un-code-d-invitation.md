@@ -356,3 +356,29 @@ Trois choses s'y lisent :
 |---|---|
 | 2026-07-27 | Story créée. Statut → `ready-for-dev` |
 | 2026-07-27 | Implémentation et vérification : choix créer/rejoindre, normalisation du code (un code dicté en minuscules avec espace fonctionne), FR-43 observable — deux membres se voient dans « Marin », 11 rayons partagés, compteur 5→4. Deux branches d'erreur écartées explicitement. Statut → `review` |
+
+---
+
+## Amendement du 2026-07-28 — revue de code Epic 1, passe 2
+
+**L'AC3 est désormais satisfaite, y compris sous concurrence.** Les Completion Notes concluaient que
+« la course décrite dans le piège n°4 reste ouverte » et qu'elle était « irréparable sans migration
+sur une base gelée ». `20260727161200_guard_invite_use_count.sql`, appliquée en production le
+2026-07-28, fusionne le contrôle et le décrément en `update … where uses_remaining > 0 returning
+household_id` : deux rachats simultanés du dernier usage ne peuvent plus tous deux aboutir, et le
+compteur ne peut plus devenir négatif. La prémisse « base gelée » elle-même a été réécrite — voir
+`deferred-work.md`.
+
+**Deux défauts trouvés dans le formulaire, corrigés :**
+- `Profile already exists` était traité comme un succès muet, au motif de « deux soumissions
+  concurrentes ». Le raisonnement était inversé : ce message signifie que le profil **existait avant**
+  la requête ; une vraie course échoue sur la clé primaire. Conséquence — quelqu'un qui avait déjà un
+  foyer voyait sa saisie effacée et son ancien foyer s'afficher, sans un mot. Il est maintenant
+  distingué (`lib/foyer/erreurs.ts`), annoncé, puis l'utilisateur est ramené chez lui.
+- `Not authenticated` n'était traité nulle part, contrairement à la microcopie imposée par cette
+  story (« *ne pas afficher* — **rediriger vers `/login`** »). Il tombait dans « Réessaie dans un
+  instant », message que l'utilisateur pouvait suivre indéfiniment sans que rien ne change.
+
+**La normalisation du code a été étendue** : elle ne retirait que les espaces. Les codes étant
+hexadécimaux, `O→0` et `I/L→1` sont des corrections sans perte possible, et les séparateurs
+(`388B-626A`, tel qu'on écrit un code sur un tableau) sont désormais retirés.

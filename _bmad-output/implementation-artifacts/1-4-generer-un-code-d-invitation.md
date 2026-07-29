@@ -392,3 +392,29 @@ C'est le contrôle le plus sévère possible sur cette table : `code` **est la c
 | 2026-07-27 | Story créée. Statut → `ready-for-dev` |
 | 2026-07-27 | Deux questions tranchées par Florian avant implémentation : la route est `/foyer` (la Story 1.6 l'enrichira), et l'annulation d'une invitation reste hors périmètre — plusieurs codes valables en parallèle est donc un comportement attendu, pas un défaut |
 | 2026-07-27 | Implémentation et vérification complètes : écran `/foyer`, émission en Server Action, code `388B626A` produit et affiché, page non-émettrice au rendu confirmée, isolation des invitations prouvée dans les deux sens. Statut → `review` |
+
+---
+
+## Amendement du 2026-07-28 — revue de code Epic 1, passe 3
+
+**La décision « plusieurs codes peuvent rester valables en parallèle » est révisée.** Elle avait été
+tranchée par Florian à la Question 2 de cette story, et elle produisait un piège que les trois
+couches de revue ont relevé indépendamment :
+
+1. on crée un code, on l'envoie par SMS ;
+2. on doute, on appuie sur « Créer un autre code » ;
+3. l'écran affiche le nouveau — **le premier disparaît de l'interface et reste vivant sept jours** ;
+4. « Annuler ce code » (ajouté en passe 2) ne porte plus que sur le nouveau.
+
+Autrement dit : le seul code qu'on pouvait vouloir révoquer, celui qu'on venait de partager puis de
+regretter, était précisément celui qu'aucun bouton n'atteignait. `invitationEnCours` n'affichant que
+le plus récent, rien à l'écran ne laissait deviner que les autres existaient encore.
+
+**Nouvelle règle : émettre remplace.** `genererInvitation` révoque tous les codes encore valables
+avant d'en créer un. Un code à la fois, ce que le mot « autre » promet. L'écran y gagne : le
+paragraphe d'avertissement ambigu disparaît, et la carte passe de trois boutons pleine largeur
+indifférenciés à une action pleine (« Copier ») et deux chemins discrets, dont l'annulation avec une
+confirmation en deux temps.
+
+Si deux codes simultanés redeviennent un besoin réel, la bonne forme sera de **tous** les lister,
+chacun avec sa propre échéance et son propre bouton — pas de revenir au silence actuel.

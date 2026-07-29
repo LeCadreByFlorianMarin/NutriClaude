@@ -5,10 +5,14 @@ on:
     branches: [main]
   pull_request:
 
-# Une seule exécution par branche : un nouveau push annule la précédente.
+# Une seule exécution par branche. L'annulation ne vaut QUE pour les pull
+# requests : sur `main`, deux merges rapprochés feraient annuler le run du
+# premier commit par le second, et un run annulé se rapporte comme neutre — pas
+# comme échoué. Le commit atterrirait sur la branche déployée sans avoir jamais
+# terminé sa vérification.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:
@@ -18,12 +22,31 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          # Plancher imposé par @supabase/supabase-js (engines: node >=22).
-          node-version: 22
+          # Source unique de la CI. Épingler un numéro ici ferait valider un
+          # runtime que personne n'exécute — et `node --test` a besoin de
+          # l'exécution native de TypeScript, absente avant Node 23.6.
+          #
+          # ⚠️ Ce fichier et `engines.node` de `package.json` doivent nommer la
+          # MÊME version majeure. C'est `engines.node` que Vercel arbitre, pas
+          # ce fichier : mesuré le 2026-07-29, `>=25.0.0` a fait échouer le
+          # déploiement (« Found invalid or discontinued Node.js Version »),
+          # alors que ce fichier disait déjà 25 depuis le squelette sans que
+          # rien ne le lise. Vercel plafonne à 24.x.
+          #
+          # `engines` est épinglé — `24.x`, pas `>=24.0.0`. Un intervalle ouvert
+          # ferait monter Vercel seul à la sortie de Node 25 (il l'avertit
+          # explicitement au build), pendant que ce fichier resterait en 24 : la
+          # CI validerait de nouveau un runtime que la production n'exécute pas,
+          # en silence et sans build rouge. Monter de majeure est donc un commit
+          # délibéré qui touche les DEUX fichiers, avec le déploiement de la PR
+          # pour témoin.
+          node-version-file: .node-version
           cache: npm
 
-      # `npm ci` échoue si package-lock.json et package.json divergent :
-      # c'est aussi la garantie que les versions d'AR-STACK sont respectées.
+      # `npm ci` échoue si package-lock.json et package.json divergent, et
+      # installe exactement les versions verrouillées. Il ne contrôle PAS le
+      # respect d'AR-STACK : une montée de `next` faite dans les deux fichiers
+      # passerait sans broncher. Ce contrôle-là reste humain, en revue.
       - run: npm ci
 
       - name: Typecheck
@@ -31,6 +54,12 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      # Sans réseau ni base : uniquement les prédicats purs dont dépend le
+      # contrôle d'accès. Aucune dépendance ajoutée — `node --test` est dans le
+      # runtime (NFR-10).
+      - name: Test
+        run: npm test
 
       # Le build a besoin des variables Supabase pour instancier le client.
       # Valeurs factices : rien n'appelle le réseau à la compilation.

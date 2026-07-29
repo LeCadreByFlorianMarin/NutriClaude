@@ -11,9 +11,19 @@
  *  - les URL absolues (`https://evil.com`, `//evil.com` protocol-relative) ;
  *  - `/\evil.com`, que plusieurs navigateurs normalisent en `//evil.com`.
  */
-const RELATIVE_PATH = /^\/(?![/\\])/;
+const CHEMIN_LOCAL = /^\/(?![/\\])/;
+
+/**
+ * Tabulation, saut de ligne et retour chariot, que le parseur d'URL **retire
+ * avant de parser**. Les tester tels quels ne sert à rien : `/⇥/evil.com` passe
+ * un contrôle « une seule barre oblique », puis `new URL()` le voit comme
+ * `//evil.com` et le résout en `https://evil.com/`. On normalise donc la chaîne
+ * comme le parseur la verra, et c'est cette forme-là qu'on renvoie.
+ */
+const IGNORES_PAR_LE_PARSEUR = /[\t\n\r]/g;
 
 export function safeNext(value: string | null | undefined): string {
   if (!value) return "/";
-  return RELATIVE_PATH.test(value) ? value : "/";
+  const normalise = value.replace(IGNORES_PAR_LE_PARSEUR, "");
+  return CHEMIN_LOCAL.test(normalise) ? normalise : "/";
 }

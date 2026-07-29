@@ -403,3 +403,27 @@ Le cas des trois espaces n'est pas un détail : la colonne est `not null` mais *
 | 2026-07-27 | Story créée. Statut → `ready-for-dev` |
 | 2026-07-27 | Questions tranchées par Florian : « Temoin3 » reste en place comme second membre (AC2 vérifiable en l'état) ; aucun lien « Retour » sur `/foyer` |
 | 2026-07-27 | Implémentation et vérification : écran foyer à quatre sections, prénom modifiable en client-direct à un seul champ, membres lus sous RLS, zone appareils annoncée. AC2 fermée depuis la session du second membre (« Flo » visible chez Temoin3), prénom remis à « Florian ». Deux branches d'affichage écartées explicitement. Statut → `review` |
+
+---
+
+## Amendement du 2026-07-28 — revue de code Epic 1, passes 1 et 2
+
+**La Task 6 coche une vérification qui n'est plus vraie.** Elle affirme `git diff app/foyer/InviteCard.tsx
+app/foyer/actions.ts app/foyer/invitation.ts` → vide. Les trois fichiers ont été modifiés depuis, par
+les deux passes de revue :
+- `actions.ts` porte `seDeconnecter` et `annulerInvitation`, et une taxonomie d'erreurs typée ;
+- `InviteCard.tsx` gagne la révocation d'un code, un retour quand le presse-papier est indisponible,
+  et des libellés d'échéance qui ne mentent plus ;
+- `invitation.ts` a été **déplacé** vers `lib/foyer/invitation.ts`, avec le client en paramètre.
+
+**Le piège n°1 de cette story est devenu faux.** Il énonçait que `profiles_update_own` n'a « aucun
+`with check` », donc que `household_id` est librement modifiable et que la discipline vit dans le
+payload du composant. La migration `20260727154504` a fermé le trou en base le 2026-07-28. Le
+commentaire de `DisplayNameForm.tsx` a été corrigé : la discipline du payload reste bonne à tenir,
+mais la frontière de sécurité est en base, comme partout ailleurs (AD-2).
+
+**Une déconnexion a été livrée dans cette zone sans qu'aucun AC ne la porte.** C'est un manque de la
+story, pas du code : le produit vit sur des appareils partagés avec un cookie de 400 jours, et il
+n'existait aucun moyen de fermer une session — `components/SignOutButton.tsx` avait été supprimé avec
+le prototype, sans remplaçant. AD-13 a été reformulé sur un critère de cause pour que ce placement
+soit justifiable autrement que par analogie.

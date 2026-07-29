@@ -159,8 +159,36 @@ Dans l'ordre. Chaque étape suppose la précédente.
 
 Tracé pour ne pas être redécouvert comme un oubli. Le détail vit dans `_bmad-output/implementation-artifacts/deferred-work.md`.
 
-- **Pas de validation des variables d'environnement au démarrage** — absentes, tout retourne 500 sans page de secours.
-- **Aucun framework de test** — la vérification est manuelle et exécutable. Les tests d'isolation et de convergence sont planifiés en story 4.15.
+- ~~Pas de validation des variables d'environnement au démarrage~~ — **clos** (revue Epic 1, passe 1) : `lib/supabase/env.ts` nomme la variable manquante au lieu de laisser `createServerClient` lever dans le proxy.
+- **Tests unitaires : `node --test`**, sans aucune dépendance ajoutée (NFR-10 respecté). Couvre les prédicats purs dont dépend le contrôle d'accès (`lib/auth/*.test.ts`, `lib/foyer/*.test.ts`).
+- ~~Les tests **d'isolation RLS** restent hors de portée tant qu'il n'existe qu'un seul projet Supabase~~ — **clos le 2026-07-29**, voir la section 8 ci-dessous.
+
+---
+
+## 8. L'environnement de test local, et les tests d'isolation
+
+NFR-5 — l'isolation entre foyers — n'était vérifiable par aucun test tant qu'il n'existait qu'un projet Supabase, qui *était* la production. Le contrôle se faisait en créant des comptes réels et en y laissant des débris : trois comptes témoins en sont sortis.
+
+```bash
+npx supabase start          # stack local, images Docker au premier lancement
+npm run test:isolation      # 11 tests à deux comptes, contre la vraie RLS
+npx supabase stop           # quand tu as fini
+```
+
+**Les ports de ce projet sont décalés** dans `supabase/config.toml` : API `55321`, base `55322`, Studio `55323`, mails `55324`. Les valeurs par défaut (`5432x`) heurtaient un autre stack Supabase local déjà en service sur cette machine. Rien n'est écrit en dur dans les tests : `supabase/tests/stack-local.ts` lit `supabase status -o json` à l'exécution.
+
+**`npm run test:isolation` n'est pas dans `npm test`**, et c'est délibéré. Il exige un stack debout ; s'il était dans le glob unitaire, la CI le lancerait sans base. Il **lève** quand le stack est absent, il ne se contente pas de passer — un test d'isolation qui « passe » sans base est le pire mode de défaillance possible.
+
+Ce que ces tests prouvent, et que rien d'autre ne peut prouver :
+
+- un membre du foyer A ne lit **aucune** ligne du foyer B — foyers, profils, rayons, invitations — y compris en nommant explicitement l'UUID cible ;
+- il ne peut ni s'y déplacer, ni renommer le foyer, ni y poser un rayon, ni supprimer une invitation ;
+- le chemin légitime reste ouvert : un troisième compte rejoint A par son code et ne voit alors que A ;
+- **le témoin négatif** : la base contient bien les deux foyers, lu en `service_role`, qui traverse la RLS. Sans lui, « A ne voit rien de B » serait vrai gratuitement si B n'existait pas.
+
+> ⚠️ Le faux client de `lib/` ne remplace pas ça et ne le remplacera jamais : **un faux ne modélise pas la RLS**. Un test de `membresDuFoyer` avec un faux prouve le mapping, jamais l'isolation.
+
+**Ce que l'ouverture de cet environnement a immédiatement révélé** — la chaîne de migrations ne reproduisait pas la production. Aucune migration n'accordait de privilège de table : le schéma s'en remettait aux privilèges par défaut de Supabase, permissifs à l'époque où le projet a été créé, et qui ne le sont plus. Sur un stack neuf, chaque lecture et chaque écriture directe rendait `42501 permission denied`, et seules les fonctions `security definer` répondaient. Corrigé par `20260729094500_grant_table_privileges.sql`.
 - **Les liens de connexion peuvent être consommés par les analyseurs d'emails** de certains fournisseurs, qui préchargent les URL. Marginal sur des boîtes personnelles ; le message « on t'en envoie un autre ? » est la porte de sortie prévue.
-- **`lib/supabase/types.ts` est écrit à la main** et divergera silencieusement du schéma. `supabase gen types` reste la bonne réponse, à traiter dans une story dédiée.
+- **`lib/supabase/types.ts` est généré** (`npx supabase gen types typescript --linked`), et non plus écrit à la main — cette dette est close. Ce qui reste ouvert : **rien ne détecte sa dérive** avec le schéma déployé. Une migration poussée sans régénération laisse `tsc` valider contre un schéma qui n'existe plus, et la garantie s'inverse : les types ne peuvent pas casser, précisément parce que rien ne les contrôle. Le contrôle en CI suppose un `SUPABASE_ACCESS_TOKEN` en secret du dépôt ; en attendant, le rappel vit dans `.github/pull_request_template.md`.
 - **Vulnérabilités `npm audit`**, toutes transitives et en dépendances de développement, jamais expédiées en production.

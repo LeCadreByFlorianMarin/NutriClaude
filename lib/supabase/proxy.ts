@@ -1,21 +1,34 @@
 import { createServerClient } from "@supabase/ssr";
+import { supabaseEnv } from "./env";
 import type { Database } from "./types";
 import { NextResponse, type NextRequest } from "next/server";
+import { estCookieDeSession } from "../auth/session-cookie";
+import { safeNext } from "../auth/safe-next";
+import {
+  AUTH_TIMEOUT_MS,
+  TIMEOUT,
+  estPanneDeTransport,
+  withTimeout,
+} from "../auth/panne";
 
 /**
  * Seules routes accessibles sans être authentifié, en correspondance **exacte**.
  * Pas de correspondance par préfixe : un `/login/<quoi-que-ce-soit>` reste protégé.
  */
-const PUBLIC_ROUTES = ["/login", "/auth/callback"];
+const PUBLIC_ROUTES = ["/login", "/auth/callback", "/auth/bascule"];
 
-/** Délai au-delà duquel on renonce à vérifier la session auprès de Supabase. */
-const AUTH_TIMEOUT_MS = 3000;
+/**
+ * Écrans d'entrée : un membre déjà connecté n'y a rien à faire.
+ *
+ * Distinct de `PUBLIC_ROUTES`, qui répond à une autre question — « joignable
+ * sans session ? ». Les confondre imposait une exception codée en dur pour
+ * `/auth/callback`, qui est publique mais doit rester joignable connecté.
+ */
+const AUTH_ENTRY_ROUTES = ["/login"];
 
-/** Vrai si la requête porte un cookie de session Supabase (`sb-<ref>-auth-token`). */
+/** Vrai si la requête porte un cookie de session Supabase. */
 function hasSessionCookie(request: NextRequest): boolean {
-  return request.cookies
-    .getAll()
-    .some((c) => c.name.startsWith("sb-") && c.name.includes("auth-token"));
+  return request.cookies.getAll().some((c) => estCookieDeSession(c.name));
 }
 
 /**
@@ -34,11 +47,12 @@ function hasSessionCookie(request: NextRequest): boolean {
  *     être servie à un autre (NFR-5).
  */
 export async function updateSession(request: NextRequest) {
+  const { url: supabaseUrl, anonKey: supabaseAnonKey } = supabaseEnv();
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -80,7 +94,7 @@ export async function updateSession(request: NextRequest) {
   // `cannotVerify` distingue « pas de session » de « pas pu vérifier ». Une
   // panne Supabase se présente sous TROIS formes distinctes, et les trois
   // doivent mener au même traitement :
-  //   1. l'appel pend            → tranché par le Promise.race ci-dessous ;
+  //   1. l'appel pend            → tranché par `withTimeout` ci-dessous ;
   //   2. l'appel échoue vite     → `getUser()` ne lève PAS, il retourne
   //      `{ user: null, error: AuthRetryableFetchError }`. Sans le test sur
   //      l'erreur, ce cas serait lu comme « pas de session » et déconnecterait
@@ -89,19 +103,12 @@ export async function updateSession(request: NextRequest) {
   let user = null;
   let cannotVerify = false;
   try {
-    const result = await Promise.race([
-      supabase.auth.getUser(),
-      new Promise<"timeout">((resolve) =>
-        setTimeout(() => resolve("timeout"), AUTH_TIMEOUT_MS)
-      ),
-    ]);
-    if (result === "timeout") {
+    const result = await withTimeout(supabase.auth.getUser(), AUTH_TIMEOUT_MS);
+    if (result === TIMEOUT) {
       cannotVerify = true;
     } else {
       user = result.data.user;
-      // `AuthRetryableFetchError` = échec de transport réessayable. Distinct d'un
-      // `AuthSessionMissingError` (400), qui signifie réellement « pas de session ».
-      if (!user && result.error?.name === "AuthRetryableFetchError") {
+      if (!user && estPanneDeTransport(result.error)) {
         cannotVerify = true;
       }
     }
@@ -113,6 +120,16 @@ export async function updateSession(request: NextRequest) {
   const isPublic = PUBLIC_ROUTES.includes(pathname);
 
   /**
+   * Vers la connexion, destination conservée. L'URL est construite à neuf : un
+   * `clone()` traînerait la query string d'origine sur la page de connexion.
+   */
+  const versConnexion = () => {
+    const url = new URL("/login", request.nextUrl.origin);
+    url.searchParams.set("next", pathname + request.nextUrl.search);
+    return NextResponse.redirect(url);
+  };
+
+  /**
    * Session non vérifiable (Supabase injoignable ou trop lent). Le hors-ligne
    * est un mode nominal, pas une erreur (NFR-1) : on laisse passer si un cookie
    * de session existe. Ce n'est pas un contournement — la RLS reste l'unique
@@ -120,27 +137,24 @@ export async function updateSession(request: NextRequest) {
    * Sans cookie, en revanche, rien ne justifie de laisser entrer.
    */
   if (cannotVerify) {
-    if (hasSessionCookie(request) || isPublic) return supabaseResponse;
-    const url = new URL("/login", request.nextUrl.origin);
-    url.searchParams.set("next", pathname + request.nextUrl.search);
-    return withSessionState(NextResponse.redirect(url));
+    if (hasSessionCookie(request) || isPublic) return withSessionState(supabaseResponse);
+    return withSessionState(versConnexion());
   }
 
-  // Pas de session sur une route protégée → vers la connexion, destination
-  // conservée. L'URL est construite à neuf : un `clone()` traînerait la query
-  // string d'origine sur la page de connexion.
-  if (!user && !isPublic) {
-    const url = new URL("/login", request.nextUrl.origin);
-    url.searchParams.set("next", pathname + request.nextUrl.search);
-    return withSessionState(NextResponse.redirect(url));
+  // Pas de session sur une route protégée.
+  if (!user && !isPublic) return withSessionState(versConnexion());
+
+  /*
+   * Session valide sur un écran d'entrée → retour à la destination demandée, ou
+   * à l'accueil. Honorer `next` ici évite qu'un membre déjà connecté ouvrant un
+   * `/login?next=/foyer` (lien partagé, second onglet) perde sa destination.
+   */
+  if (user && AUTH_ENTRY_ROUTES.includes(pathname)) {
+    const destination = safeNext(request.nextUrl.searchParams.get("next"));
+    return withSessionState(
+      NextResponse.redirect(new URL(destination, request.nextUrl.origin))
+    );
   }
 
-  // Session valide sur une page d'authentification → retour à l'accueil.
-  // `/auth/callback` est exempté : il doit rester joignable pour l'échange de code.
-  if (user && isPublic && pathname !== "/auth/callback") {
-    const url = new URL("/", request.nextUrl.origin);
-    return withSessionState(NextResponse.redirect(url));
-  }
-
-  return supabaseResponse;
+  return withSessionState(supabaseResponse);
 }

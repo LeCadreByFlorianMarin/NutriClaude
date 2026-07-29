@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
-last_updated: 2026-07-27  # story 1.6 livrée, en attente de revue
+last_updated: 2026-07-28  # rétrospective Epic 1 tenue — voir epic-1-retro-2026-07-28.md
 project: nutriclaude
 project_key: NOKEY
 tracking_system: file-system
@@ -49,15 +49,22 @@ story_location: _bmad-output/implementation-artifacts
 
 development_status:
   # ── Epic 1 : Socle technique & foyer partageable ──
-  epic-1: in-progress
+  epic-1: done
   1-1-poser-le-socle-applicatif-next-16: done
   1-2-authentification-par-magic-link-sans-mot-de-passe: done
   1-3-creer-un-foyer-a-l-inscription: done
-  1-4-generer-un-code-d-invitation: review
-  1-5-rejoindre-un-foyer-via-un-code-d-invitation: in-progress
-  1-6-ecran-profil-membres-du-foyer: review
-  1-7-fondations-de-theme-clair-sombre-de-ton: backlog
-  epic-1-retrospective: optional
+  1-4-generer-un-code-d-invitation: done
+  1-5-rejoindre-un-foyer-via-un-code-d-invitation: done
+  1-6-ecran-profil-membres-du-foyer: done
+  # Close sur décision de Florian (2026-07-28). Les deux contrôles alors ouverts
+  # ont été menés le 2026-07-29 ; il en reste un morceau :
+  #   1. relecture visuelle : SIX écrans sur sept vus dans les DEUX thèmes. Elle a
+  #      trouvé trois défauts qu'aucune des quatre portes ne voyait, dont deux
+  #      consignés « traités » par la passe 3 sans l'être. /onboarding reste à
+  #      voir : il exige un compte sans profil, donc l'environnement de test.
+  #   2. `20260728152418_require_non_blank_household_name.sql` : appliquée.
+  1-7-fondations-de-theme-clair-sombre-de-ton: done
+  epic-1-retrospective: done
 
   # ── Epic 2 : Le classement par rayon qui apprend ──
   epic-2: backlog
@@ -127,3 +134,50 @@ development_status:
   7-3-consulter-et-faconner-recettes-menu-depuis-claude: backlog
   7-4-consulter-et-modifier-rayons-regles-depuis-claude: backlog
   epic-7-retrospective: optional
+
+# ── Actions issues des rétrospectives ──
+# Alimenté par bmad-retrospective. `status` : open | in-progress | done
+action_items:
+  # Bloquant avant l'Epic 2
+  - epic: 1
+    action: "Ouvrir un environnement de test Supabase (branche ou supabase start local) — NFR-5 n'est vérifiable par aucun test tant qu'il n'existe qu'un projet, qui est la production"
+    owner: "Florian"
+    status: done
+  - epic: 1
+    action: "Écrire les tests d'isolation à deux comptes (NFR-5) une fois l'environnement disponible"
+    owner: "Amelia"
+    status: done
+  - epic: 1
+    action: "Pousser 20260729094500_grant_table_privileges.sql — aucune migration n'accordait de privilège de table, la chaîne ne reproduisait pas la production (requête de contrôle en en-tête ; no-op attendu en prod)"
+    owner: "Florian"
+    status: open
+  - epic: 1
+    action: "Réviser la story 2.1 et son recouvrement avec la 2.2 — seed_default_aisles existe déjà et amorce 11 rayons ; aucun code applicatif ne lit les rayons"
+    owner: "John + Winston"
+    status: open
+  - epic: 1
+    action: "Pousser 20260728152418_require_non_blank_household_name.sql (requête de contrôle en en-tête du fichier)"
+    owner: "Florian"
+    status: done
+  # Avant de clore l'Epic 1 pour de bon
+  - epic: 1
+    action: "Relire les sept écrans dans les deux thèmes, /auth/bascule compris — 6/7 faits le 2026-07-29 (3 défauts trouvés et corrigés) ; /onboarding exige un compte sans profil, donc l'environnement de test"
+    owner: "Florian"
+    status: in-progress
+  - epic: 1
+    action: "Nettoyer les trois comptes témoins abandonnés en production (+nc1, +nc2, +nc3) et leurs foyers"
+    owner: "Florian"
+    status: open
+  # Règles d'équipe, à appliquer dès la première story de l'Epic 2
+  - epic: 1
+    action: "Ne consigner comme vérifié que ce qui a été exécuté, en citant la commande — une déduction s'écrit « déduit »"
+    owner: "Amelia"
+    status: open
+  - epic: 1
+    action: "Un commentaire explique un pourquoi, jamais un état de la base"
+    owner: "Amelia"
+    status: open
+  - epic: 1
+    action: "Revue adversariale par story plutôt qu'en fin d'epic (décision de Florian : environnement de test ET revue)"
+    owner: "Amelia"
+    status: open

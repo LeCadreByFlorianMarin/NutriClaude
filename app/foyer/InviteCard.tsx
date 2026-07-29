@@ -1,74 +1,113 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { genererInvitation } from "./actions";
+import { useEffect, useState, useTransition } from "react";
+import { messageDe } from "@/lib/messages";
+import { usages, validite } from "@/lib/foyer/libelles-invitation";
+import { LIBELLE_OCCUPE } from "@/app/_lib/libelles";
+import { Notice } from "@/app/_lib/Notice";
+import { annulerInvitation, genererInvitation } from "./actions";
 
-/** Messages d'échec en français, sans jargon (NFR-8/NFR-9). */
-const MESSAGES: Record<string, string> = {
+/** Messages en français, sans jargon (NFR-8/NFR-9). */
+const MESSAGES = {
+  "session-perdue": "Ta session a expiré. Reconnecte-toi pour inviter quelqu'un.",
+  indisponible: "On n'arrive pas à joindre le service. Réessaie dans un instant.",
   echec: "Ça n'a pas marché. Réessaie dans un instant.",
-};
+  "copie-impossible": "Impossible de copier. Sélectionne le code à la main.",
+  copie: "Copié !",
+  cree: "Nouveau code créé. Le précédent ne marche plus.",
+  annule: "Code annulé. Il ne marche plus.",
+} as const;
 
-function validite(jours: number): string {
-  if (jours <= 0) return "Il expire aujourd'hui.";
-  if (jours === 1) return "Encore 1 jour.";
-  return `Encore ${jours} jours.`;
-}
-
-function usages(n: number): string {
-  return n === 1
-    ? "1 personne peut encore s'en servir."
-    : `${n} personnes peuvent encore s'en servir.`;
-}
+type Cle = keyof typeof MESSAGES;
+/** Quelle action est en vol — un seul `useTransition` ne suffit pas à le dire. */
+type Action = "creer" | "annuler" | null;
 
 export function InviteCard({
   code,
-  joursRestants,
+  expiresAt,
   usagesRestants,
 }: {
   code: string | null;
-  joursRestants: number;
+  expiresAt: string | null;
   usagesRestants: number;
 }) {
   const [enCours, demarrer] = useTransition();
-  const [erreur, setErreur] = useState<string | undefined>();
-  const [copie, setCopie] = useState(false);
+  const [action, setAction] = useState<Action>(null);
+  const [cle, setCle] = useState<Cle | undefined>();
+  const [confirmeAnnulation, setConfirmeAnnulation] = useState(false);
+
+  /*
+   * Le message de copie s'efface tout seul. Les autres restent : ils rendent
+   * compte d'une action qui a modifié la base, et disparaître au bout de
+   * 2,5 s les rendrait invisibles à qui lit lentement.
+   */
+  useEffect(() => {
+    if (cle !== "copie") return;
+    const minuteur = setTimeout(() => setCle(undefined), 2500);
+    return () => clearTimeout(minuteur);
+  }, [cle]);
 
   function inviter() {
-    setErreur(undefined);
+    setCle(undefined);
+    setAction("creer");
+    setConfirmeAnnulation(false);
     demarrer(async () => {
       const r = await genererInvitation();
-      if (!r.ok) setErreur(r.erreur);
+      // Le succès s'annonce aussi : une suite de caractères qui en remplace une
+      // autre au même endroit est un signal quasi nul à l'œil, et nul au lecteur
+      // d'écran. C'est ce silence qui faisait appuyer deux fois.
+      setCle(r.ok ? "cree" : r.erreur);
+      setAction(null);
+    });
+  }
+
+  function annuler() {
+    if (!code) return;
+    setCle(undefined);
+    setAction("annuler");
+    demarrer(async () => {
+      const r = await annulerInvitation(code);
+      setCle(r.ok ? "annule" : r.erreur);
+      setAction(null);
+      setConfirmeAnnulation(false);
     });
   }
 
   async function copier() {
     if (!code) return;
     try {
+      // `navigator.clipboard` est absent hors origine sécurisée — une tablette
+      // de cuisine servie en http:// sur le réseau local, par exemple.
+      if (!navigator.clipboard) throw new Error("presse-papiers indisponible");
       await navigator.clipboard.writeText(code);
-      setCopie(true);
-      setTimeout(() => setCopie(false), 2500);
+      setCle("copie");
     } catch {
-      // Presse-papiers indisponible : le code reste sélectionnable à la main,
-      // c'est le repli. On ne montre pas d'erreur pour ça.
+      // On le dit, plutôt que de ne rien faire : appuyer sur un bouton qui ne
+      // produit aucun retour laisse croire que l'application est figée.
+      setCle("copie-impossible");
     }
   }
 
-  const message = erreur ? (MESSAGES[erreur] ?? MESSAGES.echec) : undefined;
+  /*
+   * Une seule région de statut, hissée hors du conditionnel : les deux branches
+   * rendaient chacune la leur, à des positions différentes de l'arbre, si bien
+   * qu'un message posé au moment où l'on passe de l'une à l'autre n'était pas
+   * annoncé de façon fiable.
+   */
+  const statut = <Notice className="mt-3">{messageDe(MESSAGES, cle, "echec")}</Notice>;
 
   if (!code) {
     return (
       <div>
         <p className="text-base">Personne n&apos;est encore invité.</p>
-        <p role="status" aria-live="polite" className="mt-3 min-h-6 text-base font-medium">
-          {message}
-        </p>
+        {statut}
         <button
           type="button"
           onClick={inviter}
           disabled={enCours}
-          className="mt-2 min-h-11 w-full rounded-lg border border-current/30 px-4 py-2 font-medium disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+          className="btn-primaire mt-2 w-full"
         >
-          {enCours ? "Un instant…" : "Inviter quelqu'un"}
+          {enCours ? LIBELLE_OCCUPE : "Inviter quelqu'un"}
         </button>
       </div>
     );
@@ -77,38 +116,93 @@ export function InviteCard({
   return (
     <div>
       {/* Le code sera lu à voix haute ou recopié : taille et espacement font
-          tout le travail, aucune couleur n'est disponible avant la Story 1.7. */}
+          tout le travail. L'abricot serait disponible, mais il est réservé à
+          l'action courses (UX-DR2) — un code d'invitation n'en est pas une.
+
+          `aria-hidden` + doublon `sr-only` : `aria-label` est ignoré sur un
+          `<p>` (rôle `paragraph`, *name-prohibited* en ARIA 1.2), donc la
+          version épelée n'atteignait aucun lecteur d'écran. `break-all` :
+          8 caractères hexadécimaux n'ont aucune opportunité de coupure et
+          sortaient de la carte à 200 % de zoom. */}
       <p
-        className="rounded-lg border border-current/30 px-4 py-6 text-center text-3xl font-semibold tabular-nums tracking-[0.25em] select-all"
-        aria-label={`Code d'invitation : ${code.split("").join(" ")}`}
+        aria-hidden="true"
+        className="card px-4 py-6 text-center font-rounded text-3xl font-bold break-all tabular-nums tracking-[0.25em] select-all"
       >
         {code}
       </p>
+      <span className="sr-only">
+        Code d&apos;invitation : {code.split("").join(" ")}
+      </span>
 
-      <p className="mt-3 text-sm">
-        {validite(joursRestants)} {usages(usagesRestants)}
+      <p className="mt-2 text-sm tabular-nums text-muted">
+        {expiresAt ? `${validite(expiresAt, new Date())} ` : ""}
+        {usages(usagesRestants)}
       </p>
 
-      <p role="status" aria-live="polite" className="mt-3 min-h-6 text-base font-medium">
-        {message ?? (copie ? "Copié !" : "")}
-      </p>
+      {statut}
 
+      {/* La seule action pleine : 95 % des visites ne veulent que ça. */}
       <button
         type="button"
         onClick={copier}
-        className="min-h-11 w-full rounded-lg border border-current/30 px-4 py-2 font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+        disabled={enCours}
+        className="btn-primaire mt-2 w-full"
       >
         Copier
       </button>
 
-      <button
-        type="button"
-        onClick={inviter}
-        disabled={enCours}
-        className="mt-3 min-h-11 w-full rounded-lg px-4 py-2 text-sm underline underline-offset-4 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
-      >
-        {enCours ? "Un instant…" : "Créer un autre code"}
-      </button>
+      <div className="mt-6 flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={inviter}
+          disabled={enCours}
+          className="btn-quiet"
+        >
+          {action === "creer" ? LIBELLE_OCCUPE : "Créer un autre code"}
+        </button>
+
+        {/*
+          Confirmation en deux temps plutôt qu'une modale : le geste est
+          irréversible — personne ne pourra plus s'en servir — et les deux
+          boutons étaient auparavant strictement identiques, à 44px l'un de
+          l'autre.
+        */}
+        {confirmeAnnulation ? (
+          <span className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={annuler}
+              disabled={enCours}
+              className="btn-quiet"
+            >
+              {action === "annuler" ? LIBELLE_OCCUPE : "Confirmer"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmeAnnulation(false)}
+              disabled={enCours}
+              className="btn-quiet"
+            >
+              Non
+            </button>
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirmeAnnulation(true)}
+            disabled={enCours}
+            className="btn-quiet"
+          >
+            Annuler ce code
+          </button>
+        )}
+      </div>
+
+      {confirmeAnnulation ? (
+        <p className="hint mt-2">
+          Personne ne pourra plus s&apos;en servir.
+        </p>
+      ) : null}
     </div>
   );
 }

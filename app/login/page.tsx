@@ -1,6 +1,8 @@
 import { safeNext } from "@/lib/auth/safe-next";
 import { LoginForm } from "./LoginForm";
 
+export const metadata = { title: "Connexion · NutriClaude" };
+
 /**
  * Écran de connexion. Aucun mot de passe n'est demandé ni créé (AD-11) : on
  * envoie un lien par email, c'est le seul chemin d'entrée humain du produit.
@@ -17,7 +19,7 @@ export default async function LoginPage({
   const { next, error } = await searchParams;
 
   return (
-    <main className="flex-1 flex items-center justify-center p-6">
+    <main className="ecran-centre">
       <LoginForm next={safeNext(next)} error={error} />
     </main>
   );

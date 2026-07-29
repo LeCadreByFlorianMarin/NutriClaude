@@ -297,7 +297,7 @@ So that toute autre story se construise sur une fondation saine, sans dette de c
 **Then** aucune migration n'est créée ni rejouée, et le schéma déployé reste l'unique source de vérité (AR-MIGRATIONS, AD-1)
 
 **Given** le besoin de contrôle d'accès avant toute surface authentifiée
-**When** un `proxy.ts` (convention Next 16) est écrit avec `/login`, `/signup` et `/auth/callback` comme seules routes publiques
+**When** un `proxy.ts` (convention Next 16) est écrit avec `/login`, `/auth/callback` et `/auth/bascule` comme seules routes publiques
 **Then** un utilisateur non authentifié est redirigé vers `/login` en conservant sa destination, un utilisateur authentifié visitant une page d'authentification est renvoyé à l'accueil, et `/auth/callback` reste toujours accessible pour l'échange de code
 
 **Given** `cookies()` asynchrone en Next 16 et les en-têtes anti-cache exigés par `@supabase/ssr`
