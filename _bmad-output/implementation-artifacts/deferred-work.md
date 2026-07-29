@@ -267,12 +267,21 @@ la discipline réelle.
   droits de l'appelant, donc **aucune escalade de privilège** n'est à la clé ; la portée est une
   résolution de nom inattendue. *Non corrigée ici : cette story ne touche pas cette fonction, et la
   révision réserve la correction « à la story qui la touche » — ce sera la 2.3 ou la 4.16.*
-- **`docs/migrations.md` est périmé sur un point.** Sa section « Ce que ce projet n'a pas » affirme
+- ~~**`docs/migrations.md` est périmé sur un point.** Sa section « Ce que ce projet n'a pas » affirme
   encore *« `supabase db reset` ne doit jamais servir sur ce projet … il n'y a pas d'environnement de
   développement séparé : un seul projet, qui est la production »*. **Faux depuis le 2026-07-29** : le
   stack local existe, et `db reset` y est l'outil normal — il a servi trois fois pendant cette story.
   L'interdiction ne vaut que pour le distant. *Non corrigé ici pour ne pas mêler une réécriture de
-  documentation à une story de fonctionnalité ; à reprendre dans une passe propre.*
+  documentation à une story de fonctionnalité ; à reprendre dans une passe propre.*~~
+  **CADUC — et l'entrée était fausse au moment où elle a été écrite.** Le commit `03a9a09`, celui-là
+  même qui porte ce report, réécrit `docs/migrations.md` de fond en comble, section « Ce que ce
+  projet a, et n'a pas » comprise. Le report a été rédigé d'après l'intention du début de story,
+  puis n'a pas suivi la décision prise en cours de route (migrations appliquées au déploiement), qui
+  rendait la réécriture inévitable. Relevé par la revue du 2026-07-29.
+  **La leçon, et elle est plus large que ce point :** un report se relit au moment de commiter, pas
+  au moment de le penser. Une entrée « non corrigé ici » dans le commit qui corrige est exactement la
+  même famille que les trois commentaires devenus faux de l'Epic 1 — un état de la base écrit dans
+  un fichier qui ne le voit pas changer.
 - **Le bouton « Remettre les rayons de départ » n'existe que dans l'état vide** (décision de la
   story, AC5). L'ouvrir à un parcours déjà personnalisé est une ligne de code, mais inviterait à
   réintroduire onze rayons qu'on vient de supprimer. À rouvrir si l'usage le demande.
@@ -355,3 +364,12 @@ n'a plus les migrations au moment où l'on génère, si bien que `--linked` rend
 - **Rien ne vérifie en CI qu'une migration déjà appliquée n'a pas été modifiée.** La règle reste
   humaine, portée par le gabarit de PR. Elle prend du poids maintenant que la fusion applique : une
   migration éditée après coup ne serait pas rejouée sur le distant, et le dépôt mentirait en silence.
+
+## Deferred from: code review of 2-1-gerer-ses-rayons (2026-07-29)
+
+- **Une migration à horodatage antérieur bloque tous les déploiements suivants.** `scripts/migrer-au-deploiement.mjs:109` lance `supabase db push` sans `--include-all` ni `migration repair`. Deux branches ouvertes dans un ordre et fusionnées dans l'autre suffisent : la CLI refuse d'insérer une migration antérieure à la dernière appliquée en distant, le déploiement échoue, et **chaque déploiement suivant échoue aussi** — y compris ceux qui ne touchent aucune migration — jusqu'à une intervention manuelle sur la base. Le script ne distingue pas ce cas d'une migration réellement fautive. Conséquence de la conception retenue le 2026-07-29, pas un défaut du code ; à documenter dans `docs/migrations.md`, qui liste les autres limites et pas celle-ci.
+- **Deux déploiements de production concurrents ne sont pas sérialisés.** Aucun `pg_advisory_lock`, aucun `--dry-run` préalable. Deux PR fusionnées à quelques secondes d'écart lancent deux `db push` sur la même base ; le perdant échoue sur un objet déjà créé alors que la migration *est* appliquée — déploiement rouge sans cause réelle. Corollaire : un « Redeploy » **avec reconstruction** d'un déploiement antérieur aux migrations réclame `supabase migration repair` et échoue, ce qui bloque le chemin de secours « revenir au code d'avant ». Le « Instant Rollback » de Vercel, qui ne reconstruit pas, n'est pas concerné. Faible fréquence sur un projet à un développeur.
+- **`useSoumission` : ré-entrance et ré-annonce des messages identiques.** Deux points préexistants, partagés par tous les écrans du produit, découverts en revuant `/rayons` : (a) `occupe` n'est jamais lu à l'intérieur de `soumettre` (`app/_lib/useSoumission.ts:38-50`) — c'est un drapeau de rendu, pas un verrou, donc deux actions parties dans la même fenêtre de repeinture s'exécutent toutes les deux et la dernière écrase la clé de message de l'autre ; (b) `refuser` (`:26-29`) ne passe pas par `setCle(undefined)` avant de poser sa clé, contrairement à `soumettre` — deux refus identiques consécutifs ne changent donc pas le contenu du `<p aria-live>`, et un lecteur d'écran ne les annonce qu'une fois. À traiter dans le hook, pas dans les écrans.
+- **Aucune borne de longueur en base sur `aisles.name` et `aisles.icon`.** `MAX_NOM_RAYON = 40` et `maxLength={16}` ne vivent que dans le navigateur ; les deux colonnes sont `text` sans contrainte. Un `POST` REST direct insère un nom d'un mégaoctet ou une icône de 5000 diacritiques, qui casseraient l'affichage pour tous les membres du foyer. Préexistant, atteignable seulement hors interface, et de la même famille que la contrainte `check` ajoutée par cette story — à traiter le jour où l'on écrit une migration de bornes sur les champs libres (`profiles.display_name` et `households.name` ont le même trou).
+- **Le bouton « Remettre les rayons de départ » reste réservé à l'état vide, et l'arête qui va avec.** Décision de Florian du 2026-07-29, conforme à ce que la story prescrivait : montrer le bouton sur un parcours déjà personnalisé inviterait à réintroduire onze rayons qu'on vient de supprimer. La conséquence assumée : supprimer dix des onze rayons laisse un état où le bouton est invisible et où **le seul moyen de le faire réapparaître est de supprimer le onzième**. Ressaisir à la main ne rend pas l'ordre du parcours, `sort_order` n'étant pas éditable avant la story 2.2. **À l'intention de la 2.2** : une fois le déplacement possible, l'arête perd sa portée — c'est le moment de vérifier qu'on n'a plus besoin d'y revenir.
+- **L'unicité des noms de rayon reste sensible à la casse.** `unique (household_id, name)` compare octet à octet : « boucherie » et « Boucherie » coexistent dans le même foyer, sans `23505`, donc sans message. Décision de Florian du 2026-07-29 : la revue ne traite que la forme Unicode (`.normalize("NFC")` ajouté dans `lib/texte.ts`), pas la casse. La rendre insensible exige un index sur `lower(name)`, donc une migration qui change le comportement d'unicité **pour tout le produit** — `profiles.display_name` et `households.name` portent la même question — et les tests d'isolation à rejouer. À trancher avec son coût, comme la distinction Florian/conjointe.

@@ -15,17 +15,25 @@
  *   migrer puis construire → une construction cassée laisse le schéma en avance
  *                            sur du code qui ne partira jamais.
  *   construire puis migrer → une migration refusée fait échouer la commande de
- *                            construction, donc Vercel ne promeut rien : le
- *                            schéma ET le code restent intacts.
+ *                            construction, donc Vercel ne promeut pas le code.
  *
- * Le second est le seul où « ça a échoué » veut dire « rien n'a bougé ».
+ * Le second est le moins mauvais, mais **il ne garantit pas « rien n'a bougé »**,
+ * et ce fichier l'a affirmé à tort jusqu'à la revue du 2026-07-29.
  *
- * Il reste une fenêtre de quelques secondes, entre l'application des migrations
- * et la mise en ligne du nouveau code, où le schéma est en avance sur le code
- * servi. C'est sans conséquence **parce que les migrations sont strictement
- * additives** (AR-MIGRATIONS) : du code qui ignore une colonne neuve fonctionne,
- * l'inverse non. Cette discipline n'était qu'une bonne manière ; elle devient
- * ici la condition de sûreté du déploiement.
+ * ⚠️ `supabase db push` **n'est pas atomique sur un lot.** Il applique les
+ * fichiers un par un et enregistre chacun dans `supabase_migrations` au fur et
+ * à mesure ; il n'y a pas de transaction enveloppante. Sur un lot de deux
+ * migrations dont la seconde échoue, la première est appliquée ET enregistrée,
+ * le code n'est pas promu, et l'on se retrouve exactement dans l'état que
+ * l'enchaînement était censé rendre impossible : schéma en avance, code d'avant
+ * servi. Ne pas se fier au message d'échec pour conclure que rien n'a changé —
+ * lire la sortie de la CLI, qui nomme les fichiers effectivement appliqués.
+ *
+ * Ce qui rend cet état supportable, ici comme dans la fenêtre de quelques
+ * secondes entre l'application et la mise en ligne, c'est que **les migrations
+ * sont strictement additives** (AR-MIGRATIONS) : du code qui ignore une colonne
+ * neuve fonctionne, l'inverse non. Cette discipline n'était qu'une bonne
+ * manière ; elle est la condition de sûreté de tout ce fichier.
  *
  * ── CE QUE CE SCRIPT NE FAIT JAMAIS ────────────────────────────────────────
  *
@@ -56,6 +64,10 @@ import { spawnSync } from "node:child_process";
 const VERSION_CLI = "2.110.0";
 
 const environnement = process.env.VERCEL_ENV;
+const branche = process.env.VERCEL_GIT_COMMIT_REF;
+
+/** La branche dont le contenu a été revu et fusionné. */
+const BRANCHE_DE_PRODUCTION = "main";
 
 /*
  * Hors production, on ne fait rien — et on le dit. `VERCEL_ENV` vaut
@@ -68,6 +80,27 @@ if (environnement !== "production") {
       "aucune migration appliquée. Seul un déploiement de production le fait."
   );
   process.exit(0);
+}
+
+/*
+ * ⚠️ **`VERCEL_ENV === "production"` ne veut PAS dire « branche `main` ».**
+ * Un `vercel --prod` lancé depuis n'importe quelle branche produit un
+ * déploiement de production, et appliquerait donc les migrations d'un code que
+ * personne n'a revu — exactement ce que l'en-tête de ce fichier promet
+ * d'empêcher, et qu'il n'empêchait pas (revue du 2026-07-29).
+ *
+ * La branche est laissée passer si Vercel ne la renseigne pas : c'est le cas
+ * d'un déploiement sans intégration Git, où il n'y a rien à comparer. Refuser
+ * là rendrait le mécanisme inutilisable pour un redéploiement légitime.
+ */
+if (branche && branche !== BRANCHE_DE_PRODUCTION) {
+  console.error(
+    `[migrations] déploiement de production depuis « ${branche} », ` +
+      `pas « ${BRANCHE_DE_PRODUCTION} ».\n` +
+      "  Les migrations ne sont appliquées que depuis la branche fusionnée et revue.\n" +
+      "  Voir docs/migrations.md § « Le déploiement applique les migrations »."
+  );
+  process.exit(1);
 }
 
 const urlBase = process.env.SUPABASE_DB_URL;
@@ -92,6 +125,22 @@ if (!urlBase) {
   process.exit(1);
 }
 
+/*
+ * ⚠️ **Contrôle de forme de l'URL, parce qu'un commentaire ne contrôle rien.**
+ * Le pooler de TRANSACTION (port 6543) ne tient pas les instructions de
+ * définition de schéma : `db push` y échoue sur une erreur pgbouncer opaque,
+ * et le port 6543 est celui que l'interface Supabase affiche en premier. Le
+ * commentaire plus bas le disait déjà ; il ne l'empêchait pas.
+ */
+if (/:6543(\/|$|\?)/.test(urlBase)) {
+  console.error(
+    "[migrations] SUPABASE_DB_URL emploie le port 6543 (pooler de transaction).\n" +
+      "  Ce pooler ne tient pas les instructions de définition de schéma.\n" +
+      "  Employer le pooler de SESSION, port 5432."
+  );
+  process.exit(1);
+}
+
 console.log("[migrations] déploiement de production — application des migrations en attente.");
 
 /*
@@ -106,10 +155,16 @@ console.log("[migrations] déploiement de production — application des migrati
  * pooler de transaction (6543) : ce dernier ne tient pas les instructions de
  * définition de schéma. Voir docs/migrations.md.
  */
+/*
+ * `timeout` : sans lui, un pooler qui accepte la connexion TCP sans jamais
+ * répondre bloque le processus de construction jusqu'au plafond de Vercel
+ * (45 min), consomme le quota, et échoue sans qu'aucun message de ce fichier
+ * ne s'affiche. Dix minutes suffisent très largement à un lot de migrations.
+ */
 const resultat = spawnSync(
   "npx",
   ["--yes", `supabase@${VERSION_CLI}`, "db", "push", "--db-url", urlBase, "--yes"],
-  { stdio: "inherit" }
+  { stdio: "inherit", timeout: 10 * 60_000, killSignal: "SIGTERM" }
 );
 
 if (resultat.error) {
@@ -117,10 +172,27 @@ if (resultat.error) {
   process.exit(1);
 }
 
+/*
+ * `signal` avant `status` : un processus tué en rend un, pas l'autre. Sans
+ * cette branche, une expiration de délai ou un manque de mémoire du conteneur
+ * se rapportait « échec (code null) », ce qui ne dit pas quoi regarder.
+ */
+if (resultat.signal) {
+  console.error(
+    `[migrations] la CLI Supabase a été interrompue par ${resultat.signal}.\n` +
+      "  Délai dépassé, ou conteneur de construction à court de mémoire.\n" +
+      "  ⚠️ Une partie du lot a pu être appliquée : lire la sortie ci-dessus."
+  );
+  process.exit(1);
+}
+
 if (resultat.status !== 0) {
   console.error(
-    `[migrations] échec (code ${resultat.status}). Le déploiement est interrompu :\n` +
-      "  ni le schéma ni le code servi n'ont changé."
+    `[migrations] échec (code ${resultat.status}). Le déploiement est interrompu,\n` +
+      "  donc le code servi ne change pas.\n" +
+      "  ⚠️ Le SCHÉMA, lui, a pu bouger : `db push` applique un lot fichier par\n" +
+      "  fichier. Lire la sortie de la CLI ci-dessus pour savoir lesquels sont\n" +
+      "  passés avant l'échec. Voir l'en-tête de ce fichier."
   );
   process.exit(resultat.status ?? 1);
 }

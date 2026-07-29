@@ -77,18 +77,39 @@ npm run test:isolation                # 4. le filet NFR-5
 
 Rien à faire : ouvrir la PR, la faire passer en revue, la fusionner. Le déploiement de production applique les migrations en attente **après** avoir construit l'application, puis met le code en ligne.
 
-L'ordre compte, et il est expliqué en tête de `scripts/migrer-au-deploiement.mjs` : une migration refusée fait échouer la construction, donc Vercel ne promeut rien — ni le schéma ni le code servi n'ont changé. C'est le seul enchaînement où « ça a échoué » veut dire « rien n'a bougé ».
+L'ordre compte, et il est expliqué en tête de `scripts/migrer-au-deploiement.mjs` : une migration refusée fait échouer la construction, donc Vercel ne promeut pas le code.
+
+⚠️ **Mais « ça a échoué » ne veut PAS dire « rien n'a bougé », et ce document l'a affirmé à tort jusqu'au 2026-07-29.** `supabase db push` n'est pas atomique sur un lot : il applique les fichiers un par un et enregistre chacun au fur et à mesure. Sur un lot de deux migrations dont la seconde échoue, **la première est appliquée** et le code n'est pas promu. Ce qui rend cet état supportable est l'**additivité** (voir plus haut), pas une propriété du script. Après un déploiement rouge qui touchait des migrations : lire la sortie de la CLI dans le journal Vercel, qui nomme les fichiers passés, puis `npx supabase migration list --linked`.
 
 **Le seul secret nécessaire** est `SUPABASE_DB_URL`, portée **Production uniquement** dans Vercel. C'est l'URI du **pooler de session** (port `5432`), pas celle du pooler de transaction (`6543`) : ce dernier ne tient pas les instructions de définition de schéma. Le mot de passe doit être **encodé pour URL** s'il contient des caractères spéciaux.
 
+> ⚠️ **Ce secret n'est pas une variable d'environnement ordinaire.** C'est le rôle `postgres` : il **traverse la RLS de bout en bout**, par conception — une migration doit pouvoir tout faire. Or toute l'isolation entre foyers (NFR-5) repose sur la RLS : onze politiques, une garde `security definer`, dix-sept tests. Cette URI est la clé qui ouvre l'ensemble.
+>
+> Conséquences pratiques : **portée Production uniquement** (jamais Preview ni Development — le script ne s'en sert nulle part ailleurs, donc l'y déclarer n'ajouterait que de l'exposition) ; la rotation du mot de passe de la base la périme, il faut la remettre à jour ; et elle vit désormais dans un conteneur de construction où `npm ci` exécute les scripts d'installation de tout l'arbre de dépendances. C'est le coût assumé de la décision du 2026-07-29 — il est écrit ici pour être revu, pas pour être oublié.
+
 Ce que le script refuse de faire :
 
-- **Rien hors production.** Les prévisualisations partagent la base de production — il n'existe qu'un seul projet Supabase — donc y appliquer les migrations d'une branche non fusionnée écrirait dans la production depuis du code non revu.
+- **Rien hors production.** `VERCEL_ENV` doit valoir `production`.
+- **Rien hors de `main`.** `VERCEL_ENV === "production"` ne veut pas dire « branche fusionnée » : un `vercel --prod` depuis n'importe quelle branche produit un déploiement de production. Le script contrôle donc aussi `VERCEL_GIT_COMMIT_REF`. (Ajouté le 2026-07-29 : la garde promise par l'en-tête n'existait pas.)
+- **Rien sur le pooler de transaction.** Une URI en `:6543` est refusée avant tout appel, plutôt que de laisser `db push` échouer sur une erreur pgbouncer opaque.
 - **Passer son tour en silence.** Si `SUPABASE_DB_URL` manque sur un déploiement de production, le script **échoue**. Un contrôle qui rend « vert » en n'ayant rien fait est précisément le motif de défaut que ce dépôt a rencontré trois fois.
+
+### Relire une PR : sur le stack local, jamais sur la prévisualisation
+
+**Les prévisualisations Vercel parlent à la base de PRODUCTION.** Il n'existe qu'un seul projet Supabase, et `NEXT_PUBLIC_SUPABASE_URL` y pointe dans tous les environnements. Le script, lui, saute les migrations hors production — la prévisualisation sert donc du code neuf contre un schéma d'avant.
+
+Deux conséquences, et la seconde a été sous-estimée jusqu'au 2026-07-29 :
+
+1. Un écran qui **écrit** se relit sur le stack local (`.env.local` basculé vers `http://127.0.0.1:55321`, puis **restauré**), jamais sur la prévisualisation. Créer, renommer ou **supprimer** depuis une prévisualisation touche de vraies données du foyer de production. Depuis la story 2.1, le produit a des surfaces qui suppriment.
+2. Un critère d'acceptation qui dépend d'une migration de la même PR **n'est pas démontrable** sur la prévisualisation : la migration n'y est pas appliquée. Le démontrer en local, et le dire dans la PR.
+
+La prévisualisation reste le seul témoin du **déploiement** lui-même (`engines`, `.node-version`, `next.config.ts`, et ce script). C'est pour ça qu'on la garde : on la regarde construire, on ne s'en sert pas comme d'un environnement de test.
 
 ### Ce que le déploiement automatique ne rattrape pas
 
 - **Une restauration Vercel ne défait pas une migration.** Elle remet le code d'avant, jamais le schéma. C'est l'**additivité** qui rend l'opération sûre, et c'est ce qui la fait passer de bonne manière à condition de sûreté.
+- **Un « Redeploy » avec reconstruction d'un déploiement antérieur** réclamera `supabase migration repair` : le dossier local y a moins de migrations que le distant. Le repli « revenir au code d'avant » passe donc par l'**Instant Rollback** de Vercel, qui ne reconstruit pas — pas par un redéploiement.
+- **Une migration à horodatage antérieur à la dernière appliquée** fait refuser `db push`, et **tous** les déploiements suivants échouent jusqu'à intervention manuelle — y compris ceux qui ne touchent aucune migration. Cas d'école : deux branches ouvertes dans un ordre et fusionnées dans l'autre. Créer sa migration **au moment de l'écrire**, pas au moment d'ouvrir la branche.
 - **Deux déploiements de production simultanés** pourraient tenter d'appliquer la même migration. La table d'historique a une clé sur la version : l'un des deux échouerait, donc ne serait pas promu. Sans portée à ce rythme, mais ce n'est pas impossible.
 - **Le premier déploiement après ce changement est le vrai test.** La connexion depuis un conteneur de construction Vercel vers Supabase n'a jamais été jouée. Regarder le journal de construction de la PR, pas seulement la CI — *« les quatre portes ne voient pas le déploiement »*.
 

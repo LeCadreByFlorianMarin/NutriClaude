@@ -1,16 +1,25 @@
--- Interdit un nom de rayon vide ou fait uniquement d'espaces.
+-- Interdit un nom de rayon vide, blanc, ou fait uniquement d'invisibles.
 --
--- ⚠️ À CONTRÔLER AVANT `db push` — cette migration ÉCHOUERA si une ligne
--- existante ne respecte pas la contrainte. Exécuter d'abord, dans le SQL
--- Editor :
+-- ⚠️ À CONTRÔLER EN REVUE, AVANT LA FUSION — cette migration ÉCHOUERA si une
+-- ligne existante ne respecte pas la contrainte, et depuis le 2026-07-29 elle
+-- s'applique **pendant le déploiement de production** (`vercel.json` →
+-- `scripts/migrer-au-deploiement.mjs`). Il n'y a plus de `db push` humain, donc
+-- plus de moment pour sonder la base entre l'écriture et l'application : le
+-- contrôle se fait en revue de PR, pas après. Exécuter dans le SQL Editor :
 --
---   select id, household_id, name from aisles where btrim(name) = '';
+--   select id, household_id, name from aisles
+--   where name !~ '[^[:space:]\u00AD\u061C\u180E\u200B-\u200F\u202A-\u202E\u2060\u2066-\u2069\u2800\u3164\uFEFF\uFFA0]';
 --
 -- Attendu : zéro ligne. Les seuls rayons existants viennent de
 -- `seed_default_aisles`, dont les onze noms sont écrits en dur — aucun chemin
 -- n'a jamais permis d'en créer un à la main. Si la requête rend malgré tout des
--- lignes : les corriger avant de pousser, et ne pas assouplir la contrainte
+-- lignes : les corriger avant de fusionner, et ne pas assouplir la contrainte
 -- pour les accommoder.
+--
+-- ⚠️ Une migration qui échoue ici interrompt le déploiement **après** que la
+-- précédente du même lot a été appliquée : `db push` enregistre fichier par
+-- fichier, il n'y a pas de transaction enveloppante sur un lot. Voir l'en-tête
+-- de `scripts/migrer-au-deploiement.mjs`.
 --
 -- LE DÉFAUT
 -- `name` est `not null`, ce qui n'interdit pas la chaîne vide. La story 2.1
@@ -30,12 +39,25 @@
 -- décidé que vivent les règles (AD-1/AD-2). Elle couvre aussi les appels
 -- directs à l'API REST, que le contrôle navigateur ne voit pas.
 --
--- `btrim` seul ne retire pas U+200B : la normalisation applicative
--- (`lib/rayons/saisie.ts`) reste nécessaire en amont. Les deux se complètent —
--- la base refuse le vide franc, le client refuse le vide déguisé.
+-- ⚠️ POURQUOI PAS `btrim(name) <> ''`
+-- C'était la première rédaction, et la revue du 2026-07-29 l'a mesurée fausse.
+-- `btrim` à un seul argument ne retire **que l'espace ASCII** : ni tabulation,
+-- ni saut de ligne, ni U+00A0, ni aucun invisible. Un `POST` REST direct avec
+-- `{"name": "\t"}` passait la contrainte, et l'en-tête de ce fichier affirmait
+-- pourtant couvrir ce cas. La forme retenue exige **au moins un caractère qui
+-- ne soit ni un blanc ni un invisible** — la même population que `INVISIBLES`
+-- dans `lib/texte.ts`, tenue en accord avec elle à la main.
+--
+-- `[[:space:]]` couvre les blancs Unicode ; la liste explicite couvre les
+-- invisibles qui n'en sont pas (U+00AD, U+3164, U+2800, U+180E, les contrôles
+-- directionnels). U+200C et U+200D (les jointures) sont dans la liste : elles
+-- portent du sens dans un emoji, pas dans un nom de rayon, et un nom qui n'en
+-- contiendrait que ne s'afficherait pas davantage.
 --
 -- Ne change pas la forme du schéma : pas de régénération de types nécessaire.
 
 alter table aisles
   add constraint aisles_name_non_vide
-  check (btrim(name) <> '');
+  check (
+    name ~ '[^[:space:]\u00AD\u061C\u180E\u200B-\u200F\u202A-\u202E\u2060\u2066-\u2069\u2800\u3164\uFEFF\uFFA0]'
+  );

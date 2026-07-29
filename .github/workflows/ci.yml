@@ -68,3 +68,55 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+
+  # ── L'isolation entre foyers (NFR-5), prouvée par exécution ──────────────
+  #
+  # ⚠️ Job SÉPARÉ de `verify`, et c'est délibéré : il monte un stack Postgres
+  # complet, donc il est lent et il peut être instable de son propre chef. Le
+  # mêler à `verify` ferait retomber le typecheck sur une panne de conteneur.
+  #
+  # POURQUOI IL EXISTE. Jusqu'au 2026-07-29, `npm run test:isolation` ne tournait
+  # dans aucun automate : le glob de `npm test` s'arrête à `lib/`, et rien
+  # d'autre ne lançait `supabase/tests/`. Les tests qui prouvent la garde de
+  # `seed_default_aisles` — le trou d'écriture inter-foyers refermé par la story
+  # 2.1 — n'existaient donc que pour qui pensait à lancer `npx supabase start`
+  # sur son poste. AD-17 dit « l'isolation se prouve par un test exécuté, pas par
+  # une lecture » ; sans ce job, c'était une déclaration.
+  #
+  # `stack-local.ts` LÈVE si le stack est absent, au lieu de passer en silence.
+  # C'est ce qui rend ce job honnête : il ne peut pas devenir vert en n'ayant
+  # rien vérifié.
+  isolation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - run: npm ci
+
+      # Version épinglée, et la MÊME que `scripts/migrer-au-deploiement.mjs`.
+      # Deux numéros qui divergent feraient valider la chaîne de migrations par
+      # une CLI que la production n'emploie pas.
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.110.0
+
+      # `db reset` est implicite au démarrage : les migrations sont rejouées
+      # depuis zéro. C'est le seul endroit de la chaîne où elles s'exécutent
+      # avant la production.
+      - name: Démarrer le stack local
+        run: supabase start
+
+      - name: Tests d'isolation
+        run: npm run test:isolation
+
+      # Sans `if: always()`, un test rouge laisserait les conteneurs debout et
+      # le runner serait recyclé sans les arrêter — sans conséquence ici, mais
+      # la sortie de `stop` dit parfois pourquoi un test a échoué.
+      - name: Arrêter le stack local
+        if: always()
+        run: supabase stop

@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   MAX_NOM_RAYON,
+  iconeTropLongue,
   normaliserIcone,
   normaliserNomRayon,
   prochainOrdre,
@@ -83,4 +84,67 @@ test("le prochain ordre survit à des positions négatives", () => {
   // `sort_order` est un `int` signé : rien en base n'interdit le négatif, et
   // `Math.max()` sur une liste vide rend -Infinity.
   assert.equal(prochainOrdre([{ ordre: -50 }]), -40);
+});
+
+test("le nom de rayon est composé en NFC", () => {
+  /*
+   * « Crémerie » collé depuis une source en NFD s'écrit `e` + U+0301. Sans
+   * composition, `unique (household_id, name)` compare octet à octet et laisse
+   * coexister deux rayons identiques à l'œil, sans jamais rendre 23505.
+   */
+  const nfd = "Cre\u0301merie";
+  const nfc = "Crémerie";
+  assert.notEqual(nfd, nfc);
+  assert.equal(normaliserNomRayon(nfd), nfc);
+  assert.equal(normaliserNomRayon(nfc), nfc);
+});
+
+test("les invisibles qui ne sont pas des blancs sont retirés du nom", () => {
+  /*
+   * `trim()` couvre les blancs Unicode, `btrim` en base ne couvre que l'espace
+   * ASCII — ni l'un ni l'autre ne voit ceux-ci. Sans eux dans la plage, un
+   * rayon au nom entièrement invisible était créable (revue du 2026-07-29).
+   */
+  assert.equal(normaliserNomRayon("\u00AD"), null); // trait d'union conditionnel
+  assert.equal(normaliserNomRayon("\u3164"), null); // remplisseur Hangul
+  assert.equal(normaliserNomRayon("\u2800"), null); // braille blanc
+  assert.equal(normaliserNomRayon("\u180E"), null); // séparateur mongol
+  assert.equal(normaliserNomRayon("\u202E"), null); // forçage droite-à-gauche
+  assert.equal(normaliserNomRayon("\u2800\u3164 \u00AD"), null);
+});
+
+test("un nom borné ne garde pas d'espace en fin de chaîne", () => {
+  /*
+   * `slice` coupe à un nombre d'unités, pas à une frontière de mot. Sans le
+   * second `trim`, « Boucherie » et « Boucherie⎵ » sont deux noms distincts
+   * pour l'unicité de la base, et aucun 23505 ne prévient.
+   */
+  const borne = normaliserNomRayon("a".repeat(MAX_NOM_RAYON - 1) + "  b");
+  assert.equal(borne, "a".repeat(MAX_NOM_RAYON - 1));
+  assert.equal(borne?.endsWith(" "), false);
+});
+
+test("une icône à plus d'un grapheme est signalée plutôt que tronquée", () => {
+  assert.equal(iconeTropLongue("Fromages"), true);
+  assert.equal(iconeTropLongue("🥬🥩"), true);
+  assert.equal(iconeTropLongue("🥬 du texte"), true);
+});
+
+test("une icône d'un seul grapheme, ou vide, n'est pas trop longue", () => {
+  assert.equal(iconeTropLongue("🥬"), false);
+  assert.equal(iconeTropLongue("🇫🇷"), false);
+  assert.equal(iconeTropLongue("🧑\u200D🍳"), false);
+  assert.equal(iconeTropLongue("  \u200B🥬 "), false);
+  // Vide : ce n'est pas un refus, l'icône est facultative.
+  assert.equal(iconeTropLongue(""), false);
+  assert.equal(iconeTropLongue("   "), false);
+});
+
+test("les deux fonctions d'icône s'accordent sur la même saisie nettoyée", () => {
+  // Une saisie que `iconeTropLongue` accepte doit être exactement celle que
+  // `normaliserIcone` rend sans rien perdre.
+  for (const saisie of ["🥬", "🇫🇷", "🧑\u200D🍳", "\uFEFF🥬 ", "e\u0301"]) {
+    assert.equal(iconeTropLongue(saisie), false);
+    assert.equal(normaliserIcone(saisie), saisie.normalize("NFC").replace(/[\uFEFF]/g, "").trim());
+  }
 });

@@ -41,7 +41,13 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
-last_updated: 2026-07-29  # Story 2.1 contextualisée ; Epic 2 ouvert. Sa création a mesuré un trou
+last_updated: 2026-07-29  # Revue adversariale de la story 2.1. Elle a trouvé, hors du périmètre de
+                          # la story, que `main` n'était pas protégée : depuis `vercel.json`, un
+                          # commit sur `main` applique les migrations en production, gardé par le
+                          # seul `next build`. Protection posée, job CI `isolation` ajouté — les 17
+                          # tests d'isolation ne tournaient dans aucun automate.
+                          #
+                          # Story 2.1 contextualisée ; Epic 2 ouvert. Sa création a mesuré un trou
                           # d'isolation dans `seed_default_aisles` (security definer à household_id
                           # en paramètre, sans contrôle) : un membre peut écrire dans les rayons d'un
                           # autre foyer. Correctif prescrit et éprouvé en local, porté par la story.
@@ -78,7 +84,11 @@ development_status:
   #   · les anciennes 2.5, 2.6, 2.7 sont DÉPLACÉES en Epic 4 (4.16 à 4.18) :
   #     leurs critères s'énoncent sur la liste de courses, donc indémontrables ici.
   epic-2: in-progress
-  2-1-gerer-ses-rayons: review
+  # Revue adversariale du 2026-07-29 : 5 décisions tranchées, 14 correctifs appliqués,
+  # 6 reportés. Repasse en `in-progress` — trois vérifications restent, dont le parcours
+  # à l'écran après les correctifs de `ListeRayons.tsx`. Détail dans la story,
+  # § « Ce que la revue a exécuté ».
+  2-1-gerer-ses-rayons: in-progress
   2-2-reordonner-le-parcours-par-manipulation-directe: backlog
   2-3-definir-des-regles-mot-cle-rayon: backlog
   2-4-composant-carte-rayon: backlog
@@ -196,4 +206,17 @@ action_items:
   - epic: 1
     action: "Revue adversariale par story plutôt qu'en fin d'epic (décision de Florian : environnement de test ET revue)"
     owner: "Amelia"
+    status: open
+  # Ouvertes par la revue adversariale de la story 2.1 (2026-07-29)
+  - epic: 2
+    action: "Rejouer le parcours à l'écran de /rayons après les correctifs de revue — deux régions de statut, focus au clavier, refus de l'icône multiple, message « Ce rayon n'existe plus. ». Sur le stack local, dans les deux thèmes. Aucun test ne couvre le JSX (NFR-10)"
+    owner: "Florian"
+    status: open
+  - epic: 2
+    action: "Contrôler dans Vercel que SUPABASE_DB_URL n'est déclarée que pour l'environnement Production — c'est le rôle postgres, il traverse la RLS, donc c'est la clé de tout NFR-5. Non vérifiable depuis le dépôt (non lié)"
+    owner: "Florian"
+    status: open
+  - epic: 2
+    action: "Regarder la première exécution du job CI `isolation` sur un runner GitHub — `supabase start` en CI est un chemin neuf, comme l'était le script de déploiement. Le YAML est valide et les tests passent en local ; ça ne prouve pas le runner"
+    owner: "Florian"
     status: open

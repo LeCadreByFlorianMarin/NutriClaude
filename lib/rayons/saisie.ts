@@ -30,12 +30,46 @@ export function normaliserNomRayon(saisie: string): string | null {
  * dépendance à ajouter, ce que NFR-10 exige.
  */
 export function normaliserIcone(saisie: string): string | null {
-  const net = saisie.replace(INVISIBLES_HORS_JOINTURE, "").trim();
+  const net = nettoyerIcone(saisie);
   if (net === "") return null;
 
-  const segments = new Intl.Segmenter("fr", { granularity: "grapheme" });
-  const premier = segments.segment(net)[Symbol.iterator]().next();
+  const premier = graphemes(net).next();
   return premier.done ? null : premier.value.segment;
+}
+
+/**
+ * Vrai si la saisie contient **plus d'un** grapheme, donc si la réduire ferait
+ * perdre quelque chose.
+ *
+ * ⚠️ **Sa raison d'être : `normaliserIcone` réduit en silence.** Le champ icône
+ * est le premier des deux à l'écran, son libellé est visuellement masqué, et il
+ * ne reste que le placeholder pour dire ce qu'on y attend. Y taper le nom du
+ * rayon par méprise — les deux champs sont côte à côte — enregistrait « F » pour
+ * « Fromages », sans libellé, sans indice et sans message (revue du 2026-07-29).
+ * L'écran s'en sert pour refuser plutôt que pour tronquer.
+ */
+export function iconeTropLongue(saisie: string): boolean {
+  const net = nettoyerIcone(saisie);
+  if (net === "") return false;
+
+  const suite = graphemes(net);
+  suite.next();
+  return !suite.next().done;
+}
+
+/**
+ * Le nettoyage commun aux deux : composition NFC, invisibles hors jointure,
+ * espaces de bord. Séparé pour que les deux fonctions ne puissent pas diverger —
+ * une saisie que `iconeTropLongue` accepte doit être exactement celle que
+ * `normaliserIcone` réduit.
+ */
+function nettoyerIcone(saisie: string): string {
+  return saisie.normalize("NFC").replace(INVISIBLES_HORS_JOINTURE, "").trim();
+}
+
+function graphemes(net: string) {
+  const segments = new Intl.Segmenter("fr", { granularity: "grapheme" });
+  return segments.segment(net)[Symbol.iterator]();
 }
 
 /**

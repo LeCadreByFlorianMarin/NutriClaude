@@ -4,7 +4,17 @@ baseline_commit: eae9121
 
 # Story 2.1: Gérer ses rayons
 
-Status: review
+Status: in-progress
+
+<!--
+2026-07-29 — revue adversariale. 5 décisions tranchées, 14 correctifs appliqués, 6 reportés.
+`review` → `in-progress` et non `done`, pour trois raisons nommées en fin de fichier
+(§ « Ce que la revue a exécuté ») : le parcours à l'écran n'a pas été rejoué après les
+quatre changements de `ListeRayons.tsx`, la portée de `SUPABASE_DB_URL` dans Vercel n'est
+pas contrôlée, et le job CI `isolation` n'a jamais tourné sur un runner. Cocher `done`
+reviendrait à consigner comme vérifié ce qui ne l'a pas été.
+-->
+
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -94,7 +104,9 @@ dupliquer aucun rayon déjà présent (FR-11)
 
 - [x] **Task 3 — Appliquer en local et régénérer les types** (AC: 1, 5)
   - [x] `npx supabase db reset` — **autorisé et attendu en local**, interdit sur le distant. Voir
-        « Le piège n°8 » : `docs/migrations.md` dit encore le contraire, il date d'avant le stack local
+        « Le piège n°8 ». ⚠️ **Rectifié le 2026-07-29 (revue) :** la phrase « `docs/migrations.md` dit
+        encore le contraire » était vraie à l'écriture de la story et **fausse au commit** — le commit
+        `03a9a09` a réécrit ce document
   - [x] `npx supabase gen types typescript --linked > lib/supabase/types.ts` — ⚠️ **la commande est
         devenue `--local` le 2026-07-29** : le distant n'a plus les migrations au moment où l'on
         génère. Sans effet ici, la comparaison ayant été faite avec les deux sorties
@@ -201,7 +213,11 @@ dupliquer aucun rayon déjà présent (FR-11)
           de B est **inchangé** (le témoin négatif compte autant que le refus)
     - [x] A appelle `seed_default_aisles` sur **son** foyer → accepté, 11 rayons, et un second appel
           en rend toujours 11
-  - [x] Ajouter aussi le CRUD direct : A ne peut ni insérer, ni renommer, ni supprimer un rayon de B
+  - [x] Ajouter aussi le CRUD direct : A ne peut ni renommer, ni supprimer un rayon de B
+        (`isolation.test.ts:334`). ⚠️ **Rectifié le 2026-07-29 (revue) :** le cas de l'**insertion**
+        n'a pas été ajouté par cette story — il était déjà couvert par un test préexistant
+        (`isolation.test.ts:228`). La couverture est bien complète ; c'est la case qui décrivait mal
+        ce qui avait été fait
   - [x] ⚠️ **Ne « répare » pas l'ordre des tests existants ni leurs fixtures partagées** : l'en-tête
         du fichier explique que cet ordre *est* la démonstration du rayon de souffle
   - [x] `npm run test:isolation` — exige `npx supabase start` debout
@@ -389,13 +405,17 @@ casse** sans décision : elle changerait le comportement d'unicité en base pour
 
 ### Le piège n°8 — `db reset` est interdit sur le distant, attendu en local
 
-`docs/migrations.md` affirme encore : *« Ce qui ne doit jamais servir sur ce projet — `supabase db
-reset` … il n'y a pas d'environnement de développement séparé : un seul projet, qui est la
+> ✅ **Refermé pendant la story.** Cette section décrivait un document périmé ; le commit `03a9a09` l'a
+> réécrit. Elle est conservée au passé parce que la distinction local/distant, elle, reste vraie et
+> vaut d'être lue. Rectifiée par la revue du 2026-07-29 : elle était encore rédigée au présent.
+
+`docs/migrations.md` affirmait, jusqu'au 2026-07-29 : *« Ce qui ne doit jamais servir sur ce projet —
+`supabase db reset` … il n'y a pas d'environnement de développement séparé : un seul projet, qui est la
 production »*.
 
-**Ce n'est plus vrai depuis le 2026-07-29** : un stack local existe (`supabase/config.toml` versionné,
-ports en 5532x), et `next-steps.md` §2 dit explicitement qu'il « repart de zéro à chaque `db reset` ».
-Le document n'a pas été mis à jour.
+**Ce n'était plus vrai** : un stack local existe (`supabase/config.toml` versionné, ports en 5532x), et
+`next-steps.md` §2 dit explicitement qu'il « repart de zéro à chaque `db reset` ». Le document a été
+mis à jour depuis, dans cette même branche.
 
 - Sur le **local** : `db reset` est l'outil normal pour rejouer la chaîne de migrations. Utilise-le.
 - Sur le **distant** : interdit, sans exception. Le seul chemin est `db push`.
@@ -831,10 +851,19 @@ dit dans le navigateur**, seulement dans la sortie du serveur. Consigné dans `d
 - `app/rayons/page.tsx` — Server Component
 - `app/rayons/ListeRayons.tsx` — écritures client-direct + `router.refresh()`
 
+**Nouveaux — chaîne de livraison** *(commit `03a9a09`, ajouté à cette liste par la revue du
+2026-07-29 : ils en étaient absents alors qu'ils changent la façon dont ce projet écrit dans sa base
+de production)*
+- `vercel.json` — `buildCommand` : construire, puis appliquer les migrations
+- `scripts/migrer-au-deploiement.mjs` — application des migrations au déploiement de production
+
 **Modifiés**
 - `lib/foyer/saisie.ts` — délègue à `lib/texte.ts` ; comportement inchangé, 49 tests existants au vert
 - `app/page.tsx` — lien vers `/rayons`, phrase d'annonce corrigée
 - `supabase/tests/isolation.test.ts` — 6 tests de rayons, dont les appels RPC
+- `docs/migrations.md` — le cycle passe par le déploiement ; section « Ce que ce projet a, et n'a
+  pas » réécrite *(absent de cette liste jusqu'à la revue du 2026-07-29)*
+- `.github/pull_request_template.md` — la fusion applique la migration *(idem)*
 - `_bmad-output/planning-artifacts/epics.md` — correction datée de l'AC5 de la story 2.1
 - `_bmad-output/planning-artifacts/epic-2-revision-2026-07-29.md` — correction datée du §6
 - `_bmad-output/implementation-artifacts/deferred-work.md` — entrée de la story 2.1
@@ -855,3 +884,79 @@ dit dans le navigateur**, seulement dans la sortie du serveur. Consigné dans `d
 | 2026-07-29 | `epics.md` et `epic-2-revision-2026-07-29.md` rectifiés sur place, datés, avec le constat |
 | 2026-07-29 | **Décision de Florian : plus de poussée manuelle de migration.** Les deux migrations de cette story partiront avec la fusion, appliquées par le déploiement Vercel. `docs/migrations.md`, le gabarit de PR et la Task 3 rectifiés en conséquence |
 | 2026-07-29 | Implémentation : 2 migrations additives, `lib/texte.ts` + `lib/rayons/`, écran `/rayons`, lien depuis l'accueil, 6 tests d'isolation. Quatre portes vertes, 66/66 unitaires, 17/17 isolation, dents du nouveau test vérifiées. Parcours à l'écran sur le stack local : les cinq gestes et les deux thèmes. Statut → `review` |
+
+## Review Findings
+
+_Revue adversariale du 2026-07-29 — trois couches (Blind Hunter, Edge Case Hunter, Acceptance Auditor) sur `git diff main...HEAD`. Sévérité assignée après lecture du code aux emplacements cités, pas depuis les hunks._
+
+### Décisions à prendre
+
+_Les cinq tranchées par Florian le 2026-07-29, en séance de revue. La résolution retenue ouvre le correctif indiqué._
+
+- [x] [Review][Decision] → **Protéger `main`, `verify` et `isolation` requis.** **`main` n'est pas protégée — les migrations de production ne sont gardées que par `next build`** — `gh api repos/:owner/:repo/branches/main/protection` rend `404 Branch not protected`. `vercel.json:3` fait `npm run build && node scripts/migrer-au-deploiement.mjs` : Vercel démarre le déploiement de production dès qu'un commit atteint `main`, sans attendre GitHub Actions. `typecheck`, `lint` et `test` ne sont donc dans aucun chemin qui puisse empêcher une écriture dans le schéma de production. Seul `next build` l'est. Avant ce commit, la seule porte vers la production était un geste humain ; elle est maintenant plus faible que les quatre portes que le projet croit avoir.
+- [x] [Review][Decision] → **Job `isolation` dédié dans la CI, requis pour la fusion.** **Les 17 tests d'isolation ne tournent dans aucune CI** — `.github/workflows/ci.yml` lance `typecheck`, `lint`, `npm test` et `build`. `npm run test:isolation` n'y figure pas, et le glob de `npm test` (`lib/**/*.test.ts`) s'arrête avant `supabase/tests/`. Les six tests qui prouvent la garde de `seed_default_aisles` — la raison d'être de cette story — ne s'exécutent que si quelqu'un pense à lancer `npx supabase start` sur son poste. AD-17 dit « l'isolation se prouve par un test exécuté » : ces tests existent et ne s'exécutent jamais tout seuls. Un futur `create or replace function seed_default_aisles(...)` rouvrirait le trou avec les quatre portes au vert.
+- [x] [Review][Decision] → **Écrire la règle : toute relecture d'un écran qui écrit se fait sur le stack local, jamais sur la prévisualisation** (`docs/migrations.md` + gabarit de PR). **La prévisualisation de cette PR écrit dans la base de production** — `scripts/migrer-au-deploiement.mjs:65-71` sort en 0 hors production, et `docs/migrations.md` explique pourquoi : « les prévisualisations partagent la base de production — il n'existe qu'un seul projet Supabase ». Conséquence non énoncée : relire `/rayons` sur la prévisualisation, c'est créer et supprimer de **vrais** rayons de production, contre une base où ni la garde ni la contrainte `check` ne sont encore appliquées. L'AC5 ne peut pas être démontrée sur la prévisualisation sans toucher la production.
+- [x] [Review][Decision] → **Accepter le mécanisme, restreindre la portée** : `SUPABASE_DB_URL` déclarée pour le seul environnement Production de Vercel, et `docs/migrations.md` dit ce que ce secret contourne (la RLS, donc NFR-5). **Le secret de la base de production entre dans le conteneur de build Vercel** — `scripts/migrer-au-deploiement.mjs:73` lit `SUPABASE_DB_URL` : une URI Postgres avec mot de passe, rôle `postgres`, qui **traverse la RLS de bout en bout**. Tout le raisonnement NFR-5 du dépôt repose sur la RLS ; ce secret la contourne par construction, et il vit désormais là où `npm ci` exécute les `postinstall` de l'arbre de dépendances. S'y ajoute `npx --yes supabase@2.110.0` (`:109-113`) : un binaire hors `package-lock.json`, téléchargé à chaque build, exécuté contre la production.
+- [x] [Review][Decision] → **(a) état vide uniquement, inchangé** — l'arête est consignée dans `deferred-work.md` à l'intention de la story 2.2 ; **(b) `.normalize("NFC")` ajouté dans `normaliserTexte`, la casse reste ouverte.** **Deux questions de la story que la revue rouvre sur pièce** — (a) le bouton de restauration n'existe qu'à zéro rayon (`ListeRayons.tsx:228-242`) : supprimer dix des onze rayons laisse un état où le seul moyen de réparer est de supprimer le onzième, l'ordre du parcours étant définitivement perdu avant la story 2.2 ; (b) l'unicité `(household_id, name)` est sensible à la casse — « boucherie » et « Boucherie » coexistent — et `normaliserTexte` ne fait aucun `.normalize("NFC")`, donc deux noms identiques à l'œil en NFC et NFD coexistent aussi, sans qu'aucun `23505` ne prévienne.
+
+### Correctifs
+
+- [x] [Review][Patch] **Le message du formulaire de création s'affiche hors écran** [app/rayons/ListeRayons.tsx:220] — la région de statut unique est rendue en tête de la première section, le formulaire de création vit dans une seconde section `mt-12` **après** onze lignes de ≥44px. « Ce rayon existe déjà. » comme « C'est noté. » apparaissent au-dessus de la zone visible au moment où l'on presse « Ajouter » : à l'écran, le champ reste rempli, le bouton redevient actif, rien ne se passe. `DisplayNameForm.tsx:122-124` fait l'inverse — sa `Notice` est juste au-dessus de son bouton. L'argument de la région unique (hérité d'`InviteCard`) est bon, mais il confond « une seule région annoncée » et « une seule région pour trois surfaces de soumission à trois endroits de la page ».
+- [x] [Review][Patch] **Zéro ligne touchée : la ligne fantôme reste, et « Réessaie dans un instant » est un faux conseil** [app/rayons/ListeRayons.tsx:152-155, 175-178] — la branche `if (error || !data)` retourne **sans** `router.refresh()` ni `fermer()`. Si la conjointe a supprimé « Boucherie » depuis son téléphone, l'enregistrement ou la suppression de Florian rend `{data: null, error: null}` (zéro ligne n'est pas une erreur pour PostgREST), affiche « Ça n'a pas marché. Réessaie dans un instant. », garde la ligne à l'écran et le panneau ouvert — chaque nouvel essai reproduit le même échec, indéfiniment, jusqu'à un rechargement manuel. Le commentaire `:147-151` avait identifié qu'il fallait lire `data`, puis l'a rangé avec les vraies erreurs. Correctif : distinguer `!data && !error`, appeler `router.refresh()` et dire « Ce rayon n'existe plus. ».
+- [x] [Review][Patch] **Le focus est perdu à chaque ouverture et fermeture du panneau** [app/rayons/ListeRayons.tsx:247, 309, 367] — le `<button>` porteur du focus est démonté et remplacé par un `<form>` ; le focus retombe sur `<body>`. Au clavier, il faut repartir de `Tab` depuis le haut de la page et retraverser tous les rayons précédents. Idem sur « Annuler » et après un enregistrement réussi. Aucun `ref`, aucune gestion de focus dans le fichier. Ce n'est pas ce que l'interdiction d'`autoFocus` visait : déplacer le focus en réponse à un geste explicite est autre chose que le voler au chargement.
+- [x] [Review][Patch] **Le champ icône réduit « Fromages » à « F » en silence** [app/rayons/ListeRayons.tsx:397-399, lib/rayons/saisie.ts:32-39] — le champ icône est le **premier** des deux, son libellé est `sr-only`, et il ne reste à l'écran que le placeholder `🥬`. Y taper le nom du rayon par méprise enregistre son initiale, sans libellé, sans indice, sans message. `normaliserIcone` accepte n'importe quel premier grapheme, y compris une lettre ou un caractère de contrôle.
+- [x] [Review][Patch] **Les deux en-têtes de migration prescrivent un contrôle « AVANT `db push` » qui n'a plus de moment** [supabase/migrations/20260729095922_guard_seed_default_aisles.sql:3-9, 20260729095923_require_non_blank_aisle_name.sql:3-13] — les deux demandent d'exécuter une requête dans le SQL Editor avant de pousser. Le commit `03a9a09` de la **même branche** a supprimé le `db push` humain : « plus aucune migration n'est poussée à la main ». Aucun de ces deux contrôles ne sera donc exécuté. C'est exactement la classe de défaut que la story elle-même consigne (« trois commentaires sont devenus faux, dont deux écrits pendant une revue »). Le contrôle de `095923` compte : si une ligne violait la contrainte, la migration échouerait **en cours de déploiement de production**.
+- [x] [Review][Patch] **Le commentaire du script affirme une atomicité que `db push` n'a pas sur un lot** [scripts/migrer-au-deploiement.mjs:16-21, 120-124] — « une migration refusée fait échouer la commande de construction, donc Vercel ne promeut rien : le schéma ET le code restent intacts ». Vrai pour une migration, faux pour une chaîne : `db push` applique et enregistre fichier par fichier. Cette PR en pousse **deux** : si `095923` échoue, `095922` est déjà appliquée et enregistrée, le code n'est pas promu, et le message imprimé dans le journal Vercel (« ni le schéma ni le code servi n'ont changé ») affirme le contraire de ce qui vient de se produire.
+- [x] [Review][Patch] **Durcissement du script de déploiement** [scripts/migrer-au-deploiement.mjs:58, 109-113] — quatre points : (a) `VERCEL_ENV === "production"` n'implique pas « branche `main` » — un `vercel --prod` depuis une branche non fusionnée applique ses migrations en production, exactement ce que l'en-tête `:32-36` promet d'empêcher ; ajouter `VERCEL_GIT_COMMIT_REF !== "main"` ; (b) `spawnSync` sans `timeout` bloque le build jusqu'au plafond Vercel si le pooler accepte la connexion sans répondre ; (c) le commentaire `:105-107` insiste sur le port 5432 contre 6543, puis le code accepte n'importe quelle chaîne non vide — aucun contrôle de forme ; (d) `resultat.signal` n'est jamais lu, donc un processus tué par SIGKILL se rapporte « code null » sans dire pourquoi.
+- [x] [Review][Patch] **La traçabilité de la story n'a pas suivi le second commit** — quatre écarts : (a) `deferred-work.md` écrit « `docs/migrations.md` est périmé sur un point… *Non corrigé ici pour ne pas mêler une réécriture de documentation à une story de fonctionnalité* » alors que le commit `03a9a09` **qui contient cette phrase** réécrit précisément cette section ; (b) la Task 3 est cochée avec « `docs/migrations.md` dit encore le contraire », devenu faux sur la même branche, et le piège n°8 reste rédigé au présent ; (c) la `File List` omet `vercel.json`, `scripts/migrer-au-deploiement.mjs`, `docs/migrations.md` et `.github/pull_request_template.md` ; (d) la Task 9 affirme avoir ajouté le cas de l'insertion inter-foyers, qui est en réalité couvert par un test préexistant (`isolation.test.ts:228`) — la couverture est bien là, la case décrit mal ce qui a été fait.
+- [x] [Review][Patch] **Les invisibles non blancs passent le client ET la contrainte** [lib/texte.ts:21, supabase/migrations/20260729095923_require_non_blank_aisle_name.sql:41] — `INVISIBLES` couvre huit points de code ; `trim()` couvre les blancs Unicode. Restent U+00AD (trait d'union conditionnel), U+3164 (remplisseur Hangul), U+2800 (braille blanc), U+180E, U+202E (forçage droite-à-gauche) : `normaliserNomRayon` les rend tels quels, et `btrim(name)` ne retire que l'espace ASCII, donc la contrainte les accepte. Un rayon au nom entièrement invisible est créable. Les deux fichiers affirment le contraire : « la base refuse le vide franc, le client refuse le vide déguisé » (`095923:35`) et « elle couvre aussi les appels directs à l'API REST » (`:31`). Correctif : `check (name ~ '[[:graph:]]')` côté base, plage élargie côté client.
+
+**Issus des décisions ci-dessus :**
+
+- [x] [Review][Patch] **Protéger `main`** — exiger les contrôles `verify` et `isolation` avant toute fusion, et interdire le push direct. C'est ce qui remet `typecheck`, `lint` et `test` sur le chemin qui mène à `db push`. (Décision 1)
+- [x] [Review][Patch] **Job `isolation` dans `.github/workflows/ci.yml`** — `supabase/setup-cli` + `supabase start` + `npm run test:isolation`. Rend AD-17 exécuté plutôt que déclaratif. (Décision 2)
+- [x] [Review][Patch] **Écrire la règle de relecture** dans `docs/migrations.md` et `.github/pull_request_template.md` : un écran qui écrit se relit sur le stack local, jamais sur la prévisualisation — celle-ci parle à la base de production. (Décision 3)
+- [x] [Review][Patch] **Documenter ce que `SUPABASE_DB_URL` contourne** dans `docs/migrations.md` (rôle `postgres`, traverse la RLS, donc c'est la clé de tout NFR-5). (Décision 4)
+  - [ ] ⚠️ **RESTE À FAIRE, et c'est un geste de Florian** — contrôler dans le tableau de bord Vercel que `SUPABASE_DB_URL` n'est déclarée que pour l'environnement **Production**. Non vérifié : le dépôt n'est pas lié à un projet Vercel (`vercel env ls` → « isn't linked »), et lier le dépôt est un choix qui ne revient pas à la revue. Si elle est aussi en *Preview*, chaque construction de PR a la clé de la base de production en environnement, alors que le script ne s'en sert jamais là.
+- [x] [Review][Patch] **`.normalize("NFC")` dans `normaliserTexte`** [lib/texte.ts:38] — ferme le doublon NFD/NFC pour les rayons, les prénoms et les noms de foyer d'un coup. Sans effet sur l'existant : les onze rayons amorcés sont déjà en NFC dans le fichier de migration. (Décision 5b)
+
+### Reportés
+
+- [x] [Review][Defer] **Le bouton de restauration reste réservé à l'état vide** [app/rayons/ListeRayons.tsx:228-242] — décision de Florian du 2026-07-29, conforme à ce que la story prescrivait. L'arête demeure : supprimer dix des onze rayons laisse un état où le seul moyen de faire réapparaître le bouton est de supprimer le onzième, et l'ordre du parcours ne se ressaisit pas avant la story 2.2. — reporté à la story 2.2, qui rend le déplacement trivial et donc l'arête sans portée
+- [x] [Review][Defer] **L'unicité `(household_id, name)` reste sensible à la casse** [supabase/migrations/20260502000000_initial_schema.sql:81] — « boucherie » et « Boucherie » coexistent. Décision de Florian du 2026-07-29 : seul le `NFC` est traité ; la casse changerait le comportement d'unicité pour tout le produit et exige sa propre migration. — reporté, décision de produit non prise
+- [x] [Review][Defer] **Une migration à horodatage antérieur bloque tous les déploiements suivants** [scripts/migrer-au-deploiement.mjs:109] — deux branches ouvertes dans l'ordre inverse de leur fusion, et `db push` refuse (« local migration files to be inserted before the last migration on remote »). Le déploiement échoue, et **chaque déploiement suivant échoue aussi**, y compris ceux qui ne touchent aucune migration, jusqu'à une intervention manuelle. — reporté, conséquence de la conception retenue, pas un défaut du code
+- [x] [Review][Defer] **Deux déploiements concurrents ne sont pas sérialisés, et un redéploiement antérieur est bloqué** [scripts/migrer-au-deploiement.mjs:109] — aucun verrou : deux PR fusionnées à quelques secondes d'écart lancent deux `db push` sur la même base. Et un « Redeploy » avec reconstruction d'un déploiement antérieur aux migrations réclame `supabase migration repair` — le chemin de secours « revenir au code d'avant » est donc bloqué par le script lui-même. — reporté, faible fréquence
+- [x] [Review][Defer] **`useSoumission` : ré-entrance et ré-annonce des messages identiques** [app/_lib/useSoumission.ts:26-29, 38-50] — `occupe` n'est jamais lu dans `soumettre`, seulement rendu ; et `refuser` ne passe pas par `setCle(undefined)`, donc deux refus identiques consécutifs ne changent pas le DOM et ne sont annoncés qu'une fois au lecteur d'écran. — reporté, préexistant et partagé par tous les écrans
+- [x] [Review][Defer] **Aucune borne de longueur en base sur `name` et `icon`** [supabase/migrations/20260502000000_initial_schema.sql:76-77] — `MAX_NOM_RAYON = 40` et `maxLength={16}` ne vivent que dans le navigateur ; un `POST` REST direct insère un nom d'un mégaoctet ou une icône de 5000 diacritiques. — reporté, préexistant, atteignable seulement hors interface
+
+### Ce que la revue a exécuté
+
+Toutes les commandes ci-dessous ont été **lancées** sur l'arbre corrigé, le 2026-07-29. Ce qui ne
+l'a pas été porte le mot « non vérifié ».
+
+| Contrôle | Résultat |
+|---|---|
+| `npm run typecheck` | exit 0 |
+| `npm run lint` (`--max-warnings 0`) | exit 0, 0 avertissement |
+| `npm run test` | **72/72** (66 + 6 nouveaux de la revue), 0 échec |
+| `npm run build` | exit 0, `/rayons` toujours en `ƒ (dynamique)` |
+| `npm run test:isolation` | **17/17**, 0 échec, après `db reset` sur la migration corrigée |
+| `npx supabase db reset` | les 9 migrations rejouées, dont `095923` réécrite |
+| La nouvelle regex de `aisles_name_non_vide`, dans le vrai Postgres | **14/14** cas conformes (nom normal, accents, emoji seul acceptés ; vide, espaces, tabulation, saut de ligne, U+00A0, U+00AD, U+200B, U+3164, U+2800, U+202E refusés) |
+| La contrainte appliquée, à l'insertion | U+3164 et `'   '` refusés en `23514` ; « Crémerie » accepté |
+| `scripts/migrer-au-deploiement.mjs`, ses 5 branches de garde | local → 0 · preview → 0 · production hors `main` → 1 · sans secret → 1 · port 6543 → 1. **C'était le fichier qu'aucune porte n'exécutait ; il l'est maintenant.** |
+| `.github/workflows/ci.yml` | YAML parsé : 2 jobs, 7 étapes chacun |
+| Protection de `main` | posée et **relue par l'API** : `verify` + `isolation` requis, `strict`, admins soumis, push forcé et suppression interdits |
+| Caractères invisibles en clair dans les sources touchées | **aucun** — tous en `\uXXXX` |
+| Palette Tailwind par défaut, `autoFocus`, `outline-none`, `window.confirm` | aucune occurrence hors commentaires explicatifs |
+
+**Non vérifié, et dit comme tel :**
+
+- **Le parcours à l'écran n'a pas été rejoué après les correctifs.** Les quatre changements de
+  `ListeRayons.tsx` — deux régions de statut, gestion du focus, refus de l'icône multiple, message
+  « Ce rayon n'existe plus. » — touchent tous ce que seul l'œil attrape. Les 72 tests couvrent le
+  pur, pas le JSX (NFR-10 interdit le harnais). **C'est la vérification qui manque avant de fusionner.**
+- **La portée de `SUPABASE_DB_URL` dans Vercel** — voir la sous-case ci-dessus.
+- **Le job CI `isolation` n'a jamais tourné sur un runner GitHub.** Le YAML est valide et les tests
+  passent en local, mais `supabase start` dans un runner est un chemin neuf. Sa première exécution
+  sera celle de cette PR — le même motif que le script de déploiement, et il faut le regarder.

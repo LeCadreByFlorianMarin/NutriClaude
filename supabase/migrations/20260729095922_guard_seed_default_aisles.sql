@@ -1,8 +1,11 @@
 -- Referme un chemin d'écriture inter-foyers dans `seed_default_aisles`.
 --
--- ⚠️ À CONTRÔLER AVANT `db push` — cette migration remplace une fonction
--- existante. Confirmer d'abord, dans le SQL Editor, que c'est bien la version
--- du squelette qui tourne, et qu'elle est `security definer` :
+-- ⚠️ À CONTRÔLER EN REVUE, AVANT LA FUSION — cette migration remplace une
+-- fonction existante. Depuis le 2026-07-29, il n'y a plus de `db push` humain :
+-- la fusion de la PR déclenche le déploiement, qui applique les migrations
+-- (`vercel.json` → `scripts/migrer-au-deploiement.mjs`). Le contrôle ci-dessous
+-- n'a donc plus de moment « juste avant de pousser » — il se fait pendant la
+-- revue, et son résultat se consigne dans la PR. Dans le SQL Editor :
 --
 --   select prosecdef, pg_get_functiondef(oid)
 --   from pg_proc
@@ -11,7 +14,7 @@
 -- Attendu : `prosecdef = t`, et un corps identique à celui de
 -- `20260502000000_initial_schema.sql:330-351` — mêmes 11 rayons, mêmes
 -- `sort_order`, mêmes emojis. Si le corps diffère, quelqu'un l'a modifiée
--- entre-temps : relire avant de pousser, sous peine d'écraser ce changement.
+-- entre-temps : ne pas fusionner, sous peine d'écraser ce changement.
 --
 -- LE DÉFAUT
 -- `seed_default_aisles(p_household_id uuid)` est `security definer` : elle

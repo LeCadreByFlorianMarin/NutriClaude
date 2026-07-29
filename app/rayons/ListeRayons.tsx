@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createNavigateurClient } from "@/lib/supabase/client";
 import { messageDe } from "@/lib/messages";
 import { LIBELLE_OCCUPE } from "@/app/_lib/libelles";
@@ -11,6 +11,7 @@ import { refusRayon } from "@/lib/rayons/erreurs";
 import type { Rayon } from "@/lib/rayons/rayons";
 import {
   MAX_NOM_RAYON,
+  iconeTropLongue,
   normaliserIcone,
   normaliserNomRayon,
   prochainOrdre,
@@ -21,6 +22,8 @@ const MESSAGES = {
   vide: "Il faut un nom.",
   "nom-vide": "Il faut un nom.",
   "nom-pris": "Ce rayon existe déjà.",
+  "icone-multiple": "Un seul emoji pour l'icône.",
+  disparu: "Ce rayon n'existe plus. La liste vient d'être remise à jour.",
   echec: "Ça n'a pas marché. Réessaie dans un instant.",
   cree: "C'est noté.",
   modifie: "C'est noté.",
@@ -29,6 +32,24 @@ const MESSAGES = {
 } as const;
 
 type Cle = keyof typeof MESSAGES;
+
+/**
+ * Où le message de la soumission en cours doit s'afficher.
+ *
+ * ⚠️ **Une seule région ne suffisait pas, et c'est un vrai défaut, pas un
+ * détail.** Le formulaire d'ajout vit sous la liste : sur un foyer amorcé, onze
+ * lignes de 44px le poussent hors de l'écran en même temps que la région de
+ * statut, restée en tête. « Ce rayon existe déjà. » s'affichait donc là où
+ * personne ne le voyait — le champ restait rempli, le bouton redevenait actif,
+ * et rien ne se passait (revue du 2026-07-29).
+ *
+ * Deux régions **toutes deux montées en permanence**, dont une seule porte du
+ * texte à la fois. C'est ce qui préserve l'acquis d'`InviteCard` : une région
+ * annoncée de façon fiable est une région qui existait déjà avant que le
+ * message n'y arrive. Les monter conditionnellement rendrait le message muet
+ * au basculement, ce qui était exactement le constat d'origine.
+ */
+type Zone = "liste" | "creation";
 
 /**
  * L'écran des rayons : créer, renommer, ré-iconifier, supprimer.
@@ -73,24 +94,67 @@ export function ListeRayons({
   const [nouveauNom, setNouveauNom] = useState("");
   const [nouvelleIcone, setNouvelleIcone] = useState("");
 
+  /** La région de statut qui portera le message de la soumission en cours. */
+  const [zone, setZone] = useState<Zone>("liste");
+  /**
+   * L'élément à refocaliser une fois le panneau refermé.
+   *
+   * Une **ref** et non un état : la consommer ne doit pas déclencher de rendu,
+   * et `setState` dans un effet est une cascade que le lint refuse à juste
+   * titre. Elle est posée par `fermer` et lue par l'effet ci-dessous, qui est
+   * réveillé par le changement d'`enEdition` — pas par elle.
+   */
+  const retourFocus = useRef<string | null>(null);
+
+  /*
+   * ⚠️ **Le focus, sinon il retombe sur `<body>`.** Ouvrir un panneau démonte le
+   * `<button>` qui portait le focus et le remplace par un `<form>` : au clavier,
+   * il fallait repartir de `Tab` depuis le haut de la page et retraverser tous
+   * les rayons précédents (revue du 2026-07-29). Rien à voir avec l'interdiction
+   * d'`autoFocus` : déplacer le focus en réponse à un geste explicite n'est pas
+   * le voler au chargement.
+   */
+  useEffect(() => {
+    if (enEdition) {
+      document.getElementById(`nom-${enEdition}`)?.focus();
+      return;
+    }
+
+    const cible = retourFocus.current;
+    if (!cible) return;
+    retourFocus.current = null;
+    document.getElementById(cible)?.focus();
+  }, [enEdition]);
+
   function ouvrir(rayon: Rayon) {
     effacer();
+    setZone("liste");
     setEnEdition(rayon.id);
     setNomEdite(rayon.nom);
     setIconeEditee(rayon.icone ?? "");
     setAConfirmer(null);
   }
 
-  function fermer() {
+  /**
+   * Referme le panneau, et rend le focus à `retour` — l'identifiant de la ligne
+   * qu'on vient de quitter, ou le titre de la section quand cette ligne n'existe
+   * plus (suppression).
+   */
+  function fermer(retour: string) {
+    retourFocus.current = retour;
     setEnEdition(null);
     setAConfirmer(null);
   }
 
   async function creer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setZone("creation");
 
     const nom = normaliserNomRayon(nouveauNom);
     if (!nom) return refuser("vide");
+    // Refuser plutôt que réduire en silence : le champ icône est le premier des
+    // deux, et y taper le nom du rayon enregistrait son initiale sans un mot.
+    if (iconeTropLongue(nouvelleIcone)) return refuser("icone-multiple");
 
     await soumettre(async () => {
       const supabase = createNavigateurClient();
@@ -131,16 +195,20 @@ export function ListeRayons({
   async function enregistrer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!enEdition) return;
+    setZone("liste");
 
     const nom = normaliserNomRayon(nomEdite);
     if (!nom) return refuser("vide");
+    if (iconeTropLongue(iconeEditee)) return refuser("icone-multiple");
+
+    const ligne = enEdition;
 
     await soumettre(async () => {
       const supabase = createNavigateurClient();
       const { data, error } = await supabase
         .from("aisles")
         .update({ name: nom, icon: normaliserIcone(iconeEditee) })
-        .eq("id", enEdition)
+        .eq("id", ligne)
         .select("id")
         .maybeSingle();
 
@@ -149,18 +217,21 @@ export function ListeRayons({
        * succès pour PostgREST. Sans cette lecture de retour, un refus de la RLS
        * afficherait « c'est noté » sans que rien ne soit écrit.
        */
-      if (error || !data) {
-        if (error) console.error("[rayons] écriture refusée :", error.message);
+      if (error) {
+        console.error("[rayons] écriture refusée :", error.message);
         return refusRayon(error);
       }
+      if (!data) return disparu();
 
-      fermer();
+      fermer(`rayon-${ligne}`);
       router.refresh();
       return "modifie";
     });
   }
 
   async function supprimer(id: string) {
+    setZone("liste");
+
     await soumettre(async () => {
       const supabase = createNavigateurClient();
       const { data, error } = await supabase
@@ -172,18 +243,42 @@ export function ListeRayons({
 
       // Même raison que pour l'update : zéro ligne supprimée n'est pas une
       // erreur pour PostgREST, mais ce n'est pas une suppression non plus.
-      if (error || !data) {
-        if (error) console.error("[rayons] suppression refusée :", error.message);
+      if (error) {
+        console.error("[rayons] suppression refusée :", error.message);
         return refusRayon(error);
       }
+      if (!data) return disparu();
 
-      fermer();
+      fermer("titre-parcours");
       router.refresh();
       return "supprime";
     });
   }
 
+  /**
+   * Zéro ligne touchée, sans erreur : la ligne n'existe plus.
+   *
+   * ⚠️ **Ce cas était rangé avec les vraies erreurs, et c'était un piège à deux
+   * membres.** Si la conjointe supprime « Boucherie » depuis son téléphone,
+   * l'écran de Florian — sans propagation temps réel avant l'Epic 4 (AD-8) —
+   * rendait « Ça n'a pas marché. Réessaie dans un instant. » et **ne
+   * rafraîchissait pas** : la ligne fantôme restait affichée, le panneau restait
+   * ouvert, et chaque nouvel essai reproduisait le même échec indéfiniment. Le
+   * conseil de réessayer était faux, puisque rien ne pouvait plus réussir.
+   *
+   * Refermer, rafraîchir, et le dire : c'est la seule issue qui remette l'écran
+   * d'accord avec la base.
+   */
+  function disparu(): Cle {
+    // Le titre de section, jamais la ligne : elle ne sera plus là au rendu suivant.
+    fermer("titre-parcours");
+    router.refresh();
+    return "disparu";
+  }
+
   async function restaurer() {
+    setZone("liste");
+
     await soumettre(async () => {
       const supabase = createNavigateurClient();
 
@@ -212,18 +307,33 @@ export function ListeRayons({
   }
 
   /*
-   * Une seule région de statut, hissée hors des conditionnels. Deux branches
-   * rendant chacune la leur, à des positions différentes de l'arbre, laissaient
-   * un message posé au moment du basculement ne pas être annoncé de façon
-   * fiable — constat de `InviteCard`.
+   * Deux régions de statut, l'une près de la liste, l'autre près du bouton
+   * « Ajouter » — voir `Zone`. Les deux sont hissées hors des conditionnels et
+   * montées en permanence : c'est ce qui rend l'annonce fiable (constat
+   * d'`InviteCard`). Une seule porte du texte à la fois.
    */
-  const statut = <Notice className="mt-2">{messageDe(MESSAGES, cle, "echec")}</Notice>;
+  const message = messageDe(MESSAGES, cle, "echec");
+  const statutListe = (
+    <Notice className="mt-2">{zone === "liste" ? message : undefined}</Notice>
+  );
+  const statutCreation = (
+    <Notice reserve className="mt-3">
+      {zone === "creation" ? message : undefined}
+    </Notice>
+  );
 
   return (
     <div>
       <section>
-        <h2 className="titre-section">Ton parcours</h2>
-        {statut}
+        {/*
+          `tabIndex={-1}` pour recevoir le focus au clavier après une
+          suppression : la ligne qui le portait n'existe plus, et le laisser
+          retomber sur `<body>` renverrait en haut du document.
+        */}
+        <h2 id="titre-parcours" tabIndex={-1} className="titre-section">
+          Ton parcours
+        </h2>
+        {statutListe}
 
         {rayons.length === 0 ? (
           <div className="mt-2">
@@ -306,7 +416,7 @@ export function ListeRayons({
                       </button>
                       <button
                         type="button"
-                        onClick={fermer}
+                        onClick={() => fermer(`rayon-${rayon.id}`)}
                         disabled={occupe}
                         className="btn-quiet"
                       >
@@ -366,6 +476,7 @@ export function ListeRayons({
                   */
                   <button
                     type="button"
+                    id={`rayon-${rayon.id}`}
                     onClick={() => ouvrir(rayon)}
                     aria-label={`Modifier ${rayon.nom}`}
                     className="flex min-h-11 w-full cursor-pointer items-center gap-3
@@ -431,8 +542,18 @@ export function ListeRayons({
           </div>
 
           <p className="hint mt-2">
-            Il arrive à la fin du parcours. Tu pourras le déplacer plus tard.
+            À gauche un emoji, à droite le nom. Il arrive à la fin du parcours, et
+            tu pourras le déplacer plus tard.
           </p>
+
+          {/*
+            La région de statut de CE formulaire, au-dessus de son bouton et non
+            en tête de page : sur un foyer amorcé, la tête de page est hors
+            écran quand le doigt est sur « Ajouter ». `reserve` parce qu'elle
+            est au-dessus du bouton — sans elle, le message pousserait la cible
+            sous le doigt au moment du clic (contrat de `Notice`).
+          */}
+          {statutCreation}
 
           <button type="submit" disabled={occupe} className="btn-primaire mt-3 w-full">
             {occupe ? LIBELLE_OCCUPE : "Ajouter"}
