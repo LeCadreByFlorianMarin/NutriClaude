@@ -171,17 +171,17 @@ This document provides the complete epic and story breakdown for NutriClaude, de
 | FR-1 | Epic 4 | Liste unique partagée (portée au modèle canonique) |
 | FR-2 | Epic 4 | Affichage groupé par rayon (vue `grocery_list_by_aisle`) |
 | FR-3 | Epic 4 | Bascule acheté/à acheter idempotente (AD-4) — valeur posée, jamais un basculement relatif |
-| FR-4 | Epic 2 | Résolution auto du rayon à l'ajout (moteur `resolve_aisle_id`) |
+| FR-4 | Epic 4 | Résolution auto du rayon à l'ajout (moteur `resolve_aisle_id`, **déjà en base**) — déplacé d'Epic 2 le 2026-07-29 : l'ajout d'article est en Epic 4 |
 | FR-5 | Epic 4 | Agrégation UPSERT-incrémente sur clé canonique, toute surface |
 | FR-6 | Epic 4 | Suppression = tombstone, distincte du cochage |
 | FR-7 | Epic 4 | Provenance polymorphe (acteur + surface + recette) |
 | FR-8 | Epic 4 | Archivage/vidage avec confirmation |
-| FR-9 | Epic 2 | Groupe « À classer » (dépend de la résolution rayon) |
+| FR-9 | Epic 4 | Groupe « À classer » — déplacé d'Epic 2 le 2026-07-29 : ne se démontre que sur la liste |
 | FR-10 | Epic 4 | Propagation Realtime inter-surfaces |
-| FR-11 | Epic 2 | Rayons custom + jeu par défaut à l'init foyer |
+| FR-11 | Epic 2 | Rayons custom (écrans) ; le jeu par défaut est **déjà amorcé** par `seed_default_aisles()` depuis le squelette |
 | FR-12 | Epic 2 | Réordonnancement par manipulation directe |
-| FR-13 | Epic 2 | Règles mot-clé → rayon (plus spécifique gagne) |
-| FR-14 | Epic 2 | Correction apprenante en silence |
+| FR-13 | Epic 2 (écran) + Epic 4 (application) | Règles mot-clé → rayon ; le « plus spécifique gagne » est **déjà** le `order by length(keyword) desc` de `resolve_aisle_id` |
+| FR-14 | Epic 4 | Correction apprenante en silence — déplacé d'Epic 2 le 2026-07-29 : corriger suppose une liste |
 | FR-15 | Epic 3 | Grille menu jour × repas + nb personnes (dont collation) |
 | FR-16 | Epic 4 | Génération liste depuis menu (échelle, agrégation, rayons) |
 | FR-17 | Epic 4 | Génération non destructive + compte-rendu |
@@ -244,10 +244,10 @@ Poser un socle applicatif sain et transformer le « foyer » d'une intention en 
 **FRs covered:** FR-40, FR-41, FR-42 (profil/membres), FR-43 ; NFR-8, NFR-9, NFR-11 (posture)
 **Additional:** AR-SOCLE, AR-STACK, AR-MIGRATIONS, AD-11, AD-16, AD-2 (`current_household_id()`) ; UX-DR1, UX-DR12
 
-### Epic 2 : Le classement par rayon qui apprend
-Donner au foyer un tri de liste qui suit *son* magasin et s'améliore chaque semaine sans configuration. Rayons personnalisables (nom, icône, position) avec un jeu par défaut à l'initialisation, réordonnancement par manipulation directe, moteur de résolution du rayon, règles mot-clé → rayon, correction apprenante en silence, et groupe « À classer » toujours visible. C'est la boucle d'apprentissage (FR-14) que le PRD veut voir arriver tôt.
-**FRs covered:** FR-11, FR-12, FR-13, FR-14, FR-9, FR-4
-**Additional:** AD-6 (`resolve_aisle_id`), AD-1 ; UX-DR4
+### Epic 2 : Les rayons — les rendre visibles, modifiables et ordonnables
+Rendre les rayons visibles, modifiables et ordonnables, et poser les règles qui les alimentent. Écran de gestion (créer, renommer, ré-iconifier, supprimer, état vide), réordonnancement du parcours par manipulation directe, écran des règles mot-clé → rayon, et le composant carte-rayon que la liste réutilisera. **Révisé le 2026-07-29** (`epic-2-revision-2026-07-29.md`) : le moteur de cet epic — `seed_default_aisles`, `product_aisle_map`, `resolve_aisle_id`, la vue par parcours — existait déjà dans la migration du squelette ; ce qui manquait, ce sont les écrans. L'ancien objectif promettait « un tri de liste », que seul l'Epic 4 peut montrer.
+**FRs covered:** FR-11, FR-12, FR-13 (écrans)
+**Additional:** AD-1 ; UX-DR4
 
 ### Epic 3 : Recettes & menu — les affluents de la liste
 Constituer le répertoire qui alimente la liste. Répertoire de recettes (titre, description, portions, temps, instructions consultables en lecture, ingrédients éditables et réordonnables), étiquettes libres avec filtre et recherche, et grille de menu hebdomadaire (jour × repas + nombre de personnes, collation comprise) sans défilement horizontal. Valeur autonome : Florian construit et planifie sur le web avant même que la génération soit refondue.
@@ -256,7 +256,7 @@ Constituer le répertoire qui alimente la liste. Répertoire de recettes (titre,
 
 ### Epic 4 : La liste qui ne lâche jamais — hors-ligne, convergence & contrat
 Le socle : le plus coûteux, le moins visible, et celui qui débloque toutes les surfaces. La liste se consulte, se coche, se décoche et s'enrichit **sans réseau**, et deux appareils convergent sans arbitrage. Modèle canonique (ligne unique par foyer+nom+unité, LWW par champ sur intention, tombstone), agrégation et génération autoritaires côté serveur et non destructives, vocabulaire d'unités fermé, provenance polymorphe, propagation Realtime — le tout exposé comme un **contrat stable versionné** consommable par les surfaces à venir.
-**FRs covered:** FR-1, FR-2, FR-3, FR-5, FR-6, FR-7, FR-8, FR-10, FR-16, FR-17, FR-52, FR-19, FR-20, FR-22, FR-23 ; NFR-1, NFR-2, NFR-4, NFR-5
+**FRs covered:** FR-1, FR-2, FR-3, FR-5, FR-6, FR-7, FR-8, FR-10, FR-16, FR-17, FR-52, FR-19, FR-20, FR-22, FR-23 ; **FR-4, FR-9, FR-14** (déplacés d'Epic 2 le 2026-07-29 — stories 4.16 à 4.18) ; NFR-1, NFR-2, NFR-4, NFR-5
 **Additional:** AD-2, AD-3, AD-4, AD-5, AD-6, AD-7, AD-8, AD-13, AD-15, AD-17 ; UX-DR2, UX-DR3, UX-DR5, UX-DR6, UX-DR7, UX-DR11
 
 ### Epic 5 : Le dashboard de la cuisine
@@ -352,7 +352,7 @@ So that je dispose d'un espace partagé où vivront la liste, les recettes, les 
 **When** il se reconnecte
 **Then** aucun nouvel appel de création n'est déclenché et il retrouve son foyer existant
 
-*Note : l'amorçage du jeu de rayons par défaut (FR-11) est traité en Epic 2, pour les foyers créés ici comme pour les existants.*
+*Note, rectifiée le 2026-07-29 : l'amorçage du jeu de rayons par défaut (FR-11) **est déjà fait ici** — `create_household_with_profile` appelle `seed_default_aisles()` depuis la migration du squelette, et 11 rayons français sont créés avec le foyer. L'Epic 2 n'ajoute que le ré-amorçage d'un foyer dont les rayons auraient été supprimés (story 2.1).*
 
 ### Story 1.4 : Générer un code d'invitation
 
@@ -444,31 +444,29 @@ So that elle soit lisible en plein soleil comme le soir, et jamais intimidante.
 
 ---
 
-## Epic 2: Le classement par rayon qui apprend
+## Epic 2: Les rayons — les rendre visibles, modifiables et ordonnables
 
-Donner au foyer un tri de liste qui suit *son* magasin et s'améliore chaque semaine sans configuration. Rayons personnalisables (nom, icône, position) avec un jeu par défaut à l'initialisation, réordonnancement par manipulation directe, moteur de résolution du rayon côté serveur, règles mot-clé → rayon, correction apprenante en silence, et groupe « À classer » toujours visible. C'est la boucle d'apprentissage (FR-14) que le PRD veut voir arriver tôt. Le moteur (fonctions SQL) est bâti une fois et réutilisé par la liste hors-ligne de l'Epic 4.
+Rendre les rayons visibles, modifiables et ordonnables, et poser les règles qui les alimentent.
 
-### Story 2.1 : Amorcer un jeu de rayons par défaut
+⚠️ **Epic révisé le 2026-07-29** — constat et arbitrages dans `epic-2-revision-2026-07-29.md`.
+Le *moteur* de cet epic existait déjà avant l'Epic 1, dans la migration du squelette
+(`20260502000000_initial_schema.sql`) : `seed_default_aisles()`, `product_aisle_map` et son index
+GIN français, `resolve_aisle_id()` avec son « plus spécifique gagne », la vue
+`grocery_list_by_aisle` ordonnée par parcours, et la RLS de tout cela. Ce qui manquait, ce sont
+**les écrans**. L'ancien objectif — « donner au foyer un tri de liste » — promettait un résultat que
+seul l'Epic 4 peut montrer, et c'est ce qui avait permis d'écrire trois stories indémontrables.
 
-As a membre d'un foyer,
-I want que mon foyer dispose dès le départ d'un jeu de rayons français prêt à l'emploi,
-So that la liste soit triée par rayon sans que personne n'ait à tout configurer d'abord.
+Ce qui a bougé : l'ancienne story 2.1 (« Amorcer un jeu de rayons par défaut ») est **supprimée**,
+trois de ses quatre critères étant tenus en production depuis le squelette ; son seul critère
+restant — le ré-amorçage d'un foyer dépourvu de rayons — est absorbé par la story 2.1 ci-dessous,
+seule capable de créer ce cas. Les anciennes stories 2.5, 2.6 et 2.7 sont **déplacées vers
+l'Epic 4** (stories 4.16 à 4.18) : leurs critères s'énoncent sur la liste de courses, elles n'y
+étaient pas testables.
 
-**Acceptance Criteria:**
+**FRs covered:** FR-11, FR-12, FR-13 (écrans ; la résolution qui les consomme est en Epic 4)
+**Additional:** AD-1 ; UX-DR4
 
-**Given** un foyer nouvellement créé (Epic 1) sans aucun rayon
-**When** le foyer est initialisé
-**Then** un jeu de rayons par défaut en français (nom, icône emoji, position dans le parcours) est créé pour ce foyer (FR-11), via une migration/fonction additive
-
-**Given** un foyer existant antérieur à cette story et dépourvu de rayons
-**When** l'amorçage est appliqué
-**Then** il reçoit le même jeu par défaut sans dupliquer des rayons déjà présents
-
-**Given** les rayons par défaut
-**When** ils sont créés
-**Then** chacun a une position d'ordre distincte reflétant un parcours de magasin plausible, et l'ensemble est rattaché au seul foyer concerné (isolation RLS, NFR-5)
-
-### Story 2.2 : Gérer ses rayons
+### Story 2.1 : Gérer ses rayons
 
 As a membre configurant le foyer (Florian),
 I want créer, renommer, ré-iconifier et supprimer des rayons,
@@ -486,13 +484,23 @@ So that la liste reflète les rayons réels de mon magasin.
 
 **Given** un rayon que Florian supprime
 **When** il confirme la suppression
-**Then** le rayon est retiré et les articles qui y étaient rattachés basculent vers « À classer » (FR-9) plutôt que de disparaître ou de casser l'affichage
+**Then** le rayon est retiré. *(Le rattachement des articles est déjà tenu par le schéma :
+`grocery_list_items.aisle_id` est `on delete set null` depuis le squelette, donc les articles
+basculent vers « À classer » sans rien à implémenter. À **démontrer** en Epic 4, quand une liste
+existera — pas à cocher ici.)*
 
 **Given** un foyer dont tous les rayons ont été supprimés
 **When** l'écran des rayons s'affiche
-**Then** il montre un état vide lisible en français invitant à créer un rayon, jamais une page blanche ni un message technique (NFR-8)
+**Then** il montre un état vide lisible en français invitant à créer un rayon, jamais une page
+blanche ni un message technique (NFR-8)
 
-### Story 2.3 : Réordonner le parcours par manipulation directe
+**Given** ce même foyer dépourvu de rayons *(critère absorbé de l'ancienne story 2.1)*
+**When** Florian demande à restaurer le jeu par défaut
+**Then** `seed_default_aisles()` — qui existe déjà, est idempotente
+(`on conflict (household_id, name) do nothing`) et amorce 11 rayons français — est appelée, sans
+dupliquer aucun rayon déjà présent (FR-11). **Rien n'est à écrire côté base** : seul l'appel manque.
+
+### Story 2.2 : Réordonner le parcours par manipulation directe
 
 As a membre configurant le foyer (Florian),
 I want réordonner mes rayons en les manipulant directement,
@@ -502,17 +510,20 @@ So that l'ordre des rayons corresponde à l'ordre où je traverse physiquement l
 
 **Given** la liste des rayons du foyer
 **When** Florian déplace un rayon par glisser ou par un contrôle monter/descendre
-**Then** le nouvel ordre est persisté, **sans jamais demander la saisie d'un numéro d'ordre** (FR-12)
-
-**Given** un parcours réordonné
-**When** la liste de courses est affichée par rayon
-**Then** les groupes apparaissent dans l'ordre du parcours défini (FR-2), pas par ordre alphabétique
+**Then** le nouvel ordre est persisté dans `sort_order`, **sans jamais demander la saisie d'un
+numéro d'ordre** (FR-12)
 
 **Given** une réorganisation en cours
 **When** Florian relâche un rayon à une nouvelle position
 **Then** l'ordre reste cohérent (positions uniques, aucun rayon perdu ou dupliqué)
 
-### Story 2.4 : Définir des règles mot-clé → rayon
+**Given** l'écran des rayons lui-même
+**When** le parcours est réordonné
+**Then** l'écran reflète immédiatement le nouvel ordre. *(Que la **liste de courses** s'affiche dans
+cet ordre est déjà tenu par la vue `grocery_list_by_aisle`, ordonnée
+`coalesce(a.sort_order, 9999)` — démontré en Epic 4, story 4.2, pas ici.)*
+
+### Story 2.3 : Définir des règles mot-clé → rayon
 
 As a membre configurant le foyer (Florian),
 I want associer des mots-clés à des rayons (« poulet » → Boucherie),
@@ -520,77 +531,50 @@ So that les articles soient classés automatiquement selon leur nom.
 
 **Acceptance Criteria:**
 
-**Given** l'écran des règles sur la surface web (surface de Florian)
+**Given** l'écran des règles sur la surface web
 **When** Florian crée une règle associant un mot-clé à un rayon
-**Then** la règle est persistée et rattachée au foyer
+**Then** la règle est persistée dans `product_aisle_map` et rattachée au foyer
 
-**Given** plusieurs règles dont les mots-clés sont contenus dans le nom d'un article
-**When** le classement s'applique
-**Then** c'est la règle dont le mot-clé est **le plus spécifique** qui l'emporte (FR-13)
-
-**Given** les règles apprises ou saisies
+**Given** les règles saisies ou apprises
 **When** Florian consulte l'écran des règles
-**Then** il peut les voir et les révoquer ; cette gestion reste une surface de Florian et n'est jamais exposée à la conjointe (test d'acceptation, NFR-9)
+**Then** il peut les voir et les révoquer
 
-### Story 2.5 : Résoudre automatiquement le rayon d'un article ajouté
+**Given** deux règles dont les mots-clés sont tous deux contenus dans un même nom d'article
+**When** l'écran affiche laquelle l'emporterait
+**Then** c'est celle dont le mot-clé est le plus long qui est désignée — `resolve_aisle_id` tranche
+par `order by length(m.keyword) desc` (FR-13). *L'écran expose la règle ; l'appliquer à un article
+réel est la story 4.16.*
 
-As a membre qui ajoute un article,
-I want que son rayon soit déterminé automatiquement à partir de son nom,
-So that je n'aie pas à ranger manuellement chaque article — tout en gardant la main pour corriger.
+> **Critère retiré le 2026-07-29 — « cette gestion n'est jamais exposée à la conjointe (NFR-9) ».**
+> Deux raisons, toutes deux vérifiées. La citation est fausse : NFR-9 porte sur le **ton** et ses
+> mots bannis, pas sur le contrôle d'accès. Et la capacité n'a aucun support — `profiles` n'a pas
+> de colonne de rôle, et toute la RLS passe par `current_household_id()`, qui est **par foyer**,
+> jamais par membre. Distinguer deux membres est une **décision de produit non prise**, avec son
+> coût de schéma, de RLS et de tests d'isolation à rejouer ; elle ne peut pas être avalée par un
+> critère d'acceptation d'écran. Voir `epic-2-revision-2026-07-29.md` §5 D4.
 
-**Acceptance Criteria:**
+### Story 2.4 : Composant carte-rayon
 
-**Given** un article ajouté à la liste avec un nom
-**When** la résolution de rayon s'exécute (fonction serveur `resolve_aisle_id`, autoritaire — AD-6)
-**Then** le rayon est déterminé à partir des règles du foyer et posé sur l'article (FR-4) — **tout** chemin d'ajout passe par la résolution, y compris l'ajout manuel
-
-**Given** un article dont aucun mot-clé ne correspond à une règle
-**When** la résolution s'exécute
-**Then** l'article reste sans rayon (`aisle_id` nul) et sera regroupé dans « À classer » (FR-9), jamais rattaché arbitrairement
-
-**Given** la fonction de résolution
-**When** elle est appelée par n'importe quelle surface (ajout manuel, génération, plus tard le pont)
-**Then** elle produit le même résultat, car elle est unique et côté serveur (AD-1/AD-6) — aucune surface ne réimplémente sa propre résolution
-
-### Story 2.6 : Groupe « À classer » toujours visible
-
-As a membre consultant la liste,
-I want voir un groupe « À classer » pour les articles au rayon indéterminé,
-So that aucun article ne soit silencieusement masqué et que je puisse le ranger.
+As a membre,
+I want que chaque rayon se présente partout de la même façon,
+So that l'écran des rayons, la liste et le dashboard parlent le même langage visuel.
 
 **Acceptance Criteria:**
-
-**Given** un ou plusieurs articles sans rayon résolu
-**When** la liste s'affiche groupée par rayon
-**Then** ces articles apparaissent dans un groupe « À classer » visible, en tant que groupe de première classe (FR-9), jamais replié par défaut ni masqué
-
-**Given** un groupe « À classer » vide
-**When** la liste s'affiche
-**Then** le groupe n'occupe pas d'espace inutile, mais il réapparaît dès qu'un article non résolu existe
 
 **Given** le composant carte-rayon
-**When** un rayon (y compris « À classer ») est rendu
-**Then** il présente son icône emoji (`aria-hidden`), son nom en eyebrow et le ratio `n/total` (UX-DR4) — ce composant est réutilisable par la liste hors-ligne de l'Epic 4
+**When** il reçoit un rayon et un compte d'articles
+**Then** il présente son icône emoji (`aria-hidden`), son nom en eyebrow et le ratio `n/total`
+(UX-DR4)
 
-### Story 2.7 : Correction de rayon apprenante en silence
+**Given** un rayon sans article, et le rayon « À classer »
+**When** ils sont rendus
+**Then** le composant les traite comme des rayons de première classe, sans casse d'affichage
 
-As a membre qui déplace un article vers le bon rayon,
-I want que cette correction s'applique et se mémorise pour l'avenir,
-So that la même erreur ne se reproduise plus — sans que j'aie à comprendre la notion de « règle ».
-
-**Acceptance Criteria:**
-
-**Given** un article rangé dans un rayon incorrect (ou dans « À classer »)
-**When** un membre le déplace vers un autre rayon
-**Then** l'article change de rayon immédiatement (FR-4 corrigeable) et une règle mot-clé → rayon correspondante est mémorisée **en silence** (FR-14), sans question posée
-
-**Given** une correction qui a créé une règle
-**When** un futur article contenant le même mot-clé est ajouté
-**Then** il est classé directement dans le bon rayon, sans nouvelle correction
-
-**Given** la conjointe qui corrige un rayon au supermarché
-**When** la correction s'applique
-**Then** aucune notion de « règle » ni aucun réglage n'est montré — l'apprentissage est invisible pour elle ; seule la surface web de Florian expose et permet de révoquer les règles apprises (FR-14, test d'acceptation)
+**Given** que le composant reçoit ses chiffres en propriétés
+**When** il est éprouvé
+**Then** il l'est **sans liste ni base** — c'est ce qui le rend démontrable dans cet epic, là où les
+critères qui exigeaient une liste ont été déplacés en Epic 4. Le composant est réutilisé tel quel
+par les stories 4.2 et 4.17.
 
 ---
 
@@ -782,7 +766,7 @@ So that je retrouve ma liste unique et triée sur n'importe quelle surface.
 
 **Given** les articles non supprimés (tombstone nul)
 **When** la liste est rendue
-**Then** seuls les articles vivants apparaissent, groupés par rayon, « À classer » compris (réutilise le composant carte-rayon de l'Epic 2)
+**Then** seuls les articles vivants apparaissent, groupés par rayon, « À classer » compris (réutilise le composant carte-rayon de l'Epic 2, story 2.4 ; le groupe « À classer » lui-même est la story 4.17)
 
 **Given** la lecture via le contrat
 **When** une surface lit la liste
@@ -826,7 +810,7 @@ So that la liste reste propre quelle que soit la surface d'ajout.
 
 **Given** un article ajouté sans rayon explicite
 **When** l'ajout est traité
-**Then** le rayon est résolu par `resolve_aisle_id` (fonction serveur de l'Epic 2), et une quantité mise à l'échelle est arrondie à une valeur achetable (jamais « 1,67 oignon »)
+**Then** le rayon est résolu par `resolve_aisle_id` (fonction serveur autoritaire, câblée en story 4.16 — déplacée de l'Epic 2 le 2026-07-29), et une quantité mise à l'échelle est arrondie à une valeur achetable (jamais « 1,67 oignon »)
 
 ### Story 4.5 : Supprimer, archiver les achetés, vider la liste
 
@@ -1051,6 +1035,97 @@ So that une régression sur les deux propriétés les plus fragiles ne parte jam
 **Given** ces tests
 **When** ils sont intégrés au dépôt
 **Then** ils tournent sans outil d'observabilité supplémentaire (NFR-10) et échouent en cas de régression d'isolation ou de convergence
+
+### Story 4.16 : Résoudre automatiquement le rayon d'un article ajouté
+
+_Déplacée de l'Epic 2 (ex-story 2.5) le 2026-07-29 : ses critères s'énoncent sur l'ajout d'un
+article, qui n'existe qu'ici (story 4.4). `resolve_aisle_id()` existe déjà en production._
+
+As a membre qui ajoute un article,
+I want que son rayon soit déterminé automatiquement à partir de son nom,
+So that je n'aie pas à ranger manuellement chaque article — tout en gardant la main pour corriger.
+
+**Acceptance Criteria:**
+
+**Given** un article ajouté à la liste avec un nom
+**When** la résolution s'exécute via `resolve_aisle_id` (fonction serveur autoritaire — AD-6)
+**Then** le rayon est déterminé à partir des règles du foyer et posé sur l'article (FR-4) — **tout**
+chemin d'ajout passe par la résolution, y compris l'ajout manuel
+
+**Given** un article dont aucun mot-clé ne correspond à une règle
+**When** la résolution s'exécute
+**Then** l'article reste sans rayon (`aisle_id` nul) et sera regroupé dans « À classer » (FR-9),
+jamais rattaché arbitrairement
+
+**Given** la fonction de résolution
+**When** elle est appelée par n'importe quelle surface (ajout manuel, génération, plus tard le pont)
+**Then** elle produit le même résultat, car elle est unique et côté serveur (AD-1/AD-6) — aucune
+surface ne réimplémente sa propre résolution
+
+**Given** que `resolve_aisle_id` est la seule fonction du schéma initial sans `set search_path`
+**When** cette story la touche
+**Then** elle le pose, par cohérence avec les cinq autres fonctions du fichier *(observation de
+`epic-2-revision-2026-07-29.md` §7 — pas d'escalade de privilège possible, la fonction n'étant pas
+`security definer` : c'est une dette de cohérence, pas une faille)*
+
+### Story 4.17 : Groupe « À classer » toujours visible
+
+_Déplacée de l'Epic 2 (ex-story 2.6) le 2026-07-29 : ses deux premiers critères disent « quand la
+liste s'affiche ». Son troisième critère — le composant carte-rayon — est resté en Epic 2
+(story 2.4), où il est démontrable sans liste._
+
+As a membre consultant la liste,
+I want voir un groupe « À classer » pour les articles au rayon indéterminé,
+So that aucun article ne soit silencieusement masqué et que je puisse le ranger.
+
+**Acceptance Criteria:**
+
+**Given** un ou plusieurs articles sans rayon résolu
+**When** la liste s'affiche groupée par rayon
+**Then** ces articles apparaissent dans un groupe « À classer » visible, en tant que groupe de
+première classe (FR-9), jamais replié par défaut ni masqué. *La vue `grocery_list_by_aisle` les
+produit déjà : `left join` sur `aisles` et `coalesce(a.sort_order, 9999)` les place en fin de
+parcours.*
+
+**Given** un groupe « À classer » vide
+**When** la liste s'affiche
+**Then** le groupe n'occupe pas d'espace inutile, mais il réapparaît dès qu'un article non résolu
+existe
+
+**Given** un rayon supprimé depuis l'écran des rayons (story 2.1)
+**When** la liste s'affiche ensuite
+**Then** ses articles apparaissent dans « À classer » plutôt que de disparaître — c'est le critère
+de l'ancienne story 2.2 AC3, tenu par `aisle_id on delete set null` et **démontrable seulement
+ici**, puisqu'il faut une liste pour le voir
+
+### Story 4.18 : Correction de rayon apprenante en silence
+
+_Déplacée de l'Epic 2 (ex-story 2.7) le 2026-07-29 : déplacer un article suppose une liste._
+
+As a membre qui déplace un article vers le bon rayon,
+I want que cette correction s'applique et se mémorise pour l'avenir,
+So that la même erreur ne se reproduise plus — sans que j'aie à comprendre la notion de « règle ».
+
+**Acceptance Criteria:**
+
+**Given** un article rangé dans un rayon incorrect (ou dans « À classer »)
+**When** un membre le déplace vers un autre rayon
+**Then** l'article change de rayon immédiatement (FR-4 corrigeable) et une règle mot-clé → rayon
+correspondante est écrite dans `product_aisle_map` **en silence** (FR-14), sans question posée
+
+**Given** une correction qui a créé une règle
+**When** un futur article contenant le même mot-clé est ajouté
+**Then** il est classé directement dans le bon rayon, sans nouvelle correction
+
+**Given** la conjointe qui corrige un rayon au supermarché
+**When** la correction s'applique
+**Then** aucune notion de « règle » ni aucun réglage n'est montré — l'apprentissage est invisible
+(NFR-9, **ton** : le mot « règle » est du jargon à cet endroit)
+
+> ⚠️ L'ancienne rédaction ajoutait « seule la surface web de Florian expose et permet de révoquer
+> les règles apprises ». Retiré le 2026-07-29 pour la même raison qu'en story 2.3 : aucune notion
+> de rôle n'existe au schéma. La révocation est offerte par l'écran des règles (story 2.3), sans
+> restriction par membre tant que la décision de produit n'est pas prise.
 
 ---
 
