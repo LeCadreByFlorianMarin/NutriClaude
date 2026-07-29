@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
-last_updated: 2026-07-28  # rétrospective Epic 1 tenue — voir epic-1-retro-2026-07-28.md
+last_updated: 2026-07-29  # PR #12 mergée (4ee719a), 7/7 migrations en prod, révision Epic 2 analysée
 project: nutriclaude
 project_key: NOKEY
 tracking_system: file-system
@@ -150,11 +150,11 @@ action_items:
   - epic: 1
     action: "Pousser 20260729094500_grant_table_privileges.sql — aucune migration n'accordait de privilège de table, la chaîne ne reproduisait pas la production (requête de contrôle en en-tête ; no-op attendu en prod)"
     owner: "Florian"
-    status: open
+    status: done  # 2026-07-29 — `supabase migration list` rend local == remote sur les 7
   - epic: 1
     action: "Réviser la story 2.1 et son recouvrement avec la 2.2 — seed_default_aisles existe déjà et amorce 11 rayons ; aucun code applicatif ne lit les rayons"
     owner: "John + Winston"
-    status: open
+    status: in-progress  # analyse faite : epic-2-revision-2026-07-29.md. 4 décisions en attente d'arbitrage
   - epic: 1
     action: "Pousser 20260728152418_require_non_blank_household_name.sql (requête de contrôle en en-tête du fichier)"
     owner: "Florian"
@@ -167,7 +167,7 @@ action_items:
   - epic: 1
     action: "Nettoyer les trois comptes témoins abandonnés en production (+nc1, +nc2, +nc3) et leurs foyers"
     owner: "Florian"
-    status: open
+    status: done  # 2026-07-29, tableau de bord Supabase
   # Règles d'équipe, à appliquer dès la première story de l'Epic 2
   - epic: 1
     action: "Ne consigner comme vérifié que ce qui a été exécuté, en citant la commande — une déduction s'écrit « déduit »"
