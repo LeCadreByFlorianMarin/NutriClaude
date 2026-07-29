@@ -3,9 +3,20 @@
 _Journal opérationnel, tenu à jour à la main. Source : rétrospective Epic 1 du 2026-07-28
 (`epic-1-retro-2026-07-28.md`) et les trois rapports de revue `epic-1-code-review-pass{1,2,3}-*.md`._
 
-**État au 2026-07-28** — Epic 1 clos (7/7 stories). `test` 49/49 · `typecheck` ✅ ·
-`lint --max-warnings 0` ✅ · `build` ✅. Branche `feat/story-1-7-theme`, travail des trois passes
-commité (`fa0ccbf`, 79 fichiers), **non poussée**.
+**État au 2026-07-29** — Epic 1 clos (7/7 stories). `test` 49/49 · `typecheck` ✅ ·
+`lint --max-warnings 0` ✅ · `build` ✅, rejouées sur **Node 24.15.0**. Branche
+`feat/story-1-7-theme` **poussée** ; la PR #12 est retitrée en clôture d'Epic 1 et son corps
+réécrit pour les quatre commits qu'elle porte réellement.
+
+⚠️ **Le premier déploiement Vercel de la branche a échoué**, CI GitHub verte sur le même arbre.
+`engines: ">=25.0.0"`, monté par la passe 1 « par cohérence », dépasse le plafond de Vercel (24.x).
+La prémisse invoquée — « la CI valide enfin le runtime que Vercel exécute réellement » — était
+fausse : Vercel résolvait `>=22.0.0` en **24.x**, et `.node-version` (= 25 depuis le squelette)
+n'était lu par personne. Corrigé en `15647a3` : `engines >=24.0.0`, `.node-version` 24, et les
+trois documents porteurs de l'affirmation rectifiés sur place.
+
+**Troisième défaut du même motif en deux jours** — une déduction consignée comme vérifiée, puis
+réemployée comme fondation — et le premier à atteindre le déploiement. Cf. §4.
 
 ---
 
@@ -147,6 +158,10 @@ un défaut réel derrière elles.
 - **Une prémisse qui sert à reporter un défaut doit être rouverte** avant d'être invoquée une
   seconde fois. *(« Base gelée » a couvert le trou NFR-5 pendant tout l'epic.)*
 - **Aucune migration sans sa requête de contrôle** en en-tête.
+- **Les quatre portes ne voient pas le déploiement.** `typecheck`, `lint`, `test` et `build` tournent
+  sur le runtime du poste ; Vercel en construit un autre, avec ses propres plafonds. Toute
+  modification de `package.json` `engines`, `.node-version` ou `next.config.ts` se contrôle **sur le
+  déploiement de la PR**, pas sur la CI. *(Le défaut Node 25 : CI verte, production morte.)*
 - **Décisions par lots de quatre**, avec constat reproduit, options chiffrées et recommandation
   assumée. 33 sur 33 ont fonctionné ainsi.
 - **Revue adversariale par story**, pas en fin d'epic *(décision de Florian : environnement de test
