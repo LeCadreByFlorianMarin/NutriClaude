@@ -26,13 +26,20 @@ jobs:
           # runtime que personne n'exécute — et `node --test` a besoin de
           # l'exécution native de TypeScript, absente avant Node 23.6.
           #
-          # ⚠️ Ce fichier doit rester dans l'intervalle d'`engines.node` de
-          # `package.json`, ET nommer une version que Vercel sait construire.
-          # C'est `engines.node` que Vercel arbitre, pas ce fichier : mesuré le
-          # 2026-07-29, `>=25.0.0` a fait échouer le déploiement avec « Found
-          # invalid or discontinued Node.js Version », alors que ce fichier
-          # disait déjà 25 depuis le squelette sans jamais rien changer. Vercel
-          # plafonne à 24.x ; le jour où il sert 25, les deux montent ensemble.
+          # ⚠️ Ce fichier et `engines.node` de `package.json` doivent nommer la
+          # MÊME version majeure. C'est `engines.node` que Vercel arbitre, pas
+          # ce fichier : mesuré le 2026-07-29, `>=25.0.0` a fait échouer le
+          # déploiement (« Found invalid or discontinued Node.js Version »),
+          # alors que ce fichier disait déjà 25 depuis le squelette sans que
+          # rien ne le lise. Vercel plafonne à 24.x.
+          #
+          # `engines` est épinglé — `24.x`, pas `>=24.0.0`. Un intervalle ouvert
+          # ferait monter Vercel seul à la sortie de Node 25 (il l'avertit
+          # explicitement au build), pendant que ce fichier resterait en 24 : la
+          # CI validerait de nouveau un runtime que la production n'exécute pas,
+          # en silence et sans build rouge. Monter de majeure est donc un commit
+          # délibéré qui touche les DEUX fichiers, avec le déploiement de la PR
+          # pour témoin.
           node-version-file: .node-version
           cache: npm
 

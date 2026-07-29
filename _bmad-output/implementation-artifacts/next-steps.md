@@ -12,8 +12,13 @@ réécrit pour les quatre commits qu'elle porte réellement.
 `engines: ">=25.0.0"`, monté par la passe 1 « par cohérence », dépasse le plafond de Vercel (24.x).
 La prémisse invoquée — « la CI valide enfin le runtime que Vercel exécute réellement » — était
 fausse : Vercel résolvait `>=22.0.0` en **24.x**, et `.node-version` (= 25 depuis le squelette)
-n'était lu par personne. Corrigé en `15647a3` : `engines >=24.0.0`, `.node-version` 24, et les
-trois documents porteurs de l'affirmation rectifiés sur place.
+n'était lu par personne. Corrigé en `15647a3` puis épinglé : **`engines: "24.x"`** et
+`.node-version` 24, les trois documents porteurs de l'affirmation rectifiés sur place.
+
+L'épinglage est une décision, pas un détail : avec `>=24.0.0`, Vercel serait monté **seul** à la
+sortie de Node 25 — il l'avertit au build — pendant que la CI serait restée en 24. Le défaut du
+jour à l'envers, et celui-là n'aurait produit aucun build rouge. Monter de majeure est désormais un
+commit délibéré qui touche les deux fichiers, avec le déploiement de la PR pour témoin.
 
 **Troisième défaut du même motif en deux jours** — une déduction consignée comme vérifiée, puis
 réemployée comme fondation — et le premier à atteindre le déploiement. Cf. §4.
