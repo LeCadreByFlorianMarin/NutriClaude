@@ -15,26 +15,39 @@
  * messagerie et produisent une saisie qui passe tous les contrôles tout en
  * s'affichant vide.
  *
- * ⚠️ **Écrits en échappements `\uXXXX`, jamais en clair.** Un caractère
- * invisible copié tel quel dans cette source serait invisible ici aussi : on ne
- * pourrait ni le relire, ni le différ, ni savoir lequel c'est.
+ * ⚠ **Une propriété Unicode, pas une énumération — et c'est une leçon payée
+ * deux fois.** La première rédaction listait huit points de code, la seconde
+ * en listait seize. Les deux se voulaient exhaustives, les deux étaient fausses :
+ * la seconde revue du 2026-07-29 a mesuré que U+115F et U+1160 — les frères
+ * pleine largeur du U+3164 que la liste citait en exemple — passaient encore.
+ * La catégorie `Cf` seule compte plusieurs centaines de points de code, et
+ * Unicode en ajoute à chaque version. **Une liste écrite à la main ne peut pas
+ * gagner ; un prédicat de catégorie, si.**
  *
- * ⚠️ **Cette plage contient U+200D (ZWJ)**, qui est *porteur de sens* dans un
- * emoji : 🧑‍🍳 s'écrit 🧑 + ZWJ + 🍳. La retirer d'une icône la casserait en
+ * `Default_Ignorable_Code_Point` est exactement la propriété voulue : Unicode y
+ * classe les caractères « qu'un moteur de rendu doit ignorer s'il ne sait pas
+ * les traiter » — les remplisseurs Hangul, les sélecteurs de variante, les
+ * jointures, les marques et contrôles directionnels, le joncteur de graphème.
+ * S'y ajoute U+2800 (braille blanc), qui n'est pas ignorable par défaut mais
+ * s'affiche vide.
+ *
+ * ⚠ **Cette plage contient U+200D (ZWJ)**, qui est *porteur de sens* dans un
+ * emoji : 🧑\u200D🍳 s'écrit 🧑 + ZWJ + 🍳. La retirer d'une icône la casserait en
  * deux. Voir `INVISIBLES_HORS_JOINTURE` et `lib/rayons/saisie.ts`.
  *
- * ⚠️ **La couverture de `trim()` n'est pas celle qu'on croit.** Il retire bien
- * tous les blancs Unicode — tabulation, saut de ligne, U+00A0, U+2000-200A —
- * mais **pas** les invisibles qui n'en sont pas : U+00AD (trait d'union
- * conditionnel), U+3164 (remplisseur Hangul), U+2800 (braille blanc), U+180E.
- * Sans eux dans cette plage, un nom de rayon entièrement invisible passait le
- * contrôle client *et* la contrainte `check` de la base — mesuré à la revue du
- * 2026-07-29. Les contrôles directionnels U+202A-202E et U+2066-2069 sont là
- * pour une raison voisine : ils ne s'affichent pas, mais retournent le sens de
- * lecture du reste de la ligne.
+ * ⚠ **`trim()` ne couvre pas ce que couvre cette plage, et l'inverse est vrai
+ * aussi.** `trim()` retire les blancs Unicode — tabulation, U+00A0, U+2000-200A,
+ * et aussi U+0085 et U+001C-001F ; aucun d'eux n'est ignorable par défaut. Les
+ * deux sont donc appliqués, et dans cet ordre.
+ *
+ * ⚠ **La contrepartie en base est `aisles_name_non_vide`**
+ * (`20260729095923`), qui emploie `[^[:graph:]]` — Postgres n'a pas de
+ * propriété Unicode dans ses expressions rationnelles. Les deux populations ne
+ * sont pas identiques par construction ; l'accord est **mesuré** par le test
+ * « client et base s'accordent » de `saisie.test.ts`, pas affirmé.
  */
 export const INVISIBLES =
-  /[\u00AD\u061C\u180E\u200B-\u200F\u202A-\u202E\u2060\u2066-\u2069\u2800\u3164\uFEFF\uFFA0]/g;
+  /[\p{Default_Ignorable_Code_Point}\p{Cc}\p{Cf}\p{Cn}\u2800]/gu;
 
 /**
  * Même chose, **sans** les deux jointures U+200C (ZWNJ) et U+200D (ZWJ). À
@@ -43,7 +56,7 @@ export const INVISIBLES =
  * démembrer la séquence.
  */
 export const INVISIBLES_HORS_JOINTURE =
-  /[\u00AD\u061C\u180E\u200B\u200E\u200F\u202A-\u202E\u2060\u2066-\u2069\u2800\u3164\uFEFF\uFFA0]/g;
+  /(?!\u200C|\u200D)[\p{Default_Ignorable_Code_Point}\p{Cc}\p{Cf}\p{Cn}\u2800]/gu;
 
 /**
  * Rend la saisie nettoyée et bornée, ou `null` s'il ne reste rien d'affichable.
@@ -51,21 +64,32 @@ export const INVISIBLES_HORS_JOINTURE =
  * `null` est délibérément distinct de `""` : l'appelant doit décider quoi en
  * faire plutôt que d'envoyer une chaîne vide à la base.
  *
- * ⚠️ **`normalize("NFC")` d'abord, et ce n'est pas décoratif.** « Crémerie »
+ * ⚠ **`normalize("NFC")` d'abord, et ce n'est pas décoratif.** « Crémerie »
  * collé depuis une source en NFD s'écrit `e` + U+0301 : une chaîne *différente*
  * de la même en NFC, que `unique (household_id, name)` compare octet à octet et
  * laisse donc coexister. Deux rayons rigoureusement identiques à l'œil, aucun
- * `23505`, et rien pour les distinguer. La composition vient avant le bornage,
- * sans quoi `slice` compterait chaque diacritique séparément.
+ * `23505`, et rien pour les distinguer.
  *
- * ⚠️ **Le `trim()` final n'est pas un doublon du premier.** `slice` coupe à un
- * nombre d'unités, pas à une frontière de mot : borner « …aaa  b » laisse une
- * espace en fin de chaîne, et l'unicité de la base en fait un nom distinct.
+ * ⚠ **Le bornage compte des POINTS DE CODE, pas des unités UTF-16.** `slice`
+ * coupe au milieu d'une paire de substitution, et la demi-paire qui en sort
+ * n'est pas du JSON valide : Postgres rend `22P02`, que `refusRayon` ne traduit
+ * pas, donc « Réessaie dans un instant » en boucle. Ce n'est pas théorique — la
+ * seconde revue du 2026-07-29 l'a atteint depuis le champ, `maxLength` compris,
+ * parce que **NFC peut ALLONGER** : U+1D15E se compose en deux caractères
+ * hors-BMP, donc 39 unités saisies en font 77 une fois composées. La première
+ * rédaction postulait l'inverse, en toutes lettres.
+ *
+ * ⚠ **Le `trim()` final n'est pas un doublon du premier.** Le bornage coupe à
+ * un nombre de caractères, pas à une frontière de mot : borner « …aaa  b »
+ * laisserait une espace en fin de chaîne, et l'unicité de la base en fait un
+ * nom distinct.
  */
 export function normaliserTexte(saisie: string, maximum: number): string | null {
   const net = saisie.normalize("NFC").replace(INVISIBLES, "").trim();
   if (net === "") return null;
 
-  const borne = net.slice(0, maximum).trim();
+  // `[...net]` itère par points de code : une paire de substitution est un seul
+  // élément, donc jamais coupée en deux.
+  const borne = [...net].slice(0, maximum).join("").trim();
   return borne === "" ? null : borne;
 }

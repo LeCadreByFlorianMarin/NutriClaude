@@ -960,3 +960,60 @@ l'a pas été porte le mot « non vérifié ».
 - **Le job CI `isolation` n'a jamais tourné sur un runner GitHub.** Le YAML est valide et les tests
   passent en local, mais `supabase start` dans un runner est un chemin neuf. Sa première exécution
   sera celle de cette PR — le même motif que le script de déploiement, et il faut le regarder.
+
+## Review Findings — seconde passe (2026-07-29)
+
+_Deux couches (Blind Hunter, Edge Case Hunter) sur `git diff 03a9a09..HEAD`, c'est-à-dire sur le
+**commit de correction produit par la première passe**. Motif : sur ce dépôt, trois des six défauts
+majeurs de l'Epic 1 ont été **introduits par une passe de revue** et attrapés par la suivante._
+
+**Le résultat est net : la première passe a corrigé la moitié d'un défaut, en a introduit trois, et a
+écrit deux affirmations fausses.** C'est exactement ce que l'historique du projet prédisait.
+
+### Défauts introduits ou laissés par la passe de correction
+
+- [x] [Review2][Patch] **La correction des régions de statut ne couvre que le formulaire d'ajout** [app/rayons/ListeRayons.tsx:316-318] — `statutListe` est rendu ligne 336, entre le `<h2>` et le `<ul>`. Le **panneau d'édition** vit dans un `<li>` de ce `<ul>` : sur un foyer amorcé, éditer la 11ᵉ ligne affiche « Ce rayon existe déjà. » ~500 px plus haut, hors écran, et `enregistrer` n'appelle pas `fermer()` en cas d'échec — le panneau reste ouvert, le champ rempli, le bouton actif. **C'est mot pour mot le défaut que le commentaire de `type Zone` déclare avoir refermé**, transposé du formulaire d'ajout au panneau d'édition. Vaut aussi pour `refuser("vide")`, `refuser("icone-multiple")` et tout échec de `supprimer`. Trouvé par les deux couches indépendamment.
+- [x] [Review2][Patch] **La branche `signal` du script est morte sur le seul chemin qui la justifie** [scripts/migrer-au-deploiement.mjs:170-187] — **exécuté** : à l'expiration du `timeout`, `spawnSync` renseigne **`error` ET `signal`** (`status=null, signal=SIGTERM, error=ETIMEDOUT`). Le script teste `resultat.error` en premier, donc il affiche « la CLI Supabase n'a pas pu être lancée » — faux, elle a tourné dix minutes — et l'avertissement « ⚠️ Une partie du lot a pu être appliquée », écrit précisément pour ce cas, **n'est jamais imprimé**. Le schéma de production peut avoir bougé et le seul texte qui le dit ne s'affiche pas.
+- [x] [Review2][Patch] **La garde `:6543` est fausse dans les deux sens** [scripts/migrer-au-deploiement.mjs:135] — **exécuté** : `"…:6543\n"` (un secret Vercel collé avec un retour à la ligne, cas des plus banals) **passe la garde**, `$` sans le drapeau `m` n'acceptant pas de saut de ligne final ; `"…:6543 "` aussi. Et à l'inverse, une URL de pooler de **session** légitime dont le mot de passe contient `:6543/` est **refusée**, bloquant un déploiement valide.
+- [x] [Review2][Patch] **`iconeTropLongue` refuse à tort une icône qui n'affiche qu'un emoji** [lib/rayons/saisie.ts:51-58] — **exécuté** : `"‍🍳"` (un ZWJ en tête, ce que produit un copier-coller partiel de séquence emoji) rend `tropLongue = true` → « Un seul emoji pour l'icône. » sur un champ qui ne montre **qu'un** emoji. `INVISIBLES_HORS_JOINTURE` exclut délibérément U+200D, donc le nettoyage ne peut pas le retirer : l'utilisateur ne voit rien à corriger et n'a d'autre issue que de vider le champ à l'aveugle. Impasse de la même famille que celle refermée pour `disparu()`. Idem avec `"🥬ᅠ"`.
+- [x] [Review2][Patch] **Le commentaire du job CI `isolation` affirme une propriété qui n'existe pas** [.github/workflows/ci.yml:85-87] — il dit « il ne peut pas devenir vert en n'ayant rien vérifié », en s'appuyant sur le fait que `stack-local.ts` lève. Mais **exécuté** : `node --test` sur un glob qui ne correspond à aucun fichier rend **exit 0** avec « tests 0 / pass 0 ». Renommer `isolation.test.ts`, le déplacer d'un niveau, ou écrire le prochain en `.spec.ts` suffit à rendre le job vert sans une assertion. `stack-local.ts` ne lève que si un test **est chargé**. Le même trou vaut pour `npm test` dans `verify`. **C'est la classe de défaut que ce commit nomme trois fois** — « un contrôle qui rend vert en n'ayant rien fait ».
+- [x] [Review2][Patch] **`restaurer()` est le seul bouton exclu de la correction du focus** [app/rayons/ListeRayons.tsx:279-307, 344-351] — il n'est rendu que dans la branche `rayons.length === 0`. Au succès, `router.refresh()` ramène onze rayons, la branche disparaît, le bouton est démonté. `restaurer` ne passe jamais par `fermer`, donc `retourFocus` reste nul, et l'effet n'est réveillé que par `enEdition` — inchangé. Le focus retombe sur `<body>`, sur le geste où c'est le plus certain d'arriver.
+- [x] [Review2][Patch] **La liste d'invisibles reste incomplète, et les deux fichiers affirment le contraire** [lib/texte.ts:36-37, migration 095923:62] — **mesuré des deux côtés** : `U+115F` et `U+1160` (remplisseurs Hangul pleine largeur — frères de U+3164, celui que la correction cite en exemple), `U+FE0F`, `U+034F`, `U+17B4`, `U+2065` passent `normaliserNomRayon` **et** la contrainte. Un rayon au nom entièrement invisible reste créable — le scénario littéral du paragraphe « Conséquence visible » de la migration. Comptage exhaustif sur 0x1–0x2FFFF : la contrainte rejette 51 points de code, la fonction JS 46 ; la catégorie Unicode `Cf` seule en compte plusieurs centaines. **Tenir le libellé demande un prédicat de catégorie, pas une énumération.**
+- [x] [Review2][Patch] **NFC peut ALLONGER, et mon commentaire affirme l'inverse** [lib/texte.ts:60-69] — **exécuté** : `"a" + "\u{1D15E}".repeat(19)` fait 39 unités (donc passe `maxLength={40}`), sa forme NFC en fait 77, et `slice(0, 40)` tombe **au milieu d'une paire de substitution**. Le `trim()` final ne rattrape pas une demi-paire. Conséquence mesurée : Postgres rend `22P02`, non mappé dans `refusRayon` → « Réessaie dans un instant » en boucle. Le commentaire dit « la composition vient avant le bornage, sans quoi `slice` compterait chaque diacritique séparément » — il postule que NFC ne peut que raccourcir.
+
+### Un constat que la première passe avait écarté à tort
+
+- [x] [Review2][Patch] **Un enregistrement refusé laisse la suppression armée** [app/rayons/ListeRayons.tsx:456] — armer « Supprimer ce rayon », se raviser, corriger le nom, « Enregistrer », échec `23505` : `fermer()` n'est pas appelé, `aConfirmer` reste armé. Le panneau affiche alors un bouton **« Confirmer »** juste sous le champ, qui après un « Enregistrer » refusé se lit comme « confirmer l'enregistrement » — et un tap supprime le rayon. La première passe l'avait classé `low` en jugeant l'état visible et voulu ; elle n'avait pas vu que le chemin d'échec est atteignable **sans faute de l'utilisateur** depuis que `icone-multiple` refuse à tort (constat ci-dessus).
+
+### Reportés — réels, hors du périmètre de cette correction
+
+- [x] [Review2][Defer] **Les deux autres contraintes `btrim(...) <> ''` sont tout aussi faibles** [20260728133836, 20260728152418] — **mesuré** : un `PATCH` REST direct avec `{"display_name":"\t"}` ou `" "` est accepté et stocké. L'en-tête de la migration des rayons affirme « c'est la TROISIÈME contrainte de cette forme, même motif, même raison » : les deux autres ne sont justement plus de cette forme. Et le dégât y est pire — personne d'autre que l'intéressé ne peut corriger un prénom, personne ne peut corriger le nom du foyer depuis l'application. — reporté, préexistant et hors du périmètre de la story 2.1
+- [x] [Review2][Defer] **« Promote to Production » d'une prévisualisation ne rejoue pas les migrations** [scripts/migrer-au-deploiement.mjs:77-83] — la construction a eu lieu avec `VERCEL_ENV=preview`, le script est sorti en 0, et la promotion ne reconstruit pas : du code neuf servi en production contre le schéma d'avant, la direction que l'en-tête désigne comme la mauvaise. Ni la garde d'environnement ni celle de branche ne la voient. — reporté, à documenter dans `docs/migrations.md`
+- [x] [Review2][Defer] **Aucun `timeout-minutes` sur les jobs CI** [.github/workflows/ci.yml] — plafond par défaut de **6 heures** sur un job qui monte douze conteneurs Docker. C'est le mode de défaillance exact contre lequel le `timeout` du script vient d'être ajouté ; le raisonnement n'a pas été porté jusqu'au job. — reporté, faible conséquence
+- [x] [Review2][Defer] **Aucun invariant entre une soumission en vol et un geste sur la liste** [app/rayons/ListeRayons.tsx:477-484] — les boutons de ligne sont les seuls de l'écran sans `disabled={occupe}`. Une suppression en vol dont le callback fait `fermer("titre-parcours")` referme le panneau que l'utilisateur venait d'ouvrir, jette sa saisie et lui arrache le focus. — reporté, même famille que la ré-entrance de `useSoumission` déjà reportée
+- [x] [Review2][Defer] **`enEdition` reste bloqué sur une ligne disparue** [app/rayons/ListeRayons.tsx:117-127] — si la ligne ouverte disparaît via un `router.refresh()` déclenché par une **autre** action, le `<form>` est démonté sans que `enEdition` soit remis à `null` : panneau évanoui en silence, focus sur `<body>`. — reporté, se répare au clic suivant
+- [x] [Review2][Defer] **Le SIGTERM du `timeout` ne tue que `npx`, pas le `supabase` sous-jacent** [scripts/migrer-au-deploiement.mjs:163-168] — **mesuré** : le petit-fils survit au signal. La migration peut donc continuer à s'appliquer en production *après* que le déploiement a été déclaré en échec. — reporté, aggrave le constat sur la branche `signal` sans le changer
+
+### Ce que la seconde passe a exécuté
+
+| Contrôle | Résultat |
+|---|---|
+| typecheck · lint · build | verts, 0 avertissement, `/rayons` toujours en `ƒ` |
+| `npm run test` | **72/72** |
+| `npm run test:isolation` | **20/20** (17 isolation + 3 contraintes, fichier neuf) |
+| Job CI `isolation` sur un runner GitHub | ✅ **17/17** — `supabase start` en CI tient. C'était l'inconnue |
+| Expiration de `spawnSync` | `signal=SIGTERM` **et** `error=ETIMEDOUT` → la branche « interrompu » est bien atteinte |
+| Garde `:6543`, 6 formes d'URL | pooler transaction refusé y compris avec saut de ligne ou espace final ; mot de passe contenant `:6543/` accepté |
+| `iconeTropLongue`, 6 formes | ZWJ orphelin en tête, ZWJ pendant, remplisseur Hangul : plus de refus faux |
+| Bornage NFC qui allonge | 39 unités → 77 après composition, sortie **bien formée** (`isWellFormed()`) |
+| Accord client/base, balayage de **63 492 points de code** | « client accepte, base refuse » : **1439 → 79**. Le résidu est un écart de version d'Unicode entre Node et le Postgres du conteneur, pas une erreur de prédicat — il ne peut pas être supprimé, et il est écrit comme tel |
+| Garde CI « aucun test trouvé » | glob réel → 2 fichiers, passe ; glob fictif → 0, échouerait |
+| YAML du workflow | parsé, 2 jobs, 8 étapes chacun |
+
+**Toujours non vérifié :**
+
+- **Le parcours à l'écran.** Il ne l'était pas après la première passe ; il l'est encore moins après
+  celle-ci, qui a ajouté une troisième région de statut, changé les dépendances de l'effet de focus
+  et désarmé la confirmation à la soumission. **C'est la seule vérification qui reste, et deux passes
+  de revue viennent de démontrer qu'elle attrape ce qu'aucune porte ne voit.**
+- **La portée de `SUPABASE_DB_URL` dans Vercel** — inchangé, dépôt non lié.

@@ -129,10 +129,34 @@ if (!urlBase) {
  * ⚠️ **Contrôle de forme de l'URL, parce qu'un commentaire ne contrôle rien.**
  * Le pooler de TRANSACTION (port 6543) ne tient pas les instructions de
  * définition de schéma : `db push` y échoue sur une erreur pgbouncer opaque,
- * et le port 6543 est celui que l'interface Supabase affiche en premier. Le
- * commentaire plus bas le disait déjà ; il ne l'empêchait pas.
+ * et 6543 est le port que l'interface Supabase affiche en premier.
+ *
+ * ⚠️ **On analyse l'URL, on ne la filtre pas par expression rationnelle.** La
+ * première rédaction employait `/:6543(\/|$|\?)/`, et la seconde passe de revue
+ * du 2026-07-29 l'a mesurée fausse **dans les deux sens** : une valeur collée
+ * avec un retour à la ligne final (`"…:6543\n"`) passait la garde, `$` sans le
+ * drapeau `m` n'acceptant pas de saut de ligne ; et une URL de pooler de
+ * session légitime dont le mot de passe contient `:6543/` était refusée,
+ * bloquant un déploiement valide. `new URL` connaît la grammaire, pas nous.
+ *
+ * Le `trim()` n'est pas cosmétique : un secret collé avec un saut de ligne est
+ * un cas des plus banals, et la CLI le refuserait plus loin, plus obscurément.
  */
-if (/:6543(\/|$|\?)/.test(urlBase)) {
+const urlPropre = urlBase.trim();
+
+let porte;
+try {
+  porte = new URL(urlPropre).port;
+} catch {
+  console.error(
+    "[migrations] SUPABASE_DB_URL n'est pas une URL analysable.\n" +
+      "  Forme attendue : postgresql://postgres:<mot-de-passe>@<hôte>:5432/postgres\n" +
+      "  Le mot de passe doit être encodé pour URL s'il contient des caractères spéciaux."
+  );
+  process.exit(1);
+}
+
+if (porte === "6543") {
   console.error(
     "[migrations] SUPABASE_DB_URL emploie le port 6543 (pooler de transaction).\n" +
       "  Ce pooler ne tient pas les instructions de définition de schéma.\n" +
@@ -163,26 +187,43 @@ console.log("[migrations] déploiement de production — application des migrati
  */
 const resultat = spawnSync(
   "npx",
-  ["--yes", `supabase@${VERSION_CLI}`, "db", "push", "--db-url", urlBase, "--yes"],
+  ["--yes", `supabase@${VERSION_CLI}`, "db", "push", "--db-url", urlPropre, "--yes"],
   { stdio: "inherit", timeout: 10 * 60_000, killSignal: "SIGTERM" }
 );
 
-if (resultat.error) {
-  console.error("[migrations] la CLI Supabase n'a pas pu être lancée :", resultat.error.message);
+/*
+ * ⚠️ **L'interruption AVANT l'échec de lancement, et l'ordre est tout.**
+ * À l'expiration du délai, `spawnSync` renseigne **les deux** champs :
+ * `signal = SIGTERM` *et* `error.code = ETIMEDOUT`. La première rédaction
+ * testait `error` d'abord — elle affichait donc « la CLI n'a pas pu être
+ * lancée », faux puisqu'elle avait tourné dix minutes, et surtout
+ * l'avertissement ci-dessous, écrit pour ce cas précis, n'était **jamais**
+ * imprimé. Mesuré par la seconde passe de revue du 2026-07-29.
+ *
+ * ⚠️ **`SIGTERM` ne tue que `npx`, pas le `supabase` qu'il a lancé.** Le
+ * petit-fils survit au signal : le lot peut donc continuer à s'appliquer
+ * *après* que le déploiement a été déclaré en échec. D'où l'avertissement, qui
+ * n'est pas une précaution de style.
+ */
+const interrompu = resultat.signal || resultat.error?.code === "ETIMEDOUT";
+
+if (interrompu) {
+  const cause =
+    resultat.error?.code === "ETIMEDOUT"
+      ? "délai de 10 minutes dépassé"
+      : `interrompue par ${resultat.signal}`;
+  console.error(
+    `[migrations] la CLI Supabase a été interrompue (${cause}).\n` +
+      "  Conteneur de construction à court de mémoire, ou base injoignable.\n" +
+      "  ⚠️ Une partie du lot a pu être appliquée — et peut même continuer de\n" +
+      "     s'appliquer après ce message, le signal ne portant que sur `npx`.\n" +
+      "     Lire la sortie ci-dessus, puis `supabase migration list --linked`."
+  );
   process.exit(1);
 }
 
-/*
- * `signal` avant `status` : un processus tué en rend un, pas l'autre. Sans
- * cette branche, une expiration de délai ou un manque de mémoire du conteneur
- * se rapportait « échec (code null) », ce qui ne dit pas quoi regarder.
- */
-if (resultat.signal) {
-  console.error(
-    `[migrations] la CLI Supabase a été interrompue par ${resultat.signal}.\n` +
-      "  Délai dépassé, ou conteneur de construction à court de mémoire.\n" +
-      "  ⚠️ Une partie du lot a pu être appliquée : lire la sortie ci-dessus."
-  );
+if (resultat.error) {
+  console.error("[migrations] la CLI Supabase n'a pas pu être lancée :", resultat.error.message);
   process.exit(1);
 }
 

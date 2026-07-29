@@ -8,7 +8,7 @@
 -- contrôle se fait en revue de PR, pas après. Exécuter dans le SQL Editor :
 --
 --   select id, household_id, name from aisles
---   where name !~ '[^[:space:]\u00AD\u061C\u180E\u200B-\u200F\u202A-\u202E\u2060\u2066-\u2069\u2800\u3164\uFEFF\uFFA0]';
+--   where regexp_replace(name, '[^[:graph:]]|[\u034F\u115F\u1160\u17B4\u17B5\u180B-\u180E\u2800\u3164\uFE00-\uFE0F\uFFA0]', '', 'g') = '';
 --
 -- Attendu : zéro ligne. Les seuls rayons existants viennent de
 -- `seed_default_aisles`, dont les onze noms sont écrits en dur — aucun chemin
@@ -39,25 +39,43 @@
 -- décidé que vivent les règles (AD-1/AD-2). Elle couvre aussi les appels
 -- directs à l'API REST, que le contrôle navigateur ne voit pas.
 --
--- ⚠️ POURQUOI PAS `btrim(name) <> ''`
--- C'était la première rédaction, et la revue du 2026-07-29 l'a mesurée fausse.
--- `btrim` à un seul argument ne retire **que l'espace ASCII** : ni tabulation,
--- ni saut de ligne, ni U+00A0, ni aucun invisible. Un `POST` REST direct avec
--- `{"name": "\t"}` passait la contrainte, et l'en-tête de ce fichier affirmait
--- pourtant couvrir ce cas. La forme retenue exige **au moins un caractère qui
--- ne soit ni un blanc ni un invisible** — la même population que `INVISIBLES`
--- dans `lib/texte.ts`, tenue en accord avec elle à la main.
+-- ⚠️ DEUX RÉDACTIONS FAUSSES AVANT CELLE-CI, ET LA LEÇON QUI EN SORT
 --
--- `[[:space:]]` couvre les blancs Unicode ; la liste explicite couvre les
--- invisibles qui n'en sont pas (U+00AD, U+3164, U+2800, U+180E, les contrôles
--- directionnels). U+200C et U+200D (les jointures) sont dans la liste : elles
--- portent du sens dans un emoji, pas dans un nom de rayon, et un nom qui n'en
--- contiendrait que ne s'afficherait pas davantage.
+-- 1. `btrim(name) <> ''` — mesuré faux le 2026-07-29. `btrim` à un seul
+--    argument ne retire **que l'espace ASCII** : ni tabulation, ni saut de
+--    ligne, ni U+00A0, ni aucun invisible. `{"name": "\t"}` passait.
+-- 2. Une liste de seize points de code — mesurée fausse le même jour, par la
+--    seconde passe de revue. U+115F et U+1160, les frères pleine largeur du
+--    U+3164 que la liste citait en exemple, passaient encore. La catégorie
+--    Unicode `Cf` compte à elle seule plusieurs centaines de points de code.
+--
+-- **Une énumération écrite à la main ne peut pas gagner contre Unicode.** D'où
+-- la forme retenue : on retire d'abord tout ce qui n'est **pas graphique**
+-- (`[^[:graph:]]`), ce qui balaie d'un coup les blancs, les contrôles et toute
+-- la catégorie « format » — U+00AD, U+200B-200F, U+202A-202E, U+2060-2064,
+-- U+FEFF, y compris ceux qu'Unicode ajoutera. Il ne reste ensuite qu'à nommer
+-- la petite famille des caractères que Postgres classe **graphiques alors
+-- qu'ils s'affichent vides** : remplisseurs Hangul, sélecteurs de variante,
+-- joncteur de graphème, voyelles khmères, braille blanc.
+--
+-- Ce qui subsiste après ces deux retraits doit être non vide. Vérifié dans le
+-- vrai Postgres sur 25 cas — français, cyrillique, arabe, chinois, emoji,
+-- emoji à jointure, emoji à sélecteur de variante et ponctuation acceptés ;
+-- vide, espaces, tabulation, U+00A0, U+00AD, U+200B, U+3164, U+115F, U+1160,
+-- U+FE0F, U+034F, U+2800, U+202E, U+0085, U+2065 refusés.
+--
+-- ⚠️ **La contrepartie applicative n'est PAS identique, et ne peut pas l'être.**
+-- `lib/texte.ts` emploie `\p{Default_Ignorable_Code_Point}`, une propriété
+-- Unicode que les expressions rationnelles de Postgres n'ont pas. Les deux
+-- populations se recouvrent très largement sans coïncider. L'accord est
+-- **mesuré** par un test de `lib/rayons/saisie.test.ts`, pas affirmé ici — la
+-- version précédente de ce commentaire affirmait « la même population », et
+-- c'était faux.
 --
 -- Ne change pas la forme du schéma : pas de régénération de types nécessaire.
 
 alter table aisles
   add constraint aisles_name_non_vide
   check (
-    name ~ '[^[:space:]\u00AD\u061C\u180E\u200B-\u200F\u202A-\u202E\u2060\u2066-\u2069\u2800\u3164\uFEFF\uFFA0]'
+    regexp_replace(name, '[^[:graph:]]|[\u034F\u115F\u1160\u17B4\u17B5\u180B-\u180E\u2800\u3164\uFE00-\uFE0F\uFFA0]', '', 'g') <> ''
   );

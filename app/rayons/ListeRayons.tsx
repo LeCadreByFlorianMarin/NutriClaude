@@ -36,25 +36,30 @@ type Cle = keyof typeof MESSAGES;
 /**
  * Où le message de la soumission en cours doit s'afficher.
  *
- * ⚠️ **Une seule région ne suffisait pas, et c'est un vrai défaut, pas un
- * détail.** Le formulaire d'ajout vit sous la liste : sur un foyer amorcé, onze
- * lignes de 44px le poussent hors de l'écran en même temps que la région de
- * statut, restée en tête. « Ce rayon existe déjà. » s'affichait donc là où
- * personne ne le voyait — le champ restait rempli, le bouton redevenait actif,
- * et rien ne se passait (revue du 2026-07-29).
+ * ⚠ **Un message qu'on ne voit pas n'existe pas, et cet écran a trois surfaces
+ * de soumission à trois endroits de la page.** Sur un foyer amorcé, onze lignes
+ * de 44px séparent le haut de la page du formulaire d'ajout — et du panneau
+ * d'édition de la dernière ligne. Une région unique en tête affichait donc
+ * « Ce rayon existe déjà. » hors écran : le champ restait rempli, le bouton
+ * redevenait actif, et rien ne se passait.
  *
- * Deux régions **toutes deux montées en permanence**, dont une seule porte du
- * texte à la fois. C'est ce qui préserve l'acquis d'`InviteCard` : une région
- * annoncée de façon fiable est une région qui existait déjà avant que le
- * message n'y arrive. Les monter conditionnellement rendrait le message muet
- * au basculement, ce qui était exactement le constat d'origine.
+ * ⚠ **La première correction n'en a créé que DEUX, et le défaut est resté sur
+ * le panneau d'édition** — la seconde passe de revue du 2026-07-29 l'a retrouvé
+ * mot pour mot au même endroit. `enregistrer` n'appelle pas `fermer()` en cas
+ * d'échec : le panneau reste ouvert en bas de liste pendant que son message
+ * s'écrit tout en haut. Trois surfaces, trois régions.
+ *
+ * Les trois sont **montées en permanence** tant que leur surface existe, et une
+ * seule porte du texte à la fois. C'est ce qui préserve l'acquis d'`InviteCard` :
+ * une région annoncée de façon fiable est une région qui existait déjà avant que
+ * le message n'y arrive.
  */
-type Zone = "liste" | "creation";
+type Zone = "liste" | "edition" | "creation";
 
 /**
  * L'écran des rayons : créer, renommer, ré-iconifier, supprimer.
  *
- * ⚠️ **Écritures client-direct, pas de Server Action** — et le critère est la
+ * ⚠ **Écritures client-direct, pas de Server Action** — et le critère est la
  * cause, pas l'analogie de vocabulaire (AD-13, formulation du 2026-07-28) : une
  * écriture passe par une Server Action si elle exige un secret serveur, ou si sa
  * conséquence doit apparaître dans un rendu serveur. Ici, ni l'un ni l'autre :
@@ -63,7 +68,7 @@ type Zone = "liste" | "creation";
  * une Server Action *malgré* l'absence de secret, parce que `/foyer` doit
  * montrer le code immédiatement.
  *
- * ⚠️ **Aucune copie locale de la liste.** L'état de ce composant ne porte que
+ * ⚠ **Aucune copie locale de la liste.** L'état de ce composant ne porte que
  * l'interface — quelle ligne est ouverte, quelle suppression attend
  * confirmation. La liste vient des propriétés, et `router.refresh()` la
  * rafraîchit. Une copie locale divergerait dès que l'autre membre du foyer
@@ -107,28 +112,32 @@ export function ListeRayons({
   const retourFocus = useRef<string | null>(null);
 
   /*
-   * ⚠️ **Le focus, sinon il retombe sur `<body>`.** Ouvrir un panneau démonte le
-   * `<button>` qui portait le focus et le remplace par un `<form>` : au clavier,
-   * il fallait repartir de `Tab` depuis le haut de la page et retraverser tous
-   * les rayons précédents (revue du 2026-07-29). Rien à voir avec l'interdiction
-   * d'`autoFocus` : déplacer le focus en réponse à un geste explicite n'est pas
-   * le voler au chargement.
+   * ⚠ **Le focus, sinon il retombe sur `<body>`.** Tout geste de cet écran
+   * démonte l'élément qui portait le focus : ouvrir un panneau remplace le
+   * `<button>` de la ligne par un `<form>`, le refermer fait l'inverse,
+   * supprimer fait disparaître la ligne, et restaurer fait disparaître le bouton
+   * de l'état vide. Sans rien, il faut repartir de `Tab` depuis le haut de la
+   * page. Rien à voir avec l'interdiction d'`autoFocus` : déplacer le focus en
+   * réponse à un geste explicite n'est pas le voler au chargement.
+   *
+   * ⚠ **`rayons` est dans les dépendances, et ce n'est pas décoratif.** La
+   * première correction ne réveillait cet effet que sur `enEdition` — ce qui
+   * laissait dehors le seul bouton qui se démonte sans passer par le panneau :
+   * « Remettre les rayons de départ », dont la branche disparaît dès que la
+   * liste cesse d'être vide. Trouvé par la seconde passe de revue. Un seul
+   * chemin pour tout le monde : on pose la cible, le rendu suivant la consomme.
    */
   useEffect(() => {
-    if (enEdition) {
-      document.getElementById(`nom-${enEdition}`)?.focus();
-      return;
-    }
-
     const cible = retourFocus.current;
     if (!cible) return;
     retourFocus.current = null;
     document.getElementById(cible)?.focus();
-  }, [enEdition]);
+  }, [enEdition, rayons]);
 
   function ouvrir(rayon: Rayon) {
     effacer();
-    setZone("liste");
+    setZone("edition");
+    retourFocus.current = `nom-${rayon.id}`;
     setEnEdition(rayon.id);
     setNomEdite(rayon.nom);
     setIconeEditee(rayon.icone ?? "");
@@ -195,7 +204,16 @@ export function ListeRayons({
   async function enregistrer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!enEdition) return;
-    setZone("liste");
+    setZone("edition");
+    /*
+     * Soumettre, c'est renoncer à supprimer. Sans ce désarmement, un
+     * enregistrement refusé (23505) laissait le panneau ouvert avec « Confirmer »
+     * toujours armé juste sous le champ — où il se lit comme « confirmer
+     * l'enregistrement », et où un tap supprime le rayon. La première passe de
+     * revue avait vu l'état et l'avait jugé voulu ; la seconde a montré que le
+     * chemin d'échec est atteignable sans faute de l'utilisateur.
+     */
+    setAConfirmer(null);
 
     const nom = normaliserNomRayon(nomEdite);
     if (!nom) return refuser("vide");
@@ -223,6 +241,9 @@ export function ListeRayons({
       }
       if (!data) return disparu();
 
+      // Le panneau se referme : le message appartient désormais à la liste, pas
+      // à une surface qui n'existe plus.
+      setZone("liste");
       fermer(`rayon-${ligne}`);
       router.refresh();
       return "modifie";
@@ -230,7 +251,9 @@ export function ListeRayons({
   }
 
   async function supprimer(id: string) {
-    setZone("liste");
+    // Le panneau est ouvert : un refus s'affiche DANS le panneau. Le succès, lui,
+    // le referme et bascule vers la liste, plus bas.
+    setZone("edition");
 
     await soumettre(async () => {
       const supabase = createNavigateurClient();
@@ -249,6 +272,7 @@ export function ListeRayons({
       }
       if (!data) return disparu();
 
+      setZone("liste");
       fermer("titre-parcours");
       router.refresh();
       return "supprime";
@@ -258,7 +282,7 @@ export function ListeRayons({
   /**
    * Zéro ligne touchée, sans erreur : la ligne n'existe plus.
    *
-   * ⚠️ **Ce cas était rangé avec les vraies erreurs, et c'était un piège à deux
+   * ⚠ **Ce cas était rangé avec les vraies erreurs, et c'était un piège à deux
    * membres.** Si la conjointe supprime « Boucherie » depuis son téléphone,
    * l'écran de Florian — sans propagation temps réel avant l'Epic 4 (AD-8) —
    * rendait « Ça n'a pas marché. Réessaie dans un instant. » et **ne
@@ -271,6 +295,7 @@ export function ListeRayons({
    */
   function disparu(): Cle {
     // Le titre de section, jamais la ligne : elle ne sera plus là au rendu suivant.
+    setZone("liste");
     fermer("titre-parcours");
     router.refresh();
     return "disparu";
@@ -278,6 +303,14 @@ export function ListeRayons({
 
   async function restaurer() {
     setZone("liste");
+    /*
+     * Le bouton qui vient d'être pressé n'est rendu que dans la branche
+     * `rayons.length === 0` : au succès, il disparaît avec elle. C'est le seul
+     * geste de l'écran qui démonte son propre déclencheur sans passer par
+     * `fermer`, et la première passe de revue l'avait laissé dehors — le focus
+     * retombait sur `<body>`, sur le geste où c'était le plus certain.
+     */
+    retourFocus.current = "titre-parcours";
 
     await soumettre(async () => {
       const supabase = createNavigateurClient();
@@ -315,6 +348,11 @@ export function ListeRayons({
   const message = messageDe(MESSAGES, cle, "echec");
   const statutListe = (
     <Notice className="mt-2">{zone === "liste" ? message : undefined}</Notice>
+  );
+  const statutEdition = (
+    <Notice reserve className="mt-3">
+      {zone === "edition" ? message : undefined}
+    </Notice>
   );
   const statutCreation = (
     <Notice reserve className="mt-3">
@@ -405,6 +443,16 @@ export function ListeRayons({
                         />
                       </span>
                     </div>
+
+                    {/*
+                      La région de statut de CE panneau, au-dessus de ses
+                      boutons. `enregistrer` ne referme pas en cas d'échec : le
+                      panneau reste ouvert là où il est, et son message doit
+                      rester avec lui. `reserve` parce qu'elle surplombe les
+                      boutons — sans elle, le message les pousserait sous le
+                      doigt au moment du clic (contrat de `Notice`).
+                    */}
+                    {statutEdition}
 
                     <div className="mt-3 flex items-center gap-2">
                       <button

@@ -55,6 +55,17 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Même garde que dans le job `isolation`, et pour la même raison :
+      # `node --test` sur un glob vide rend 0. Voir le commentaire là-bas.
+      - name: Contrôler que les tests unitaires existent
+        run: |
+          n=$(find lib -name '*.test.ts' | wc -l)
+          echo "fichiers de test unitaire trouvés : $n"
+          if [ "$n" -lt 1 ]; then
+            echo "::error::Aucun fichier de test unitaire. Le glob de npm test ne correspond à rien."
+            exit 1
+          fi
+
       # Sans réseau ni base : uniquement les prédicats purs dont dépend le
       # contrôle d'accès. Aucune dépendance ajoutée — `node --test` est dans le
       # runtime (NFR-10).
@@ -83,9 +94,21 @@ jobs:
   # sur son poste. AD-17 dit « l'isolation se prouve par un test exécuté, pas par
   # une lecture » ; sans ce job, c'était une déclaration.
   #
-  # `stack-local.ts` LÈVE si le stack est absent, au lieu de passer en silence.
-  # C'est ce qui rend ce job honnête : il ne peut pas devenir vert en n'ayant
-  # rien vérifié.
+  # ⚠️ DEUX GARDES, ET IL EN FALLAIT BIEN DEUX.
+  #   1. `stack-local.ts` LÈVE si le stack est absent, au lieu de passer en
+  #      silence.
+  #   2. L'étape « Contrôler que les tests existent », ci-dessous.
+  #
+  # La première rédaction de ce commentaire affirmait, en s'appuyant sur la
+  # seule garde 1, que ce job « ne peut pas devenir vert en n'ayant rien
+  # vérifié ». C'était faux, et mesuré tel quel par la seconde passe de revue du
+  # 2026-07-29 : `node --test` sur un glob qui ne correspond à AUCUN fichier
+  # affiche « tests 0 / pass 0 » et **sort avec 0**. Renommer `isolation.test.ts`,
+  # le déplacer d'un niveau, ou écrire le prochain en `.spec.ts` suffisait à
+  # rendre ce job vert sans une seule assertion — `stack-local.ts` ne lève que si
+  # un test est effectivement CHARGÉ. C'est exactement la classe de défaut que ce
+  # dépôt a rencontrée trois fois : un contrôle qui rend « vert » en n'ayant rien
+  # fait.
   isolation:
     runs-on: ubuntu-latest
     steps:
@@ -110,6 +133,16 @@ jobs:
       # avant la production.
       - name: Démarrer le stack local
         run: supabase start
+
+      # Sans elle, un glob qui ne correspond à rien rend 0 et le job est vert.
+      - name: Contrôler que les tests d'isolation existent
+        run: |
+          n=$(find supabase/tests -name '*.test.ts' | wc -l)
+          echo "fichiers de test d'isolation trouvés : $n"
+          if [ "$n" -lt 1 ]; then
+            echo "::error::Aucun fichier de test d'isolation. Le glob de npm run test:isolation ne correspond à rien, et node --test rendrait 0 sans avoir vérifié NFR-5."
+            exit 1
+          fi
 
       - name: Tests d'isolation
         run: npm run test:isolation
