@@ -4,15 +4,24 @@ baseline_commit: eae9121
 
 # Story 2.1: Gérer ses rayons
 
-Status: in-progress
+Status: done
 
 <!--
-2026-07-29 — revue adversariale. 5 décisions tranchées, 14 correctifs appliqués, 6 reportés.
-`review` → `in-progress` et non `done`, pour trois raisons nommées en fin de fichier
-(§ « Ce que la revue a exécuté ») : le parcours à l'écran n'a pas été rejoué après les
-quatre changements de `ListeRayons.tsx`, la portée de `SUPABASE_DB_URL` dans Vercel n'est
-pas contrôlée, et le job CI `isolation` n'a jamais tourné sur un runner. Cocher `done`
-reviendrait à consigner comme vérifié ce qui ne l'a pas été.
+2026-07-29 — DEUX passes de revue adversariale. La première : 5 décisions, 14 correctifs,
+6 reportés — son fait marquant était hors périmètre (`main` non protégée, migrations de
+production gardées par `next build` seul, tests d'isolation dans aucun automate). La
+seconde a porté sur le commit de correction de la première, et a bien fait : celle-ci
+avait réparé la moitié d'un défaut, en avait introduit trois, et affirmé deux choses
+fausses. 9 correctifs de plus, 6 reportés.
+
+2026-07-29/30 — les trois vérifications qui retenaient la story sont fermées :
+  · parcours à l'écran, six gestes, deux thèmes, focus mesuré dans le DOM
+  · job CI `isolation` sur un runner GitHub — 17/17 puis 20/20
+  · état vide en thème sombre — OBSERVÉ, il était consigné « déduit »
+  · portée de `SUPABASE_DB_URL` dans Vercel — confirmée par Florian (rapportée, non
+    mesurée par la revue : le dépôt n'est pas lié à un projet Vercel)
+
+`in-progress` → `done`.
 -->
 
 
@@ -917,7 +926,7 @@ _Les cinq tranchées par Florian le 2026-07-29, en séance de revue. La résolut
 - [x] [Review][Patch] **Job `isolation` dans `.github/workflows/ci.yml`** — `supabase/setup-cli` + `supabase start` + `npm run test:isolation`. Rend AD-17 exécuté plutôt que déclaratif. (Décision 2)
 - [x] [Review][Patch] **Écrire la règle de relecture** dans `docs/migrations.md` et `.github/pull_request_template.md` : un écran qui écrit se relit sur le stack local, jamais sur la prévisualisation — celle-ci parle à la base de production. (Décision 3)
 - [x] [Review][Patch] **Documenter ce que `SUPABASE_DB_URL` contourne** dans `docs/migrations.md` (rôle `postgres`, traverse la RLS, donc c'est la clé de tout NFR-5). (Décision 4)
-  - [ ] ⚠️ **RESTE À FAIRE, et c'est un geste de Florian** — contrôler dans le tableau de bord Vercel que `SUPABASE_DB_URL` n'est déclarée que pour l'environnement **Production**. Non vérifié : le dépôt n'est pas lié à un projet Vercel (`vercel env ls` → « isn't linked »), et lier le dépôt est un choix qui ne revient pas à la revue. Si elle est aussi en *Preview*, chaque construction de PR a la clé de la base de production en environnement, alors que le script ne s'en sert jamais là.
+  - [x] ⚠️ **Portée de `SUPABASE_DB_URL` dans Vercel — CONFIRMÉE PAR FLORIAN le 2026-07-30.** Elle n'est déclarée que pour l'environnement **Production**. ⚠️ **Confirmé, pas mesuré par la revue** : le dépôt n'est pas lié à un projet Vercel (`vercel env ls` → « isn't linked »), et lier le dépôt n'était pas un choix qui revenait à la revue. La distinction est écrite ici parce que c'est la règle de ce projet — ce qui est déduit ou rapporté ne s'écrit pas comme ce qui est exécuté.
 - [x] [Review][Patch] **`.normalize("NFC")` dans `normaliserTexte`** [lib/texte.ts:38] — ferme le doublon NFD/NFC pour les rayons, les prénoms et les noms de foyer d'un coup. Sans effet sur l'existant : les onze rayons amorcés sont déjà en NFC dans le fichier de migration. (Décision 5b)
 
 ### Reportés
