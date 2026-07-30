@@ -1,0 +1,23 @@
+<!--
+  Modèle de PREMIÈRE connexion (inscription), POUR LE STACK LOCAL.
+
+  ⚠️ Une première connexion déclenche une inscription, donc c'est CE modèle que
+  Supabase envoie, pas celui du lien de connexion. L'en-tête de
+  `app/auth/callback/route.ts` le dit explicitement, et `type` vaut ici
+  `signup`. Oublier ce second modèle laisse la connexion marcher et
+  l'inscription échouer — exactement le cas qui empêchait de créer un compte
+  local et de voir `/onboarding`.
+
+  Il doit rester le miroir du modèle « Confirm sign up » du tableau de bord.
+-->
+<h2>Bienvenue dans NutriClaude</h2>
+
+<p>Clique pour créer ton foyer.</p>
+
+<p>
+  <a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=signup">
+    C'est parti
+  </a>
+</p>
+
+<p>Si tu n'as rien demandé, ignore ce message.</p>

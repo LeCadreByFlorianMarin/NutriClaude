@@ -1,0 +1,29 @@
+<!--
+  Modèle du lien de connexion, POUR LE STACK LOCAL.
+
+  ⚠️ Il doit rester le miroir de celui du tableau de bord Supabase en
+  production. `app/auth/callback/route.ts` vérifie un `token_hash` via
+  `verifyOtp`, et **non** un `?code=` PKCE — pour qu'un lien demandé sur
+  l'ordinateur puisse s'ouvrir sur le téléphone, ce qui est un parcours normal
+  du foyer. Le modèle par défaut de Supabase, lui, émet `{{ .ConfirmationURL }}`,
+  qui produit un `?code=` : le callback le refuse, l'écran affiche « lien
+  expiré », et rien n'indique que c'est une affaire de configuration.
+
+  C'est ce qui rendait le parcours d'inscription infranchissable en local
+  (constaté le 2026-07-29, en tentant de créer un compte pour la relecture de
+  la story 2.1) — et donc, très probablement, ce qui a laissé l'action
+  « relire /onboarding dans les deux thèmes » de l'Epic 1 ouverte.
+
+  `type=magiclink` est écrit en dur, comme le prescrit l'en-tête du callback.
+-->
+<h2>Ta connexion à NutriClaude</h2>
+
+<p>Clique, tu y es.</p>
+
+<p>
+  <a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=magiclink">
+    Me connecter
+  </a>
+</p>
+
+<p>Si tu n'as rien demandé, ignore ce message.</p>

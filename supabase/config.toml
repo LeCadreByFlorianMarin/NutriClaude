@@ -156,11 +156,30 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "http://127.0.0.1:3000"
+# ⚠️ Adapté au port de CE projet le 2026-07-29. La valeur par défaut du modèle
+# Supabase — `http://127.0.0.1:3000` — n'a jamais été touchée quand le stack
+# local a été ajouté, alors que le serveur de développement écoute sur **3333**
+# (`package.json` : `next dev -p 3333`). Le lien magique renvoyait donc vers un
+# port où rien n'écoute : aucun compte ne pouvait être créé en local, et le
+# parcours d'inscription était infranchissable.
+#
+# C'est très probablement pourquoi l'action « relire /onboarding dans les deux
+# thèmes » de l'Epic 1 est restée ouverte : elle exige un compte sans profil,
+# et ce chemin-là était cassé.
+#
+# `localhost` et non `127.0.0.1` : Next 16 bloque ses ressources de
+# développement en cross-origin, et le serveur s'annonce sur `localhost:3333`.
+# Naviguer sur l'autre forme empêche l'hydratation, sans que rien ne le dise
+# dans le navigateur (piège consigné dans `deferred-work.md`).
+site_url = "http://localhost:3333"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+# Les deux formes de la boucle locale, pour ne pas dépendre de celle qu'on tape.
+additional_redirect_urls = [
+  "http://localhost:3333/**",
+  "http://127.0.0.1:3333/**",
+]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
@@ -247,6 +266,32 @@ otp_expiry = 3600
 # [auth.email.template.invite]
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
+
+# ⚠️ AJOUTÉ LE 2026-07-29 — ces deux modèles sont le miroir LOCAL de ceux du
+# tableau de bord Supabase en production, et sans eux le stack local ne
+# reproduit pas la production sur le point le plus visible : la connexion.
+#
+# `app/auth/callback/route.ts` vérifie un `token_hash` (`verifyOtp`) et non un
+# `?code=` PKCE — choix documenté dans son en-tête, pour qu'un lien demandé sur
+# l'ordinateur s'ouvre sur le téléphone. Les modèles PAR DÉFAUT de Supabase
+# émettent `{{ .ConfirmationURL }}`, qui produit un `?code=` : le callback le
+# refuse, l'écran affiche « lien expiré », et rien ne dit que c'est une affaire
+# de configuration et non de lien périmé.
+#
+# Conséquence constatée : aucun compte ne pouvait être créé sur le stack local.
+# C'est très probablement pourquoi l'action « relire /onboarding dans les deux
+# thèmes » de l'Epic 1 est restée ouverte — elle exige un compte sans profil.
+#
+# ⚠️ LES DEUX sont nécessaires : une première connexion est une inscription,
+# donc Supabase envoie `confirmation`, pas `magic_link`. N'en garder qu'un
+# laisse la connexion marcher et l'inscription échouer.
+[auth.email.template.magic_link]
+subject = "Ta connexion à NutriClaude"
+content_path = "./supabase/templates/magic_link.html"
+
+[auth.email.template.confirmation]
+subject = "Bienvenue dans NutriClaude"
+content_path = "./supabase/templates/confirmation.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
