@@ -1017,3 +1017,83 @@ majeurs de l'Epic 1 ont été **introduits par une passe de revue** et attrapés
   et désarmé la confirmation à la soumission. **C'est la seule vérification qui reste, et deux passes
   de revue viennent de démontrer qu'elle attrape ce qu'aucune porte ne voit.**
 - **La portée de `SUPABASE_DB_URL` dans Vercel** — inchangé, dépôt non lié.
+
+## Parcours à l'écran — 2026-07-29 (après les deux passes de revue)
+
+Mené **sur le stack local**, jamais en production. `.env.local` basculé vers
+`http://127.0.0.1:55321`, contrôlé (aucune référence au projet de production dans ce qui est servi),
+puis **restauré — empreinte SHA-256 identique au bit près**. Serveur sur `localhost:3333`, jamais
+`127.0.0.1:3333` : Next 16 y bloquerait ses ressources et l'hydratation échouerait en silence.
+
+Compte créé par le vrai chemin : lien magique → Mailpit → `/auth/callback` → `/onboarding` → foyer.
+Base remise à l'état du dépôt (`db reset`) après coup, compte et foyer supprimés.
+
+### Les six gestes que la revue avait modifiés
+
+| Geste | Observé |
+|---|---|
+| **Doublon à la création**, foyer amorcé, formulaire sous le pli | « Ce rayon existe déjà. » **juste au-dessus du bouton**, saisie conservée, et la liste **n'a pas bougé d'un pixel** — le `reserve` a tenu la place |
+| **Doublon à l'édition**, 11ᵉ ligne — *le défaut de la première passe* | Message **dans le panneau**, entre le champ et « Enregistrer ». Le bouton est resté à la même ordonnée : la cible ne fuit pas sous le doigt |
+| **Confirmation armée puis enregistrement refusé** | « Confirmer » **a disparu**, remplacé par « Supprimer ce rayon ». Le piège est refermé |
+| **Champ icône, nom tapé dedans** | « Un seul emoji pour l'icône. », **aucun rayon créé**. Avant, « F » partait en base sans un mot |
+| **Champ icône, emoji à jointure 🧑‍🍳** | Accepté. En base : **3 points de code**, ZWJ inclus. `sort_order = 1009` = 999 + 10, après « Autre » |
+| **Restauration depuis l'état vide** — *le bouton oublié par la première passe* | 11 rayons revenus, « Les rayons de départ sont revenus. », focus sur « Ton parcours » |
+
+### Le focus, mesuré dans le DOM et non déduit
+
+`document.activeElement` relevé après chaque geste :
+
+| Après | `activeElement` |
+|---|---|
+| Ouverture du panneau | `input#nom-<id>` — anneau visible |
+| « Annuler » | `button#rayon-<id>`, `aria-label="Modifier Autre"` |
+| Suppression confirmée | `h2#titre-parcours` |
+| Restauration | `h2#titre-parcours` |
+
+Et la boucle complète au clavier : « Annuler » rend le focus à la ligne, `Entrée` rouvre le panneau,
+le focus va dans le champ avec son anneau. **Elle était impraticable avant.**
+
+### Les deux thèmes
+
+Bascule au **réglage d'apparence macOS** (`osascript`), pas une émulation d'outils de développement —
+le thème suit `prefers-color-scheme`. L'état initial était *sombre* ; il a été **remis en sombre**.
+
+| Écran | Sombre | Clair |
+|---|---|---|
+| `/rayons`, les 11 rayons | ✅ | ✅ |
+| Panneau d'édition + son message | ✅ | ✅ |
+| Formulaire d'ajout + son message | ✅ | ✅ |
+| **État vide + bouton de restauration** | ✅ **observé** | ✅ |
+| Anneau de focus au clavier | ✅ | ✅ |
+
+> ⚠️ **L'état vide en thème sombre était consigné « déduit, non observé » par la story.** Il est
+> maintenant **observé** : « Il n'y a plus aucun rayon. », l'invite, le bouton en `.btn` secondaire.
+> Ni page blanche, ni message technique. La case peut être cochée pour de vrai.
+
+Aucun abricot ailleurs que sur l'anneau de focus (UX-DR2). L'indicateur « 1 Issue » de Next est le
+`console.error` volontaire du code — le message destiné au développeur pendant que l'utilisateur lit
+du français.
+
+### ⚠️ Ce que le parcours a révélé sur l'ENVIRONNEMENT DE TEST
+
+Deux trous qui n'ont rien à voir avec le code de la story, et qui rendaient ce parcours
+**infranchissable** :
+
+1. **`supabase/config.toml` avait gardé les URL par défaut du modèle Supabase** —
+   `site_url = "http://127.0.0.1:3000"`, alors que le serveur écoute sur **3333**. Le lien magique
+   renvoyait vers un port où rien n'écoute.
+2. **Les modèles d'email du stack local étaient ceux de Supabase par défaut**, qui émettent
+   `{{ .ConfirmationURL }}` donc un `?code=` PKCE. Or `app/auth/callback/route.ts` vérifie un
+   `token_hash` (`verifyOtp`) — choix documenté dans son en-tête, pour qu'un lien demandé sur
+   l'ordinateur s'ouvre sur le téléphone. Le callback refusait, l'écran affichait « lien expiré », et
+   **rien n'indiquait qu'il s'agissait d'une affaire de configuration et non d'un lien périmé.**
+
+**Aucun compte ne pouvait donc être créé sur le stack local.** C'est très probablement pourquoi
+l'action « relire `/onboarding` dans les deux thèmes » de l'Epic 1 est restée ouverte : elle exige un
+compte sans profil.
+
+Corrigé pour mener ce parcours : `site_url`, `additional_redirect_urls`, et deux modèles sous
+`supabase/templates/` qui sont le miroir de ceux du tableau de bord de production.
+**Hors périmètre de la story 2.1 — à garder ou à écarter, c'est une décision de Florian.**
+
+Bonus : `/onboarding` a été vu en **thème sombre** au passage, ce qui entame l'action d'Epic 1.

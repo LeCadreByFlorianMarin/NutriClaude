@@ -187,7 +187,7 @@ action_items:
     status: done
   # Avant de clore l'Epic 1 pour de bon
   - epic: 1
-    action: "Relire les sept écrans dans les deux thèmes, /auth/bascule compris — 6/7 faits le 2026-07-29 (3 défauts trouvés et corrigés) ; /onboarding exige un compte sans profil, donc l'environnement de test"
+    action: "Relire les sept écrans dans les deux thèmes, /auth/bascule compris — 6/7 faits le 2026-07-29 (3 défauts trouvés et corrigés) ; /onboarding vu en SOMBRE le 2026-07-29 pendant le parcours de la story 2.1. Reste le thème clair. La CAUSE du blocage est trouvée : config.toml gardait site_url sur le port 3000 et les modèles d'email par défaut de Supabase, donc aucun compte ne pouvait naître en local — corrigé"
     owner: "Florian"
     status: in-progress
   - epic: 1
@@ -211,7 +211,8 @@ action_items:
   - epic: 2
     action: "Rejouer le parcours à l'écran de /rayons après les correctifs de revue — deux régions de statut, focus au clavier, refus de l'icône multiple, message « Ce rayon n'existe plus. ». Sur le stack local, dans les deux thèmes. Aucun test ne couvre le JSX (NFR-10)"
     owner: "Florian"
-    status: open
+    status: done  # 2026-07-29 — six gestes, deux thèmes, focus mesuré dans le DOM.
+                  # Détail dans la story, § « Parcours à l'écran »
   - epic: 2
     action: "Contrôler dans Vercel que SUPABASE_DB_URL n'est déclarée que pour l'environnement Production — c'est le rôle postgres, il traverse la RLS, donc c'est la clé de tout NFR-5. Non vérifiable depuis le dépôt (non lié)"
     owner: "Florian"
@@ -219,4 +220,4 @@ action_items:
   - epic: 2
     action: "Regarder la première exécution du job CI `isolation` sur un runner GitHub — `supabase start` en CI est un chemin neuf, comme l'était le script de déploiement. Le YAML est valide et les tests passent en local ; ça ne prouve pas le runner"
     owner: "Florian"
-    status: open
+    status: done  # 2026-07-29 — 17/17 sur le runner, puis 20/20 avec les contraintes
