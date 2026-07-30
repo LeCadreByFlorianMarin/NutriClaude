@@ -104,7 +104,7 @@ companions: []
 ### AD-16 — Foyer & appartenance humaine
 - **Binds:** FR-40, FR-41, FR-42, FR-43 ; NFR-5
 - **Prevents:** un foyer sans porte d'entrée humaine ; la confusion appareil/membre dans l'appartenance ; des données non partagées entre membres.
-- **Rule:** le foyer est l'**unité d'isolation** (AD-2). Un humain **crée** un foyer **ou** le **rejoint** via magic-link (AD-11) + **code d'invitation** à durée + usages limités (FR-40/41), émis depuis le **web** (surface de Florian). Écran **profil / membres / appareils** = surface web (FR-42). `recipes`, rayons, menu et liste sont **partagés entre tous les membres** (FR-43). Un appareil (AD-9) n'est **jamais** promu membre.
+- **Rule:** le foyer est l'**unité d'isolation** (AD-2). Un humain **crée** un foyer **ou** le **rejoint** via magic-link (AD-11) + **code d'invitation** à durée + usages limités (FR-40/41), émis depuis le **web** (surface de configuration ; ouverte à tout membre — décision du 2026-07-30). Écran **profil / membres / appareils** = surface web (FR-42). `recipes`, rayons, menu et liste sont **partagés entre tous les membres** (FR-43). Un appareil (AD-9) n'est **jamais** promu membre.
 
 ### AD-17 — Posture de vérification
 - **Binds:** NFR-5, NFR-2 ; qualité

@@ -1283,7 +1283,7 @@ So that je garde le contrôle des identités non-humaines et complète l'écran 
 
 **Given** cet écran
 **When** il est rendu
-**Then** il reste une surface de Florian, en français sans jargon (NFR-9), et ne promet aucune capacité d'appareil non encore disponible
+**Then** il reste une surface de configuration — web, jamais une surface liste — en français sans jargon (NFR-9), et ne promet aucune capacité d'appareil non encore disponible. *(Reformulé le 2026-07-30 — décision de Florian : le foyer est symétrique, tous les membres ont les mêmes droits. C'est la SURFACE qui décide de ce qu'on y montre, jamais la personne. Voir EXPERIENCE.md § Foundation.)*
 
 ---
 
@@ -1502,8 +1502,8 @@ So that j'affine le parcours et l'apprentissage sans passer par l'écran web.
 **Then** les rayons sont lus ou mis à jour dans le foyer (FR-38), cohérents avec l'Epic 2
 
 **Given** une conversation avec Claude
-**When** Florian consulte ou modifie les règles mot-clé → rayon (y compris révoquer une règle apprise)
-**Then** les règles sont lues ou modifiées (FR-38), la gestion des règles restant une surface de Florian (jamais exposée à la conjointe)
+**When** un membre du foyer consulte ou modifie les règles mot-clé → rayon (y compris révoquer une règle apprise)
+**Then** les règles sont lues ou modifiées (FR-38), la gestion des règles restant une surface de configuration — jamais exposée sur une surface liste. *(Reformulé le 2026-07-30 — décision de Florian : le foyer est symétrique, tous les membres ont les mêmes droits. C'est la SURFACE qui décide de ce qu'on y montre, jamais la personne. Voir EXPERIENCE.md § Foundation.)*
 
 **Given** une modification de rayon ou de règle depuis Claude
 **When** elle est appliquée

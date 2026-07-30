@@ -186,7 +186,15 @@ action_items:
   - epic: 2
     action: "Trancher la distinction Florian / conjointe : aucune colonne de rôle sur profiles, RLS par foyer et non par membre. Retirée de la story 2.3, à décider avec son coût (schéma + RLS + 11 tests d'isolation à rejouer)"
     owner: "John + Florian"
-    status: open
+    status: done  # 2026-07-30 — DÉCISION DE FLORIAN : le foyer est SYMÉTRIQUE, tous les
+                  # membres ont les mêmes droits. C'est EXPERIENCE.md qui avait tort, pas le
+                  # schéma. Coût réel mesuré du modèle promis : 13 politiques RLS sur 18 (la
+                  # story en estimait 11), 20 tests à rejouer, et une famille de tests
+                  # d'isolation à deux membres du MÊME foyer qui n'existe pas.
+                  # Corrigé dans EXPERIENCE.md (8 passages + décision en tête), epics.md
+                  # (AC de 5.7 et 7.4), epic-2-revision (AC3 de la 2.4), ARCHITECTURE-SPINE.
+                  # Distinction désormais explicite : la SURFACE décide de ce qu'on y montre,
+                  # la PERSONNE ne décide de rien.
   - epic: 1
     action: "Pousser 20260728152418_require_non_blank_household_name.sql (requête de contrôle en en-tête du fichier)"
     owner: "Florian"

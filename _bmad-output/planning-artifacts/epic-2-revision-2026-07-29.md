@@ -55,6 +55,11 @@ La formule de l'objectif d'epic entretient l'illusion : « donner au foyer un tr
 **Story 2.4, AC3** : « cette gestion reste une surface de Florian et n'est jamais exposée à la
 conjointe (test d'acceptation, **NFR-9**) ».
 
+> ⚠️ **Caduc le 2026-07-30.** Florian a tranché : le foyer est symétrique. L'AC3 doit se relire
+> « cette gestion reste une surface de **configuration** et n'est jamais exposée sur une surface
+> **liste** ». C'est la surface qui est en cause, pas la personne — le constat ci-dessous reste
+> valable, sa formulation non. Voir EXPERIENCE.md § Foundation.
+
 Deux problèmes, tous deux vérifiés :
 
 1. **NFR-9 ne dit pas ça.** Lu à `epics.md:114`, NFR-9 porte sur le **ton** — « aucun jargon

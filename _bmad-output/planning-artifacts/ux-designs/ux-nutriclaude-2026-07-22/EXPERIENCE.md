@@ -10,9 +10,40 @@ sources:
 
 # NutriClaude — Experience Spine
 
-> La liste de courses est le produit. Cinq surfaces de rang égal consomment la même donnée. Aucune n'est « la vraie ». `DESIGN.md` porte l'identité visuelle ; ce document porte le comportement, l'IA, la voix et les parcours. Cible d'acceptation implicite qui plane sur tout : **la conjointe ne configure jamais rien** — si une capacité exige de comprendre l'outil, elle a échoué.
+> La liste de courses est le produit. Cinq surfaces de rang égal consomment la même donnée. Aucune n'est « la vraie ». `DESIGN.md` porte l'identité visuelle ; ce document porte le comportement, l'IA, la voix et les parcours. Cible d'acceptation implicite qui plane sur tout : **on doit pouvoir se servir de NutriClaude sans jamais rien configurer** — si une capacité exige de comprendre l'outil, elle a échoué. ⚠️ Ce document formulait cette cible comme une asymétrie entre membres (« la conjointe ne configure jamais rien ») ; c'est **corrigé le 2026-07-30**, voir la décision en tête de la section Foundation. La cible est un objectif de simplicité, pas un contrôle d'accès.
 
 ## Foundation
+
+> ### ⚠️ Décision du 2026-07-30 — le foyer est symétrique
+>
+> **Tous les membres d'un foyer ont exactement les mêmes droits.** Il n'y a pas, et il n'y aura
+> pas, de rôle « celui qui configure » et de rôle « celle qui fait les courses ».
+>
+> **Ce que ce document disait**, en huit endroits : « surfaces de Florian uniquement », « la
+> conjointe ne configure jamais rien », « la conjointe ne voit jamais la notion de règle ». Ces
+> formulations promettaient une **asymétrie de permissions** que rien n'a jamais portée — et
+> que rien ne portera : `profiles` n'a aucune colonne de rôle, et les **13 politiques RLS sur
+> 18** qui filtrent passent toutes par `current_household_id()`, c'est-à-dire par **foyer**, pas
+> par membre.
+>
+> La contradiction a été relevée à la création de la story 2.1, mesurée à sa revue
+> (2026-07-29), et tranchée par Florian le 2026-07-30. **C'est ce document qui avait tort**, pas
+> le schéma : le coût du modèle promis était une colonne de rôle, les 13 politiques rejugées une
+> par une, les 20 tests rejoués, et une famille de tests d'isolation **à deux membres du même
+> foyer** qui n'existe pas encore — les 17 actuels opposent deux *foyers*.
+>
+> **Ce qui reste, et qui n'a rien à voir.** La cible d'acceptation « on doit pouvoir s'en servir
+> sans jamais rien configurer » est intacte, et c'est elle qui compte. Elle dit que le produit
+> doit marcher pour qui ne configure rien — **pas** qu'il faut l'en empêcher. Les deux avaient
+> été confondues ; elles sont désormais distinctes partout dans ce document :
+>
+> - la **surface** décide ce qu'on y montre — aucune surface liste ne parle jamais de « règle »
+>   ni de « configuration », à personne ;
+> - la **personne** ne décide de rien — tout membre du foyer peut ouvrir `/rayons`.
+>
+> ⚠️ **Corollaire pour l'implémentation :** ne jamais inventer un contrôle d'accès applicatif
+> entre membres. Il serait contournable à un appel RPC près et contredirait AD-2 (la règle vit
+> en base). Voir `_bmad-output/project-context.md § Architecture`.
 
 Produit **multi-surface, 5 surfaces de rang égal**, hérité du PRD (§2). Ce n'est pas une app avec des intégrations : c'est une donnée avec cinq points d'accès. Une règle métier appliquée par une surface l'est par toutes (FR-20 / NFR-5). Aucune surface n'est prioritaire dans l'expérience ; chacune a son contexte et son geste dominant.
 
@@ -22,7 +53,7 @@ Produit **multi-surface, 5 surfaces de rang égal**, hérité du PRD (§2). Ce n
 | **Assistant Google** | Ajouter à la voix | Toute la maison, enceinte comprise | Confirmation **par l'assistant**, pas par nous ; arrivée **différée < 1 min, structurelle** (NFR-4) |
 | **Téléphone (iOS + Android)** | Cocher + ajouter | Supermarché, une main, caddie dans l'autre | **Hors-ligne = mode nominal** (NFR-1) ; PWA installable, aucun binaire natif (NFR-11) ; parité iPhone/Android |
 | **Claude conversationnel** | Piloter + planifier | Bureau, dimanche soir | Périmètre strict au foyer (FR-39) ; aucun jargon rendu à l'écran |
-| **Web** | Configurer + planifier | Recettes, menu, rayons, règles | Seule surface où Florian configure ; confortable au grand écran |
+| **Web** | Configurer + planifier | Recettes, menu, rayons, règles | Seule surface de configuration ; confortable au grand écran |
 
 `DESIGN.md` est la référence visuelle. Maquettes : [`mockups/liste-et-dashboard.html`](mockups/liste-et-dashboard.html) (téléphone + dashboard, cf. Flows 1 & 2), [`mockups/grille-menu.html`](mockups/grille-menu.html) (grille du menu web, cf. Flow 4). Le web (recettes, rayons, onboarding, profil) et Claude héritent des tokens et patterns sans composition figée ici. **Les spines (`DESIGN.md` + `EXPERIENCE.md`) priment sur toute maquette en cas de conflit.**
 
@@ -37,7 +68,7 @@ L'objet central est **la liste unique du foyer** (FR-1). Tout le reste sont des 
 | **Ajout rapide** | Bouton d'action / cible de partage système / voix | Ajouter un article sans clavier ou en 2 gestes | Téléphone (partage), Google (voix), Claude |
 | **Menu de la semaine** | Web / Claude | Assigner recettes à la grille jour × repas, générer la liste | Web, Claude, + affichage lecture seule (menu du jour) sur Dashboard (FR-44) |
 | **Répertoire de recettes** | Web / Claude | Créer, filtrer par étiquette, chercher par titre (FR-51) | Web, Claude |
-| **Rayons & règles** | Web / Claude | Ordonner le parcours (FR-12), consulter/révoquer les règles apprises | Web, Claude — **surfaces de Florian uniquement** |
+| **Rayons & règles** | Web / Claude | Ordonner le parcours (FR-12), consulter/révoquer les règles apprises | Web, Claude — **ouvert à tout membre du foyer** (décision du 2026-07-30) |
 | **Foyer & appareils** | Web | Prénom, membres, code d'invitation (FR-41), appareils rattachés | Web |
 
 **Le classement des rayons suit le parcours physique du magasin, jamais l'alphabet ni une catégorie théorique** (FR-2). Le rayon « À classer » est une zone de première classe, visible : le masquer serait mentir sur la fiabilité du tri.
@@ -76,7 +107,7 @@ Comportement. Les specs visuelles vivent dans `DESIGN.md.Components`.
 | **Séparateur « Dans le panier »** | Dans une carte-rayon | Repousse les articles cochés en bas du rayon, consultables et récupérables (FR-3). |
 | **Bandeau hors-ligne** | Haut de la liste | Apparaît quand le réseau est absent. Informe, ne bloque pas, ne rougit pas. Disparaît au retour du réseau. |
 | **Bouton d'action / ajout** | Liste (téléphone) | « Ajouter un truc ». Résout le rayon automatiquement (FR-4), agrège si doublon même nom + même unité (FR-5). |
-| **Correction de rayon** | Liste (dashboard/téléphone : geste ; web/Claude : gestion) | Déplacer un article vers un autre rayon **mémorise la règle en silence** (FR-14) et l'applique immédiatement. Aucune question posée, aucune notion de « règle » montrée à la conjointe. |
+| **Correction de rayon** | Liste (dashboard/téléphone : geste ; web/Claude : gestion) | Déplacer un article vers un autre rayon **mémorise la règle en silence** (FR-14) et l'applique immédiatement. Aucune question posée, aucune notion de « règle » montrée **sur les surfaces liste** — ni à qui que ce soit. La règle s'apprend en silence ; elle se consulte sur le web, par qui veut. |
 
 ## State Patterns
 
@@ -89,7 +120,7 @@ Comportement. Les specs visuelles vivent dans `DESIGN.md.Components`.
 | **Action non synchronisée** | Téléphone | Pastille « arrive… » sur l'article concerné : **visuellement distincte** d'une action confirmée, sans bloquer le geste suivant (NFR-1). |
 | **Article dicté en attente** | Toutes | Un article dicté à Google **n'apparaît pas instantanément** : il arrive < 1 min (NFR-4). Aucune surface ne fait croire qu'il est déjà là. Quand il arrive, il porte la provenance micro. |
 | **Article coché/supprimé ailleurs** | Toutes | Convergence sans conflit (NFR-2) : cocher un article déjà coché, ou supprimer un article coché ailleurs, n'est jamais une erreur ni un arbitrage demandé. L'état converge silencieusement. |
-| **Pont vocal rompu** | Foyer prévenu (FR-49) | Le foyer est **prévenu sans avoir à le constater au supermarché** : « On dirait que la voix ne passe plus. » Les articles dictés **ne sont pas perdus** — ils s'accumulent côté Google et arrivent à la réparation (FR-48). `[ASSUMPTION]` Canal exact de la notification non spécifié par les sources — proposé : bandeau discret sur les surfaces de Florian (web + Claude), **jamais** une alerte anxiogène côté conjointe. À trancher. |
+| **Pont vocal rompu** | Foyer prévenu (FR-49) | Le foyer est **prévenu sans avoir à le constater au supermarché** : « On dirait que la voix ne passe plus. » Les articles dictés **ne sont pas perdus** — ils s'accumulent côté Google et arrivent à la réparation (FR-48). `[ASSUMPTION]` Canal exact de la notification non spécifié par les sources — proposé : bandeau discret sur les surfaces de configuration (web + Claude), **jamais** une alerte anxiogène sur une surface liste. À trancher. |
 | **Génération depuis le menu** | Web, Claude | Indique combien d'articles ont été ajoutés (FR-17), sans écraser les ajouts manuels ni les articles déjà achetés. |
 | **Plein soleil** | Téléphone | Le thème automatique bascule en clair selon le système ; lisibilité prioritaire (voir `DESIGN.md`). |
 
@@ -102,7 +133,7 @@ Comportement. Les specs visuelles vivent dans `DESIGN.md.Components`.
 - **Corriger un rayon = apprendre :** le geste de correction crée la règle en silence (FR-14).
 - **Vider le panier :** archiver les achetés d'un geste, avec confirmation (FR-8).
 
-**Banni, toutes surfaces liste :** défilement horizontal (NFR-3) ; écran de login sur le dashboard (FR-28) ; message d'erreur bloquant hors ligne (NFR-1) ; toute UI qui prétend qu'un article dicté est déjà arrivé (NFR-4) ; tout jargon technique rendu (NFR-9) ; toute notion de « règle/configuration » exposée à la conjointe (test d'acceptation).
+**Banni, toutes surfaces liste :** défilement horizontal (NFR-3) ; écran de login sur le dashboard (FR-28) ; message d'erreur bloquant hors ligne (NFR-1) ; toute UI qui prétend qu'un article dicté est déjà arrivé (NFR-4) ; tout jargon technique rendu (NFR-9) ; toute notion de « règle/configuration » exposée **sur une surface liste**, à n'importe quel membre (test d'acceptation ; reformulé le 2026-07-30 — c'est la surface qui est en cause, pas la personne).
 
 ## Accessibility Floor
 
@@ -142,7 +173,7 @@ Ce que le produit **assume de ne pas être** — pistes explicitement écartées
 | **Fond indigo froid** (celui de la réf) | Trop « tableau de bord logiciel ». Remplacé par un sombre chaud aubergine/espresso, registre cuisine du soir. |
 | **Lecture de la liste à voix haute** (ex-FR-30) | Retirée du périmètre : la voix sert à **ajouter**, pas à consulter. Aucune surface ne lit la liste. |
 | **App native / passage par un store** (NFR-11) | Compte développeur, revue externe, releases à perpétuité — coût de possession incompatible avec « tenir sans entretien » (NFR-10). PWA installable uniquement. |
-| **Jargon technique visible** (« synchronisation », « jeton », « API », « MCP ») | Test d'acceptation de la conjointe : si comprendre l'outil est requis, l'outil a échoué (NFR-9). |
+| **Jargon technique visible** (« synchronisation », « jeton », « API », « MCP ») | Test d'acceptation : si comprendre l'outil est requis, l'outil a échoué (NFR-9). |
 | **Rougir le hors-ligne** | Le hors-ligne est un **mode nominal** (NFR-1), jamais une erreur : teinte neutre, jamais d'alerte. |
 | **Widget iOS, scan code-barres, génération de repas par l'IA** | Non-objectifs v1 (repoussés). Claude *pilote* la liste, ne décide pas des repas. |
 
@@ -184,8 +215,8 @@ Variante d'échec : le pont est rompu. La commande vocale continue de marcher, l
 ## Lacunes & hypothèses
 
 **[ASSUMPTION] posées dans ce fichier :**
-- **Garde-fou du silent-learning (FR-14) :** les règles mot-clé → rayon apprises sont consultables/révocables côté web + Claude (surfaces de Florian) ; la conjointe ne voit jamais la notion de règle. Repris du memlog, à valider par Florian.
-- **Canal de la notification « pont rompu » (FR-49)** non spécifié par les sources : proposé en bandeau discret sur les surfaces de Florian, jamais une alerte côté conjointe. À trancher.
+- **Garde-fou du silent-learning (FR-14) :** les règles mot-clé → rayon apprises sont consultables/révocables côté web + Claude, **par tout membre du foyer** ; aucune surface liste ne montre jamais la notion de règle. *(Reformulé le 2026-07-30 : le garde-fou porte sur la SURFACE, pas sur la personne — voir la décision en tête de Foundation.)*
+- **Canal de la notification « pont rompu » (FR-49)** non spécifié par les sources : proposé en bandeau discret sur les surfaces de configuration (web + Claude), jamais une alerte sur une surface liste. À trancher.
 - **Plancher d'accessibilité** : ~~absent des sources~~ → **désormais spécifié comme décision ferme** (durcissement Reviewer Gate, validé Florian). Cf. *Accessibility Floor* : contraste sur fonds réels, coche vraie et ≥3:1, gris porteurs en muted, provenance à double canal (icône + `aria-label`), tailles dashboard 1 m, focus clavier, `prefers-reduced-motion`, compteur annoncé en entier. Reste **une seule** [ASSUMPTION] mineure : comportement exact sous **zoom 200 %** (colonne unique sans scroll horizontal — à vérifier sur rendu réel). La provenance à **4 canaux** (🎙/🗒/＋/🍴) est désormais **confirmée** (décision Florian), plus une hypothèse.
 - **Mécanisme d'appairage du dashboard** (rattachement au foyer) : l'invariant est spécifié (rattaché une fois, jamais de re-auth), le mécanisme technique (code/URL) est délégué à l'architecture.
 
