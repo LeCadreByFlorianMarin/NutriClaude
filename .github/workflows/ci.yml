@@ -55,6 +55,19 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # « Aucune migration sans sa requête de contrôle en en-tête » — règle
+      # d'équipe issue de la rétrospective de l'Epic 1, restée une intention
+      # pendant deux epics parce qu'elle vivait dans un document de
+      # planification. Elle compte davantage depuis que la fusion applique les
+      # migrations sans geste humain : cette requête est ce qui permet au
+      # relecteur de savoir, AVANT de fusionner, si la migration va passer.
+      #
+      # À sa première exécution, le script a trouvé une violation réelle
+      # (`create_valid_invites_view`) — déjà en production, donc exemptée
+      # nommément plutôt que réécrite après coup.
+      - name: Contrôler les en-têtes de migration
+        run: npm run check:migrations
+
       # Même garde que dans le job `isolation`, et pour la même raison :
       # `node --test` sur un glob vide rend 0. Voir le commentaire là-bas.
       - name: Contrôler que les tests unitaires existent

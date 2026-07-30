@@ -151,6 +151,21 @@ déjà en production.
 
 ## 4. Règles à appliquer dès la première story de l'Epic 2
 
+> ⚠️ **DÉPLACÉES le 2026-07-30 — la source fait désormais foi ailleurs :
+> [`_bmad-output/project-context.md`](../project-context.md).**
+>
+> Ces règles sont restées ici, dans un document de **planification**, pendant deux epics. Trois
+> d'entre elles étaient encore « ouvertes » dans `sprint-status.yaml` — non pas faute d'être
+> bonnes, mais parce que personne ne charge ce fichier au moment d'écrire du code. La revue du
+> 2026-07-29 a mesuré que **deux avaient été violées par la passe de revue elle-même**.
+>
+> `project-context.md` est le fichier que chaque session d'agent charge. Il était vide depuis le
+> 2026-07-24 ; il porte maintenant ces règles, enrichies des motifs de défaut de l'Epic 2, et
+> l'une d'elles a gagné un mécanisme (`npm run check:migrations`).
+>
+> **La liste ci-dessous est conservée pour l'histoire, pas pour être lue en implémentant.** Si
+> les deux divergent, `project-context.md` gagne.
+
 Issues des trois motifs de défaut de l'Epic 1. Elles ne coûtent rien à l'écriture et ont chacune
 un défaut réel derrière elles.
 

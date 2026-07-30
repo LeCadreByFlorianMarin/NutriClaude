@@ -204,15 +204,21 @@ action_items:
   - epic: 1
     action: "Ne consigner comme vérifié que ce qui a été exécuté, en citant la commande — une déduction s'écrit « déduit »"
     owner: "Amelia"
-    status: open
+    status: done  # 2026-07-30 — déplacée dans project-context.md, le fichier que chaque
+                  # session d'agent charge. Elle vivait dans next-steps.md, un document de
+                  # planification que personne ne lit en implémentant : c'est pour ça qu'elle
+                  # est restée ouverte deux epics et qu'une passe de revue l'a violée
   - epic: 1
     action: "Un commentaire explique un pourquoi, jamais un état de la base"
     owner: "Amelia"
-    status: open
+    status: done  # 2026-07-30 — déplacée dans project-context.md, avec les quatre cas réels
+                  # où un commentaire est devenu faux (dont deux écrits pendant une revue)
   - epic: 1
     action: "Revue adversariale par story plutôt qu'en fin d'epic (décision de Florian : environnement de test ET revue)"
     owner: "Amelia"
-    status: open
+    status: done  # 2026-07-30 — déplacée dans project-context.md, ENRICHIE : la passe de
+                  # correction doit être revue à son tour. Mesuré le 2026-07-29 — la première
+                  # passe avait réparé la moitié d'un défaut et en avait introduit trois
   # Ouvertes par la revue adversariale de la story 2.1 (2026-07-29)
   - epic: 2
     action: "Rejouer le parcours à l'écran de /rayons après les correctifs de revue — deux régions de statut, focus au clavier, refus de l'icône multiple, message « Ce rayon n'existe plus. ». Sur le stack local, dans les deux thèmes. Aucun test ne couvre le JSX (NFR-10)"

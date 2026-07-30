@@ -10,6 +10,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint --max-warnings 0",
+    "check:migrations": "node scripts/controler-migrations.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"lib/**/*.test.ts\"",
     "test:isolation": "node --test \"supabase/tests/**/*.test.ts\""
