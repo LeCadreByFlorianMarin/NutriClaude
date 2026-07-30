@@ -41,7 +41,16 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
-last_updated: 2026-07-29  # PR #12 mergée (4ee719a), 7/7 migrations en prod, révision Epic 2 analysée
+last_updated: 2026-07-29  # Revue adversariale de la story 2.1. Elle a trouvé, hors du périmètre de
+                          # la story, que `main` n'était pas protégée : depuis `vercel.json`, un
+                          # commit sur `main` applique les migrations en production, gardé par le
+                          # seul `next build`. Protection posée, job CI `isolation` ajouté — les 17
+                          # tests d'isolation ne tournaient dans aucun automate.
+                          #
+                          # Story 2.1 contextualisée ; Epic 2 ouvert. Sa création a mesuré un trou
+                          # d'isolation dans `seed_default_aisles` (security definer à household_id
+                          # en paramètre, sans contrôle) : un membre peut écrire dans les rayons d'un
+                          # autre foyer. Correctif prescrit et éprouvé en local, porté par la story.
 project: nutriclaude
 project_key: NOKEY
 tracking_system: file-system
@@ -74,8 +83,18 @@ development_status:
   #     restant est absorbé par la nouvelle 2.1.
   #   · les anciennes 2.5, 2.6, 2.7 sont DÉPLACÉES en Epic 4 (4.16 à 4.18) :
   #     leurs critères s'énoncent sur la liste de courses, donc indémontrables ici.
-  epic-2: backlog
-  2-1-gerer-ses-rayons: backlog
+  epic-2: in-progress
+  # DEUX passes de revue adversariale le 2026-07-29. La première : 5 décisions, 14
+  # correctifs, 6 reportés — son fait marquant était hors périmètre (`main` non protégée,
+  # migrations de production gardées par `next build` seul, tests d'isolation dans aucun
+  # automate). La seconde a porté sur le commit de correction de la première : celle-ci
+  # avait réparé la moitié d'un défaut, en avait introduit trois, et affirmé deux choses
+  # fausses. 9 correctifs de plus.
+  #
+  # Les trois vérifications qui retenaient la story sont fermées (2026-07-29/30) :
+  # parcours à l'écran dans les deux thèmes, job CI `isolation` sur un runner, état vide
+  # en sombre observé. La portée de SUPABASE_DB_URL est confirmée par Florian.
+  2-1-gerer-ses-rayons: done
   2-2-reordonner-le-parcours-par-manipulation-directe: backlog
   2-3-definir-des-regles-mot-cle-rayon: backlog
   2-4-composant-carte-rayon: backlog
@@ -167,14 +186,22 @@ action_items:
   - epic: 2
     action: "Trancher la distinction Florian / conjointe : aucune colonne de rôle sur profiles, RLS par foyer et non par membre. Retirée de la story 2.3, à décider avec son coût (schéma + RLS + 11 tests d'isolation à rejouer)"
     owner: "John + Florian"
-    status: open
+    status: done  # 2026-07-30 — DÉCISION DE FLORIAN : le foyer est SYMÉTRIQUE, tous les
+                  # membres ont les mêmes droits. C'est EXPERIENCE.md qui avait tort, pas le
+                  # schéma. Coût réel mesuré du modèle promis : 13 politiques RLS sur 18 (la
+                  # story en estimait 11), 20 tests à rejouer, et une famille de tests
+                  # d'isolation à deux membres du MÊME foyer qui n'existe pas.
+                  # Corrigé dans EXPERIENCE.md (8 passages + décision en tête), epics.md
+                  # (AC de 5.7 et 7.4), epic-2-revision (AC3 de la 2.4), ARCHITECTURE-SPINE.
+                  # Distinction désormais explicite : la SURFACE décide de ce qu'on y montre,
+                  # la PERSONNE ne décide de rien.
   - epic: 1
     action: "Pousser 20260728152418_require_non_blank_household_name.sql (requête de contrôle en en-tête du fichier)"
     owner: "Florian"
     status: done
   # Avant de clore l'Epic 1 pour de bon
   - epic: 1
-    action: "Relire les sept écrans dans les deux thèmes, /auth/bascule compris — 6/7 faits le 2026-07-29 (3 défauts trouvés et corrigés) ; /onboarding exige un compte sans profil, donc l'environnement de test"
+    action: "Relire les sept écrans dans les deux thèmes, /auth/bascule compris — 6/7 faits le 2026-07-29 (3 défauts trouvés et corrigés) ; /onboarding vu en SOMBRE le 2026-07-29 pendant le parcours de la story 2.1. Reste le thème clair. La CAUSE du blocage est trouvée : config.toml gardait site_url sur le port 3000 et les modèles d'email par défaut de Supabase, donc aucun compte ne pouvait naître en local — corrigé"
     owner: "Florian"
     status: in-progress
   - epic: 1
@@ -185,12 +212,32 @@ action_items:
   - epic: 1
     action: "Ne consigner comme vérifié que ce qui a été exécuté, en citant la commande — une déduction s'écrit « déduit »"
     owner: "Amelia"
-    status: open
+    status: done  # 2026-07-30 — déplacée dans project-context.md, le fichier que chaque
+                  # session d'agent charge. Elle vivait dans next-steps.md, un document de
+                  # planification que personne ne lit en implémentant : c'est pour ça qu'elle
+                  # est restée ouverte deux epics et qu'une passe de revue l'a violée
   - epic: 1
     action: "Un commentaire explique un pourquoi, jamais un état de la base"
     owner: "Amelia"
-    status: open
+    status: done  # 2026-07-30 — déplacée dans project-context.md, avec les quatre cas réels
+                  # où un commentaire est devenu faux (dont deux écrits pendant une revue)
   - epic: 1
     action: "Revue adversariale par story plutôt qu'en fin d'epic (décision de Florian : environnement de test ET revue)"
     owner: "Amelia"
-    status: open
+    status: done  # 2026-07-30 — déplacée dans project-context.md, ENRICHIE : la passe de
+                  # correction doit être revue à son tour. Mesuré le 2026-07-29 — la première
+                  # passe avait réparé la moitié d'un défaut et en avait introduit trois
+  # Ouvertes par la revue adversariale de la story 2.1 (2026-07-29)
+  - epic: 2
+    action: "Rejouer le parcours à l'écran de /rayons après les correctifs de revue — deux régions de statut, focus au clavier, refus de l'icône multiple, message « Ce rayon n'existe plus. ». Sur le stack local, dans les deux thèmes. Aucun test ne couvre le JSX (NFR-10)"
+    owner: "Florian"
+    status: done  # 2026-07-29 — six gestes, deux thèmes, focus mesuré dans le DOM.
+                  # Détail dans la story, § « Parcours à l'écran »
+  - epic: 2
+    action: "Contrôler dans Vercel que SUPABASE_DB_URL n'est déclarée que pour l'environnement Production — c'est le rôle postgres, il traverse la RLS, donc c'est la clé de tout NFR-5. Non vérifiable depuis le dépôt (non lié)"
+    owner: "Florian"
+    status: done  # 2026-07-30 — confirmé par Florian. Rapporté, non mesuré par la revue
+  - epic: 2
+    action: "Regarder la première exécution du job CI `isolation` sur un runner GitHub — `supabase start` en CI est un chemin neuf, comme l'était le script de déploiement. Le YAML est valide et les tests passent en local ; ça ne prouve pas le runner"
+    owner: "Florian"
+    status: done  # 2026-07-29 — 17/17 sur le runner, puis 20/20 avec les contraintes

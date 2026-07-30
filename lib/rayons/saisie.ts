@@ -1,0 +1,117 @@
+import { INVISIBLES_HORS_JOINTURE, normaliserTexte } from "../texte.ts";
+
+/**
+ * Longueur maximale d'un nom de rayon. Plus courte que celle d'un nom de foyer
+ * (60) : un nom de rayon s'affiche en eyebrow capitales dans l'en-tête d'une
+ * carte, sur un téléphone tenu à une main.
+ */
+export const MAX_NOM_RAYON = 40;
+
+/** Rend le nom nettoyé et borné, ou `null` s'il ne reste rien d'affichable. */
+export function normaliserNomRayon(saisie: string): string | null {
+  return normaliserTexte(saisie, MAX_NOM_RAYON);
+}
+
+/**
+ * Rend le **premier grapheme** de la saisie, ou `null` s'il n'y en a pas.
+ *
+ * ⚠ **Ne borne pas avec `slice(0, 1)` ni `maxLength={1}`.** Les deux comptent
+ * des unités UTF-16, pas des caractères perçus : 🥬 en occupe 2, un drapeau 4,
+ * un emoji à modificateur de teinte jusqu'à 7. Couper à une unité rend une
+ * demi-paire de substitution, stockée telle quelle et affichée en carré blanc.
+ *
+ * ⚠ **N'emploie pas `normaliserTexte` non plus.** Sa plage d'invisibles couvre
+ * U+200D (ZWJ), qui est porteur de sens ici : 🧑\u200D🍳 s'écrit 🧑 + ZWJ + 🍳, et le
+ * retirer laisserait deux graphemes dont on ne garderait que le premier — 🧑.
+ * D'où `INVISIBLES_HORS_JOINTURE`, qui retire l'espace de largeur nulle collé
+ * par un copier-coller sans démembrer la séquence.
+ *
+ * `Intl.Segmenter` est natif (Node 24, tous navigateurs cibles) : aucune
+ * dépendance à ajouter, ce que NFR-10 exige.
+ */
+export function normaliserIcone(saisie: string): string | null {
+  const net = nettoyerIcone(saisie);
+  if (net === "") return null;
+
+  const premier = graphemes(net).next();
+  return premier.done ? null : premier.value.segment;
+}
+
+/**
+ * Vrai si la saisie contient **plus d'un** grapheme, donc si la réduire ferait
+ * perdre quelque chose.
+ *
+ * ⚠ **Sa raison d'être : `normaliserIcone` réduit en silence.** Le champ icône
+ * est le premier des deux à l'écran, son libellé est visuellement masqué, et il
+ * ne reste que le placeholder pour dire ce qu'on y attend. Y taper le nom du
+ * rayon par méprise — les deux champs sont côte à côte — enregistrait « F » pour
+ * « Fromages », sans libellé, sans indice et sans message (revue du 2026-07-29).
+ * L'écran s'en sert pour refuser plutôt que pour tronquer.
+ */
+export function iconeTropLongue(saisie: string): boolean {
+  const net = nettoyerIcone(saisie);
+  if (net === "") return false;
+
+  const suite = graphemes(net);
+  suite.next();
+  return !suite.next().done;
+}
+
+/**
+ * Les jointures **en bord de chaîne**, qui ne joignent donc rien.
+ *
+ * ⚠ **Sans elles, un copier-coller partiel devenait une impasse.** Coller la
+ * moitié d'un 🧑\u200D🍳 donne « ZWJ + 🍳 » : `Intl.Segmenter` compte le ZWJ orphelin
+ * comme un grapheme à part entière, donc `iconeTropLongue` refusait « Un seul
+ * emoji pour l'icône. » sur un champ qui n'en montrait **qu'un**. Et comme
+ * `INVISIBLES_HORS_JOINTURE` exclut délibérément U+200D, rien ne pouvait le
+ * retirer : l'utilisateur ne voyait rien à corriger et n'avait d'autre issue
+ * que de vider le champ à l'aveugle. Mesuré par la seconde revue du 2026-07-29.
+ *
+ * Au bord, une jointure ne porte aucun sens — c'est précisément la raison pour
+ * laquelle on peut la retirer ici sans démembrer quoi que ce soit. Au milieu,
+ * elle reste intouchée.
+ */
+const JOINTURES_AU_BORD = /^[\u200C\u200D]+|[\u200C\u200D]+$/g;
+
+/**
+ * Le nettoyage commun aux deux : composition NFC, invisibles hors jointure,
+ * espaces de bord, jointures orphelines. Séparé pour que les deux fonctions ne
+ * puissent pas diverger — une saisie que `iconeTropLongue` accepte doit être
+ * exactement celle que `normaliserIcone` réduit.
+ */
+function nettoyerIcone(saisie: string): string {
+  return saisie
+    .normalize("NFC")
+    .replace(INVISIBLES_HORS_JOINTURE, "")
+    .trim()
+    .replace(JOINTURES_AU_BORD, "");
+}
+
+function graphemes(net: string) {
+  const segments = new Intl.Segmenter("fr", { granularity: "grapheme" });
+  return segments.segment(net)[Symbol.iterator]();
+}
+
+/**
+ * La position d'un rayon nouvellement créé : après tous les autres.
+ *
+ * ⚠ **Ne laisse jamais le défaut de la colonne faire ce travail.**
+ * `aisles.sort_order` vaut `100` par défaut, et 100 est **déjà pris** par
+ * « Hygiène & Entretien » dans le jeu amorcé — un rayon créé sans calcul
+ * atterrirait au milieu du parcours, ex æquo avec un rayon existant.
+ *
+ * Le pas de 10 laisse de la place pour insérer à la main entre deux rayons ;
+ * c'est déjà l'écart du jeu par défaut. Sur un foyer amorcé, le premier rayon
+ * créé vaut donc 1009, c'est-à-dire **après « Autre » (999)** : c'est la lecture
+ * littérale de « en fin de parcours », et la story 2.2 rendra le déplacement
+ * trivial.
+ *
+ * `sort_order` n'est pas unique en base : deux rayons peuvent légalement
+ * partager une position, d'où le tri secondaire par nom dans `rayonsDuFoyer`.
+ */
+export function prochainOrdre(rayons: ReadonlyArray<{ ordre: number }>): number {
+  // `Math.max()` sur une liste vide rend -Infinity, pas 0.
+  if (rayons.length === 0) return 10;
+  return Math.max(...rayons.map((r) => r.ordre)) + 10;
+}

@@ -1,0 +1,81 @@
+-- Interdit un nom de rayon vide, blanc, ou fait uniquement d'invisibles.
+--
+-- ⚠️ À CONTRÔLER EN REVUE, AVANT LA FUSION — cette migration ÉCHOUERA si une
+-- ligne existante ne respecte pas la contrainte, et depuis le 2026-07-29 elle
+-- s'applique **pendant le déploiement de production** (`vercel.json` →
+-- `scripts/migrer-au-deploiement.mjs`). Il n'y a plus de `db push` humain, donc
+-- plus de moment pour sonder la base entre l'écriture et l'application : le
+-- contrôle se fait en revue de PR, pas après. Exécuter dans le SQL Editor :
+--
+--   select id, household_id, name from aisles
+--   where regexp_replace(name, '[^[:graph:]]|[\u034F\u115F\u1160\u17B4\u17B5\u180B-\u180E\u2800\u3164\uFE00-\uFE0F\uFFA0]', '', 'g') = '';
+--
+-- Attendu : zéro ligne. Les seuls rayons existants viennent de
+-- `seed_default_aisles`, dont les onze noms sont écrits en dur — aucun chemin
+-- n'a jamais permis d'en créer un à la main. Si la requête rend malgré tout des
+-- lignes : les corriger avant de fusionner, et ne pas assouplir la contrainte
+-- pour les accommoder.
+--
+-- ⚠️ Une migration qui échoue ici interrompt le déploiement **après** que la
+-- précédente du même lot a été appliquée : `db push` enregistre fichier par
+-- fichier, il n'y a pas de transaction enveloppante sur un lot. Voir l'en-tête
+-- de `scripts/migrer-au-deploiement.mjs`.
+--
+-- LE DÉFAUT
+-- `name` est `not null`, ce qui n'interdit pas la chaîne vide. La story 2.1
+-- ouvre le premier chemin de création de rayon par saisie libre ; sans cette
+-- contrainte, la seule protection vivrait côté navigateur — et
+-- `String.prototype.trim()` ne retire pas les caractères invisibles (U+200B et
+-- voisins) qu'un copier-coller depuis une messagerie transporte.
+--
+-- Conséquence visible : une ligne muette dans la liste des rayons, un en-tête
+-- de carte-rayon vide sur la liste de courses à l'Epic 4, et un rayon que
+-- personne ne peut plus désigner pour le corriger.
+--
+-- C'est la TROISIÈME contrainte de cette forme, après
+-- `20260728133836_require_non_blank_display_name` et
+-- `20260728152418_require_non_blank_household_name`. Même motif, même raison :
+-- un champ libre partagé par tout le foyer descend en base, là où le projet a
+-- décidé que vivent les règles (AD-1/AD-2). Elle couvre aussi les appels
+-- directs à l'API REST, que le contrôle navigateur ne voit pas.
+--
+-- ⚠️ DEUX RÉDACTIONS FAUSSES AVANT CELLE-CI, ET LA LEÇON QUI EN SORT
+--
+-- 1. `btrim(name) <> ''` — mesuré faux le 2026-07-29. `btrim` à un seul
+--    argument ne retire **que l'espace ASCII** : ni tabulation, ni saut de
+--    ligne, ni U+00A0, ni aucun invisible. `{"name": "\t"}` passait.
+-- 2. Une liste de seize points de code — mesurée fausse le même jour, par la
+--    seconde passe de revue. U+115F et U+1160, les frères pleine largeur du
+--    U+3164 que la liste citait en exemple, passaient encore. La catégorie
+--    Unicode `Cf` compte à elle seule plusieurs centaines de points de code.
+--
+-- **Une énumération écrite à la main ne peut pas gagner contre Unicode.** D'où
+-- la forme retenue : on retire d'abord tout ce qui n'est **pas graphique**
+-- (`[^[:graph:]]`), ce qui balaie d'un coup les blancs, les contrôles et toute
+-- la catégorie « format » — U+00AD, U+200B-200F, U+202A-202E, U+2060-2064,
+-- U+FEFF, y compris ceux qu'Unicode ajoutera. Il ne reste ensuite qu'à nommer
+-- la petite famille des caractères que Postgres classe **graphiques alors
+-- qu'ils s'affichent vides** : remplisseurs Hangul, sélecteurs de variante,
+-- joncteur de graphème, voyelles khmères, braille blanc.
+--
+-- Ce qui subsiste après ces deux retraits doit être non vide. Vérifié dans le
+-- vrai Postgres sur 25 cas — français, cyrillique, arabe, chinois, emoji,
+-- emoji à jointure, emoji à sélecteur de variante et ponctuation acceptés ;
+-- vide, espaces, tabulation, U+00A0, U+00AD, U+200B, U+3164, U+115F, U+1160,
+-- U+FE0F, U+034F, U+2800, U+202E, U+0085, U+2065 refusés.
+--
+-- ⚠️ **La contrepartie applicative n'est PAS identique, et ne peut pas l'être.**
+-- `lib/texte.ts` emploie `\p{Default_Ignorable_Code_Point}`, une propriété
+-- Unicode que les expressions rationnelles de Postgres n'ont pas. Les deux
+-- populations se recouvrent très largement sans coïncider. L'accord est
+-- **mesuré** par un test de `lib/rayons/saisie.test.ts`, pas affirmé ici — la
+-- version précédente de ce commentaire affirmait « la même population », et
+-- c'était faux.
+--
+-- Ne change pas la forme du schéma : pas de régénération de types nécessaire.
+
+alter table aisles
+  add constraint aisles_name_non_vide
+  check (
+    regexp_replace(name, '[^[:graph:]]|[\u034F\u115F\u1160\u17B4\u17B5\u180B-\u180E\u2800\u3164\uFE00-\uFE0F\uFFA0]', '', 'g') <> ''
+  );

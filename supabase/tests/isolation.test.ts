@@ -276,3 +276,124 @@ test("un troisième compte rejoint A par son code, et ne voit alors que A", asyn
 
   await admin.auth.admin.deleteUser(cree!.user!.id);
 });
+
+// ── `seed_default_aisles` : le paramètre n'est pas une autorisation ─────────
+//
+// Ces tests couvrent un chemin que les onze précédents ne voyaient pas : les
+// appels **RPC**. Ils portent tous sur des tables, et une fonction
+// `security definer` ne passe pas par la RLS — c'est tout l'intérêt de
+// `security definer`, et c'est ce qui rendait le trou invisible.
+//
+// `seed_default_aisles` reçoit le foyer en paramètre. Avant
+// `20260729095922_guard_seed_default_aisles.sql`, elle ne le confrontait à rien :
+// mesuré le 2026-07-29, A pouvait poser onze rayons chez B. Retirer la garde de
+// la fonction sur la base locale fait tomber le premier de ces tests — c'est la
+// vérification des dents, au sens de l'en-tête de ce fichier.
+
+test("A ne peut pas amorcer les rayons du foyer de B", async () => {
+  const { count: avant } = await admin
+    .from("aisles")
+    .select("id", { count: "exact", head: true })
+    .eq("household_id", b.foyerId);
+
+  const { error } = await a.client.rpc("seed_default_aisles", {
+    p_household_id: b.foyerId,
+  });
+  assert.notEqual(error, null, "la garde d'identité doit refuser");
+
+  /*
+   * Le témoin négatif compte autant que le refus. Un `insert … on conflict do
+   * nothing` sur un foyer déjà amorcé ne changerait rien de toute façon : sans
+   * cette mesure, le test passerait tout aussi bien sur la version vulnérable.
+   * On mesure donc l'écart, pas seulement l'erreur.
+   */
+  const { count: apres } = await admin
+    .from("aisles")
+    .select("id", { count: "exact", head: true })
+    .eq("household_id", b.foyerId);
+  assert.equal(apres, avant, "le foyer de B ne bouge pas");
+});
+
+test("A ne peut pas amorcer un foyer qui n'existe pas", async () => {
+  // `current_household_id()` rend l'UUID de A ; un UUID quelconque ne peut donc
+  // jamais l'égaler. Le cas vaut d'être épinglé : c'est celui d'un appel forgé.
+  const { error } = await a.client.rpc("seed_default_aisles", {
+    p_household_id: randomUUID(),
+  });
+  assert.notEqual(error, null, "un foyer inconnu doit être refusé");
+});
+
+test("A ré-amorce son propre foyer, et l'opération est idempotente", async () => {
+  // On part du cas réel de l'écran : Alice a tout supprimé.
+  const { error: erreurSuppression } = await a.client
+    .from("aisles")
+    .delete()
+    .eq("household_id", a.foyerId);
+  assert.equal(erreurSuppression, null, "supprimer ses propres rayons est permis");
+
+  const { count: vide } = await admin
+    .from("aisles")
+    .select("id", { count: "exact", head: true })
+    .eq("household_id", a.foyerId);
+  assert.equal(vide, 0, "le foyer de A est bien vide avant l'amorçage");
+
+  const { error } = await a.client.rpc("seed_default_aisles", {
+    p_household_id: a.foyerId,
+  });
+  assert.equal(error, null, "le chemin légitime doit rester ouvert");
+
+  const { count: amorce } = await admin
+    .from("aisles")
+    .select("id", { count: "exact", head: true })
+    .eq("household_id", a.foyerId);
+  assert.equal(amorce, 11, "onze rayons français");
+
+  // Second appel : `on conflict (household_id, name) do nothing`.
+  await a.client.rpc("seed_default_aisles", { p_household_id: a.foyerId });
+  const { count: apresSecondAppel } = await admin
+    .from("aisles")
+    .select("id", { count: "exact", head: true })
+    .eq("household_id", a.foyerId);
+  assert.equal(apresSecondAppel, 11, "rien n'est dupliqué");
+});
+
+test("A ne peut ni renommer ni supprimer un rayon de B", async () => {
+  const { data: cible } = await admin
+    .from("aisles")
+    .select("id, name")
+    .eq("household_id", b.foyerId)
+    .eq("name", "Boucherie")
+    .single();
+
+  await a.client.from("aisles").update({ name: "Piraté" }).eq("id", cible!.id);
+  await a.client.from("aisles").delete().eq("id", cible!.id);
+
+  const { data: apres } = await admin
+    .from("aisles")
+    .select("name")
+    .eq("id", cible!.id)
+    .maybeSingle();
+  assert.equal(apres?.name, "Boucherie", "le rayon de B est intact");
+});
+
+test("la base refuse un nom de rayon vide", async () => {
+  // `aisles_name_non_vide`. Le client normalise en amont, mais la contrainte
+  // couvre aussi les appels directs à l'API REST, qu'aucun écran ne voit.
+  const { error } = await a.client.from("aisles").insert({
+    household_id: a.foyerId,
+    name: "   ",
+    sort_order: 1000,
+  });
+  assert.notEqual(error, null, "un nom d'espaces doit être refusé");
+  assert.equal(error!.code, "23514", "violation de contrainte check");
+});
+
+test("la base refuse deux rayons de même nom dans un foyer", async () => {
+  const { error } = await a.client.from("aisles").insert({
+    household_id: a.foyerId,
+    name: "Boucherie",
+    sort_order: 1010,
+  });
+  assert.notEqual(error, null, "le doublon doit être refusé");
+  assert.equal(error!.code, "23505", "violation d'unicité — le code que `refusRayon` lit");
+});
