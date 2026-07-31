@@ -378,3 +378,46 @@ n'a plus les migrations au moment où l'on génère, si bien que `--linked` rend
 - **Aucune borne de longueur en base sur `aisles.name` et `aisles.icon`.** `MAX_NOM_RAYON = 40` et `maxLength={16}` ne vivent que dans le navigateur ; les deux colonnes sont `text` sans contrainte. Un `POST` REST direct insère un nom d'un mégaoctet ou une icône de 5000 diacritiques, qui casseraient l'affichage pour tous les membres du foyer. Préexistant, atteignable seulement hors interface, et de la même famille que la contrainte `check` ajoutée par cette story — à traiter le jour où l'on écrit une migration de bornes sur les champs libres (`profiles.display_name` et `households.name` ont le même trou).
 - **Le bouton « Remettre les rayons de départ » reste réservé à l'état vide, et l'arête qui va avec.** Décision de Florian du 2026-07-29, conforme à ce que la story prescrivait : montrer le bouton sur un parcours déjà personnalisé inviterait à réintroduire onze rayons qu'on vient de supprimer. La conséquence assumée : supprimer dix des onze rayons laisse un état où le bouton est invisible et où **le seul moyen de le faire réapparaître est de supprimer le onzième**. Ressaisir à la main ne rend pas l'ordre du parcours, `sort_order` n'étant pas éditable avant la story 2.2. **À l'intention de la 2.2** : une fois le déplacement possible, l'arête perd sa portée — c'est le moment de vérifier qu'on n'a plus besoin d'y revenir.
 - **L'unicité des noms de rayon reste sensible à la casse.** `unique (household_id, name)` compare octet à octet : « boucherie » et « Boucherie » coexistent dans le même foyer, sans `23505`, donc sans message. Décision de Florian du 2026-07-29 : la revue ne traite que la forme Unicode (`.normalize("NFC")` ajouté dans `lib/texte.ts`), pas la casse. La rendre insensible exige un index sur `lower(name)`, donc une migration qui change le comportement d'unicité **pour tout le produit** — `profiles.display_name` et `households.name` portent la même question — et les tests d'isolation à rejouer. À trancher avec son coût, comme la distinction Florian/conjointe.
+
+## Deferred from: story 2.2 (2026-07-31)
+
+**Refermé par cette story — l'arête que la 2.1 lui avait adressée.** L'entrée « Le bouton *Remettre
+les rayons de départ* reste réservé à l'état vide » demandait de vérifier ici que son arête perdait
+sa portée. **Elle la perd, et c'est mesuré** : l'ordre du parcours est désormais entièrement
+ressaisissable — flèches et glisser — donc supprimer dix rayons sur onze n'enferme plus dans un état
+irréparable. Il reste à retaper les noms, mais c'était déjà vrai et ce n'est pas ce que l'entrée
+signalait. Le bouton reste réservé à l'état vide, conformément à la décision de Florian du
+2026-07-29 : **rien à rouvrir**.
+
+**Reporté, avec la raison :**
+
+- **Le glisser n'a pas de défilement automatique en bord d'écran.** Limite assumée et annoncée dès
+  l'écriture de la story, pas découverte après coup : on ne peut donc glisser un rayon qu'à
+  l'intérieur de la zone visible. Les longs trajets passent par les flèches monter/descendre, qui
+  couvrent le cas sans limite — c'est précisément la complémentarité des deux mécanismes. Un
+  défilement automatique demande une boucle d'animation, une zone morte en bord d'écran et une
+  recalibration des centres mesurés au début du geste ; à traiter le jour où la liste dépassera
+  franchement un écran, ce qu'onze rayons ne font pas.
+- **La géométrie du glisser se fige au `pointerdown` : défiler la page pendant qu'on tire décale la
+  cible.** Les centres des lignes sont mesurés une seule fois, en coordonnées de fenêtre, et c'est ce
+  qui garantit que l'index visé n'oscille pas. Corollaire : si l'utilisateur défile *pendant* le
+  geste, les mesures se décalent d'autant. Sans défilement automatique, le seul défilement possible
+  est délibéré, et le trait d'insertion montre en permanence où le rayon atterrira — l'écart est donc
+  visible avant le relâchement, jamais subi. Compenser exigerait de relire `window.scrollY` à chaque
+  `pointermove` ; à faire en même temps que le défilement automatique, pas avant.
+- **Le chemin TACTILE du glisser n'a pas été observé.** Le mécanisme qui le conditionne est vérifié —
+  `touch-action: none` est bien appliqué sur la poignée et sur elle seule (mesuré dans les styles
+  calculés), et les gestionnaires sont agnostiques au `pointerType`. Mais le geste lui-même n'a été
+  joué qu'à la **souris**. Un vrai doigt sur un vrai iPhone reste à faire : c'est le seul chemin où
+  `touch-action` et le défilement concurrent existent, et c'est exactement la classe d'erreur qui a
+  fait écarter `draggable` HTML5. **À faire par Florian avant la fusion.**
+- **La latence mesurée l'a été contre un Supabase LOCAL.** 81 ms médians par déplacement sur le build
+  de production, 771 ms pour remonter un rayon du onzième rang au premier. Le trajet réseau vers un
+  projet distant n'y est pas : en production réelle, compter le temps d'aller-retour en plus. La
+  décision « pas de mise à jour optimiste » repose sur ce chiffre — s'il se dégrade nettement en
+  production, c'est la question 2 de la story qui se rouvre, avec `useOptimistic` pour réponse.
+- **`indexCibleDuGlisser` compare des centres, pas des bords.** Conséquence : tirer une ligne
+  *haute* (nom sur deux lignes) au-dessus d'une ligne *basse* demande de dépasser le centre de
+  celle-ci, ce qui peut sembler exiger un pixel de plus qu'attendu. Le trait d'insertion le rend
+  visible en continu, donc l'écart s'observe avant de relâcher. Un modèle par bords serait plus
+  fidèle mais demande de gérer les recouvrements ; sans portée tant que les hauteurs restent proches.

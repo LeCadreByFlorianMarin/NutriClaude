@@ -7,8 +7,14 @@ import { messageDe } from "@/lib/messages";
 import { LIBELLE_OCCUPE } from "@/app/_lib/libelles";
 import { Notice } from "@/app/_lib/Notice";
 import { useSoumission } from "@/app/_lib/useSoumission";
-import { refusRayon } from "@/lib/rayons/erreurs";
+import { refusOrdre, refusRayon } from "@/lib/rayons/erreurs";
 import type { Rayon } from "@/lib/rayons/rayons";
+import {
+  indexCibleDuGlisser,
+  ordreApresDeplacement,
+  ordreDeplace,
+  type Sens,
+} from "@/lib/rayons/ordre";
 import {
   MAX_NOM_RAYON,
   iconeTropLongue,
@@ -29,6 +35,20 @@ const MESSAGES = {
   modifie: "C'est noté.",
   supprime: "Le rayon est parti.",
   restaure: "Les rayons de départ sont revenus.",
+  /*
+   * ⚠️ Jamais « Réessaie » ici. Réessayer sans rafraîchir reproduirait le même
+   * refus indéfiniment : le tableau envoyé ne correspond plus à la base, et
+   * seul un rafraîchissement peut le remettre d'accord. C'est pour ça que le
+   * `router.refresh()` fait partie du TRAITEMENT du refus, pas d'une éventuelle
+   * nouvelle tentative de l'utilisateur.
+   */
+  "liste-changee": "La liste des rayons vient de changer. La voilà à jour.",
+  /*
+   * Repli statique : la région du parcours rend mieux que ça — elle nomme le
+   * rayon et son nouveau rang, la seule information qu'un lecteur d'écran ne
+   * peut PAS tirer d'une liste qui se réordonne en silence.
+   */
+  deplace: "C'est noté.",
 } as const;
 
 type Cle = keyof typeof MESSAGES;
@@ -49,12 +69,61 @@ type Cle = keyof typeof MESSAGES;
  * d'échec : le panneau reste ouvert en bas de liste pendant que son message
  * s'écrit tout en haut. Trois surfaces, trois régions.
  *
- * Les trois sont **montées en permanence** tant que leur surface existe, et une
+ * ⚠ **`parcours` est la QUATRIÈME**, ajoutée avec le réordonnancement (story
+ * 2.2, décision de Florian du 2026-07-30). Elle est rendue SOUS la liste : sur
+ * un foyer amorcé, déplacer le onzième rayon écrirait sinon son message tout en
+ * haut, hors écran — le défaut que les deux passes de revue ont déjà trouvé sur
+ * deux surfaces différentes.
+ *
+ * Limite connue et acceptée : déplacer un rayon du HAUT d'une longue liste écrit
+ * le message SOUS la liste, donc possiblement hors écran lui aussi. Aucune
+ * position fixe ne satisfait les deux bouts. C'est supportable parce que le
+ * déplacement est sa propre confirmation visuelle — la ligne bouge sous les yeux
+ * — et que l'annonce au lecteur d'écran fonctionne quelle que soit la position
+ * de défilement. Le cas qui compterait vraiment, le refus, s'accompagne d'un
+ * `router.refresh()` dont l'effet est visible partout.
+ *
+ * Les quatre sont **montées en permanence** tant que leur surface existe, et une
  * seule porte du texte à la fois. C'est ce qui préserve l'acquis d'`InviteCard` :
  * une région annoncée de façon fiable est une région qui existait déjà avant que
  * le message n'y arrive.
  */
-type Zone = "liste" | "edition" | "creation";
+type Zone = "liste" | "edition" | "creation" | "parcours";
+
+/**
+ * Le geste de glisser en cours.
+ *
+ * ⚠ **C'est un ordre local, donc une entorse à « aucune copie locale de la
+ * liste » — et elle est bornée.** La règle de la story 2.1 interdit un état qui
+ * DIVERGE DANS LA DURÉE quand l'autre membre du foyer écrit. Un geste ne dure
+ * pas : cet objet est remis à `null` sur `pointerup`, sur `pointercancel` ET sur
+ * `Escape`, sans exception, et il ne porte que des positions — jamais un nom,
+ * une icône ou un `sort_order`. La soumission recalcule depuis les propriétés,
+ * jamais depuis lui. Même famille que `useOptimistic` : un aperçu qui expire.
+ *
+ * ⚠ **Les centres sont mesurés UNE fois, au `pointerdown`, et c'est pour ça que
+ * l'ordre du DOM ne bouge pas pendant le geste.** Un aperçu qui réordonnerait la
+ * liste sous le doigt invaliderait ces mesures à l'instant même où on s'en sert :
+ * la ligne visée se déroberait, l'index oscillerait entre deux valeurs et la
+ * liste tremblerait. Ici rien ne se réarrange — seule la ligne tirée se
+ * translate, et un trait montre où elle atterrira. Les mesures restent donc
+ * vraies pendant tout le geste, par construction.
+ */
+type Glisse = {
+  id: string;
+  /** Index de la ligne tirée dans `rayons` (donc dans la liste complète). */
+  depuisIndex: number;
+  /** `clientY` au `pointerdown`, origine du `delta`. */
+  departY: number;
+  /** Centre de la ligne tirée à la mesure initiale. */
+  centreDepart: number;
+  /** Centres des AUTRES lignes, dans l'ordre d'affichage. */
+  centresAutres: number[];
+  /** Déplacement courant du pointeur, en pixels. */
+  delta: number;
+  /** Index visé, exprimé dans la liste privée de la ligne tirée. */
+  cible: number;
+};
 
 /**
  * L'écran des rayons : créer, renommer, ré-iconifier, supprimer.
@@ -101,6 +170,48 @@ export function ListeRayons({
 
   /** La région de statut qui portera le message de la soumission en cours. */
   const [zone, setZone] = useState<Zone>("liste");
+  /**
+   * Le rayon qui vient d'être déplacé, et son nouveau rang.
+   *
+   * ⚠ **Ce n'est pas une copie de la liste** — c'est le contenu d'un message.
+   * Le rang est la seule information qu'un lecteur d'écran ne peut PAS obtenir
+   * autrement : une liste qui se réordonne le fait en silence, sans qu'aucune
+   * annonce ne soit émise.
+   */
+  const [deplacement, setDeplacement] = useState<{
+    nom: string;
+    rang: number;
+  } | null>(null);
+
+  /**
+   * Le geste de glisser en cours — voir `Glisse`. `null` en dehors d'un geste.
+   *
+   * ⚠ **Deux exemplaires, et ce n'est pas une redondance.** La `ref` est la
+   * source de vérité des gestionnaires ; l'état ne sert qu'à rendre.
+   *
+   * La raison est une fermeture : lu depuis l'état, `glisse` vaut dans
+   * `finirGlisse` ce qu'il valait au rendu où le gestionnaire a été posé. React
+   * groupe les mises à jour ; rien ne garantit qu'un rendu s'intercale entre le
+   * `pointerdown` et le `pointerup` d'un geste très bref. Le relâchement lirait
+   * alors `null` et le geste serait perdu **en silence** — pas d'erreur, pas de
+   * message, rien.
+   *
+   * ⚠️ Ce scénario est **raisonné, pas mesuré** : le seul échec observé le
+   * 2026-07-31 avait une tout autre cause (un point de départ périmé après un
+   * défilement de la page). La `ref` est retenue parce qu'elle supprime la
+   * classe de défaut par construction, pas parce qu'on a vu celui-ci se
+   * produire.
+   */
+  const glisseRef = useRef<Glisse | null>(null);
+  const [glisse, setGlisse] = useState<Glisse | null>(null);
+  /** La liste, pour mesurer la géométrie des lignes au début d'un glisser. */
+  const listeRef = useRef<HTMLUListElement>(null);
+
+  /** Pose le geste aux deux endroits — jamais l'un sans l'autre. */
+  function poserGlisse(g: Glisse | null) {
+    glisseRef.current = g;
+    setGlisse(g);
+  }
   /**
    * L'élément à refocaliser une fois le panneau refermé.
    *
@@ -301,6 +412,164 @@ export function ListeRayons({
     return "disparu";
   }
 
+  /**
+   * Réordonne le parcours et persiste la permutation entière.
+   *
+   * ⚠ **Un seul appel, pas deux `update`.** `reorder_aisles` renumérote tout le
+   * parcours en une transaction, et refuse tout tableau qui ne le couvre pas
+   * exactement. C'est ce qui tient l'AC2 — « positions uniques, aucun rayon
+   * perdu ou dupliqué » est un invariant sur plusieurs lignes à la fois, donc il
+   * vit en Postgres (AD-1/AD-2) et pas dans la vigilance de cet écran.
+   *
+   * ⚠ **Le calcul part des PROPRIÉTÉS, donc du dernier rendu serveur.** Deux
+   * pressions avant l'arrivée du `router.refresh()` calculeraient le même
+   * tableau depuis le même état, et la seconde serait silencieusement perdue :
+   * la base ne broncherait pas, le rayon aurait bougé d'un cran au lieu de deux.
+   * C'est `disabled={occupe}` sur les flèches qui ferme cette course — et pas
+   * `useSoumission`, dont `occupe` n'est jamais relu dans `soumettre`.
+   */
+  async function persisterOrdre(ordre: string[], nom: string, versIndex: number) {
+    setZone("parcours");
+
+    await soumettre(async () => {
+      const supabase = createNavigateurClient();
+      const { error } = await supabase.rpc("reorder_aisles", { p_ids: ordre });
+
+      if (error) {
+        console.error("[rayons] réordonnancement refusé :", error.message);
+        const refus = refusOrdre(error);
+        /*
+         * Rafraîchir fait partie du traitement du refus. Sans lui, l'écran
+         * resterait en désaccord avec la base — l'autre membre a ajouté ou
+         * supprimé un rayon — et chaque nouvelle tentative reproduirait le même
+         * refus, indéfiniment. Même impasse que celle refermée par `disparu()`.
+         */
+        if (refus === "liste-changee") router.refresh();
+        return refus;
+      }
+
+      setDeplacement({ nom, rang: versIndex + 1 });
+      router.refresh();
+      return "deplace";
+    });
+  }
+
+  async function deplacer(rayon: Rayon, sens: Sens, index: number) {
+    const ordre = ordreApresDeplacement(rayons, rayon.id, sens);
+    // Bout de course : le bouton était désactivé, on ne devrait pas arriver là.
+    // Rien à écrire, donc rien à dire.
+    if (!ordre) return;
+
+    const versIndex = sens === "haut" ? index - 1 : index + 1;
+
+    /*
+     * ⚠ **Le focus, et c'est le piège de cette story.** Le déplacement peut
+     * désactiver le bouton qu'on vient de presser — monter jusqu'à la première
+     * place désactive « monter » — et **un élément désactivé perd le focus**,
+     * qui retombe sur `<body>`. Au clavier, il faudrait repartir de `Tab` en
+     * haut du document. On vise donc, quand c'est le cas, la flèche opposée,
+     * qui elle restera active.
+     *
+     * Posé AVANT la soumission : l'effet de focus est réveillé par le changement
+     * de `rayons` et consomme la cible qu'il trouve.
+     */
+    const finDeCourse =
+      sens === "haut" ? versIndex === 0 : versIndex === rayons.length - 1;
+    const opposee = sens === "haut" ? "descendre" : "monter";
+    const meme = sens === "haut" ? "monter" : "descendre";
+    retourFocus.current = `${finDeCourse ? opposee : meme}-${rayon.id}`;
+
+    await persisterOrdre(ordre, rayon.nom, versIndex);
+  }
+
+  /* ── Le glisser ──────────────────────────────────────────────────────────
+   *
+   * ⚠ **`draggable` HTML5 est hors jeu** : il n'émet AUCUN événement au toucher
+   * sur iOS Safari, et NFR-1 nomme l'iPhone 15 Pro comme appareil de référence.
+   * D'où les événements de pointeur, qui unifient souris, stylet et doigt.
+   *
+   * ⚠ **Les flèches ci-dessus ne sont pas un doublon de ce geste : elles sont ce
+   * qui le rend CONFORME.** WCAG 2.5.7 (« Dragging Movements », AA) exige que
+   * toute fonction reposant sur un glissement dispose d'une alternative à
+   * pointeur simple qui n'en soit pas un. Livrer le glisser seul serait une
+   * régression d'accessibilité.
+   */
+
+  function debutGlisse(event: React.PointerEvent<HTMLSpanElement>, rayon: Rayon, index: number) {
+    // Une poignée n'est pas un `<button>` : `disabled` n'existe pas dessus, donc
+    // la garde contre la ré-entrance s'écrit ici. Même raison que le
+    // `disabled={occupe}` des flèches.
+    if (occupe || !listeRef.current) return;
+
+    /*
+     * Sans capture de pointeur, sortir du rectangle de la poignée — ce qui
+     * arrive dès les premiers pixels — ferait perdre les événements suivants.
+     */
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    const lignes = [...listeRef.current.querySelectorAll(":scope > li")];
+    const centres = lignes.map((el) => {
+      const r = el.getBoundingClientRect();
+      return r.top + r.height / 2;
+    });
+
+    poserGlisse({
+      id: rayon.id,
+      depuisIndex: index,
+      departY: event.clientY,
+      centreDepart: centres[index],
+      centresAutres: centres.filter((_, i) => i !== index),
+      delta: 0,
+      cible: index,
+    });
+  }
+
+  function suivreGlisse(event: React.PointerEvent<HTMLSpanElement>) {
+    const g = glisseRef.current;
+    if (!g) return;
+    const delta = event.clientY - g.departY;
+    poserGlisse({
+      ...g,
+      delta,
+      cible: indexCibleDuGlisser(g.centresAutres, g.centreDepart + delta),
+    });
+  }
+
+  async function finirGlisse() {
+    const g = glisseRef.current;
+    // Jeter l'aperçu AVANT d'écrire : aucun chemin de sortie ne doit pouvoir le
+    // laisser derrière lui.
+    poserGlisse(null);
+    if (!g) return;
+
+    const rayon = rayons.find((r) => r.id === g.id);
+    if (!rayon) return;
+
+    const ordre = ordreDeplace(rayons, g.id, g.cible);
+    // Relâché à sa place de départ : il ne s'est rien passé, donc rien à écrire
+    // et rien à annoncer.
+    if (!ordre) return;
+
+    /*
+     * Le focus n'est PAS déplacé ici, et la dissymétrie avec les flèches est
+     * voulue : un utilisateur au pointeur ne navigue pas au focus, et le lui
+     * bouger serait une surprise. La poignée est `aria-hidden` et non
+     * focalisable — il n'y a rien à lui rendre.
+     */
+    await persisterOrdre(ordre, rayon.nom, g.cible);
+  }
+
+  /* `Escape` annule le geste — au même titre que `pointercancel`, qui arrive
+     pour de vrai : appel entrant, changement d'application, geste système. */
+  useEffect(() => {
+    if (!glisse) return;
+    const surTouche = (e: KeyboardEvent) => {
+      if (e.key === "Escape") poserGlisse(null);
+    };
+    window.addEventListener("keydown", surTouche);
+    return () => window.removeEventListener("keydown", surTouche);
+  }, [glisse]);
+
   async function restaurer() {
     setZone("liste");
     /*
@@ -359,6 +628,41 @@ export function ListeRayons({
       {zone === "creation" ? message : undefined}
     </Notice>
   );
+  /*
+   * Sous la liste, et sans `reserve` : elle n'est au-dessus d'aucune cible, donc
+   * réserver sa hauteur ne protégerait rien (contrat de `Notice`).
+   *
+   * ⚠ Le rang est rendu en `tabular-nums` — UX-DR12 l'impose sur tout chiffre, et
+   * `.notice` ne le porte pas. Et le premier rang s'écrit « 1re », jamais
+   * « 1ᵉ » ni « 1ère » : une synthèse vocale lit de travers un ordinal mal formé.
+   */
+  const statutParcours = (
+    <Notice className="mt-3">
+      {zone !== "parcours" ? undefined : cle === "deplace" && deplacement ? (
+        <>
+          {deplacement.nom} est en{" "}
+          <span className="tabular-nums">{deplacement.rang}</span>
+          {deplacement.rang === 1 ? "re" : "e"} position.
+        </>
+      ) : (
+        message
+      )}
+    </Notice>
+  );
+
+  /*
+   * Où le trait d'insertion doit s'afficher. `cible` est un index dans la liste
+   * PRIVÉE de la ligne tirée : le rayon atterrira juste avant `idsAutres[cible]`,
+   * ou tout à la fin quand `cible` vaut la longueur.
+   *
+   * Le trait est en position absolue — sans quoi ses 2px décaleraient tout ce
+   * qui suit et fausseraient les centres mesurés au `pointerdown`.
+   */
+  const idsAutres = glisse ? rayons.filter((r) => r.id !== glisse.id).map((r) => r.id) : [];
+  const glisseUtile = glisse !== null && glisse.cible !== glisse.depuisIndex;
+  const idAvantLequelInserer =
+    glisseUtile && glisse.cible < idsAutres.length ? idsAutres[glisse.cible] : null;
+  const traitEnFinDeListe = glisseUtile && glisse.cible === idsAutres.length;
 
   return (
     <div>
@@ -389,9 +693,60 @@ export function ListeRayons({
             </button>
           </div>
         ) : (
-          <ul className="mt-2">
-            {rayons.map((rayon) => (
-              <li key={rayon.id} className="border-b border-card-border last:border-0">
+          <>
+          <ul className="mt-2" ref={listeRef}>
+            {rayons.map((rayon, index) => (
+              <li
+                key={rayon.id}
+                className={`relative border-b border-card-border last:border-0 ${
+                  glisse?.id === rayon.id ? "z-10" : ""
+                }`}
+                style={
+                  glisse?.id === rayon.id
+                    ? {
+                        /* Suit le pointeur en 1:1. AUCUNE transition : le retour
+                           d'état direct au geste doit rester immédiat, et
+                           l'absence d'animation satisfait
+                           `prefers-reduced-motion` sans code conditionnel
+                           (UX-DR11). */
+                        transform: `translateY(${glisse.delta}px)`,
+                        /*
+                          ⚠ **La ligne tirée doit être OPAQUE, et
+                          `--surface-card` ne l'est pas.** En thème sombre elle
+                          vaut `#ffffff0e` — 5 % de blanc — et `--card-shadow`
+                          vaut `none` : la ligne recouverte se lisait à travers,
+                          deux noms superposés et illisibles. Vu à l'écran le
+                          2026-07-31 ; aucune des quatre portes ne pouvait
+                          l'attraper.
+
+                          D'où le fond de base OPAQUE, avec la teinte de carte
+                          posée par-dessus en dégradé plat — deux tokens
+                          existants, aucune couleur inventée. C'est exactement
+                          le rendu d'une carte qui flotte au-dessus de la page.
+                        */
+                        backgroundColor: "var(--surface-base)",
+                        backgroundImage:
+                          "linear-gradient(var(--surface-card), var(--surface-card))",
+                        boxShadow: "var(--card-shadow)",
+                      }
+                    : undefined
+                }
+              >
+                {/* Le trait d'insertion : où le rayon tiré atterrira. En
+                    position absolue pour ne décaler AUCUNE ligne — un décalage
+                    invaliderait les centres mesurés au début du geste. */}
+                {idAvantLequelInserer === rayon.id ? (
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -top-px right-0 left-0 h-0.5 bg-text"
+                  />
+                ) : null}
+                {traitEnFinDeListe && idsAutres[idsAutres.length - 1] === rayon.id ? (
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute right-0 -bottom-px left-0 h-0.5 bg-text"
+                  />
+                ) : null}
                 {enEdition === rayon.id ? (
                   <form onSubmit={enregistrer} className="py-3">
                     {/*
@@ -518,32 +873,112 @@ export function ListeRayons({
                   </form>
                 ) : (
                   /*
-                    Toute la ligne est le bouton, et c'est le seul de la ligne :
-                    une cible unique, généreuse, plutôt que deux petits liens
-                    côte à côte sur une largeur de téléphone.
+                    ⚠ **La ligne n'est plus UN bouton, et c'est structurel.**
+                    Elle l'était jusqu'à la story 2.2 — `<button>` unique portant
+                    toute la largeur. Un `<button>` ne peut pas en contenir un
+                    autre : les flèches ne pouvaient pas y entrer. D'où trois
+                    frères, et non un bouton qui en contiendrait deux.
+
+                    L'esprit du choix d'origine est préservé : ouvrir l'édition
+                    reste UNE cible, généreuse, qui prend toute la place que les
+                    flèches lui laissent. On n'a pas fractionné l'ouverture.
+
+                    La largeur, comptée : `max-w-sm` (384px) dans un `p-6` fait
+                    ~336px. Deux flèches à 44px = 88px ; il reste ~248px pour
+                    l'emoji et le nom. L'eyebrow « Modifier » a donc disparu — le
+                    nom accessible vit dans l'`aria-label`, rien n'est perdu pour
+                    un lecteur d'écran.
                   */
-                  <button
-                    type="button"
-                    id={`rayon-${rayon.id}`}
-                    onClick={() => ouvrir(rayon)}
-                    aria-label={`Modifier ${rayon.nom}`}
-                    className="flex min-h-11 w-full cursor-pointer items-center gap-3
-                               py-2 text-left text-base"
-                  >
-                    {/* L'emoji est décoratif : le nom est déjà en texte juste à
-                        côté, et le lire deux fois n'apporte rien (UX-DR4). */}
-                    <span aria-hidden="true" className="w-6 shrink-0 text-center">
-                      {rayon.icone ?? ""}
+                  <div className="flex items-center gap-1">
+                    {/*
+                      La poignée de glisser.
+
+                      ⚠ **`aria-hidden` sur un élément qui réagit au pointeur
+                      n'est PAS une erreur ici, et il ne faut pas le
+                      « corriger ».** Elle n'a AUCUN comportement clavier : sa
+                      fonction est intégralement dupliquée par les deux flèches,
+                      qui sont de vrais boutons nommés. L'annoncer au lecteur
+                      d'écran reviendrait à lui présenter un contrôle inopérant.
+                      C'est cette dualité qui satisfait WCAG 2.5.7.
+
+                      ⚠ **`touch-none` est vital, et sur elle seule.** Sans lui,
+                      le navigateur traite le geste comme un défilement et AUCUN
+                      `pointermove` n'arrive : le glisser ne marche pas au doigt.
+                      L'étendre à la liste casserait le défilement de la page.
+                    */}
+                    <span
+                      aria-hidden="true"
+                      tabIndex={-1}
+                      onPointerDown={(e) => debutGlisse(e, rayon, index)}
+                      onPointerMove={suivreGlisse}
+                      onPointerUp={finirGlisse}
+                      onPointerCancel={() => poserGlisse(null)}
+                      className={`flex min-h-11 w-11 shrink-0 touch-none items-center
+                                  justify-center text-base text-muted select-none
+                                  ${glisse?.id === rayon.id ? "cursor-grabbing" : "cursor-grab"}`}
+                    >
+                      ⠿
                     </span>
-                    <span className="min-w-0 flex-1 break-all">{rayon.nom}</span>
-                    <span aria-hidden="true" className="hint shrink-0">
-                      Modifier
-                    </span>
-                  </button>
+                    <button
+                      type="button"
+                      id={`rayon-${rayon.id}`}
+                      onClick={() => ouvrir(rayon)}
+                      aria-label={`Modifier ${rayon.nom}`}
+                      className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center
+                                 gap-3 py-2 text-left text-base"
+                    >
+                      {/* L'emoji est décoratif : le nom est déjà en texte juste à
+                          côté, et le lire deux fois n'apporte rien (UX-DR4). */}
+                      <span aria-hidden="true" className="w-6 shrink-0 text-center">
+                        {rayon.icone ?? ""}
+                      </span>
+                      <span className="min-w-0 flex-1 break-all">{rayon.nom}</span>
+                    </button>
+
+                    {/*
+                      Les deux flèches. `disabled={occupe}` n'est pas décoratif :
+                      il ferme la course de deux pressions rapides, qui
+                      calculeraient le même ordre depuis les mêmes propriétés.
+
+                      Désactivé = un ton plus clair (`text-muted`), jamais une
+                      opacité réductrice : c'est la règle de la couche de
+                      composants, et une opacité ferait tomber le glyphe sous le
+                      seuil de contraste.
+
+                      Le glyphe est `aria-hidden` — le nom accessible est dans
+                      l'`aria-label` du bouton, et « ↑ » ne se lit pas.
+                    */}
+                    <button
+                      type="button"
+                      id={`monter-${rayon.id}`}
+                      onClick={() => deplacer(rayon, "haut", index)}
+                      disabled={occupe || index === 0}
+                      aria-label={`Monter ${rayon.nom}`}
+                      className="flex min-h-11 w-11 shrink-0 cursor-pointer items-center
+                                 justify-center text-base text-text
+                                 disabled:cursor-default disabled:text-muted"
+                    >
+                      <span aria-hidden="true">↑</span>
+                    </button>
+                    <button
+                      type="button"
+                      id={`descendre-${rayon.id}`}
+                      onClick={() => deplacer(rayon, "bas", index)}
+                      disabled={occupe || index === rayons.length - 1}
+                      aria-label={`Descendre ${rayon.nom}`}
+                      className="flex min-h-11 w-11 shrink-0 cursor-pointer items-center
+                                 justify-center text-base text-text
+                                 disabled:cursor-default disabled:text-muted"
+                    >
+                      <span aria-hidden="true">↓</span>
+                    </button>
+                  </div>
                 )}
               </li>
             ))}
           </ul>
+          {statutParcours}
+          </>
         )}
       </section>
 

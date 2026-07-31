@@ -13,11 +13,14 @@ export const metadata = { title: "Tes rayons · NutriClaude" };
  * amorce onze à la création du foyer — mais **aucune surface ne les avait
  * jamais affichés**. C'est le premier écran qui les rend visibles.
  *
- * Ce que cet écran ne fait pas, et où ça vit : réordonner par manipulation
- * directe (story 2.2), les règles mot-clé → rayon (story 2.3), la carte-rayon
- * avec son ratio `n/total` (story 2.4), et l'affichage de la liste de courses
- * groupée par rayon (Epic 4). Le ratio suppose des articles, et il n'y en a pas
- * encore.
+ * Il porte aussi le réordonnancement du parcours depuis la story 2.2 : deux
+ * flèches par ligne et un glisser à la poignée, jamais une saisie de numéro
+ * d'ordre (FR-12).
+ *
+ * Ce que cet écran ne fait pas, et où ça vit : les règles mot-clé → rayon
+ * (story 2.3), la carte-rayon avec son ratio `n/total` (story 2.4), et
+ * l'affichage de la liste de courses groupée par rayon (Epic 4). Le ratio
+ * suppose des articles, et il n'y en a pas encore.
  *
  * Rendu serveur, écritures client-direct : voir `ListeRayons`.
  */

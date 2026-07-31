@@ -41,7 +41,23 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
-last_updated: 2026-07-29  # Revue adversariale de la story 2.1. Elle a trouvé, hors du périmètre de
+last_updated: 2026-07-31  # Story 2.2 implémentée, en attente de revue (branche
+                          # `feat/rayons-reordonner-parcours`, depuis `f29c1a1`). Cinq portes
+                          # vertes : 96/96 unitaires, 27/27 isolation, dents vérifiées (27 → 25
+                          # sans la garde de comptage). Le parcours à l'écran a trouvé un défaut
+                          # qu'aucune porte ne voyait : en thème sombre la ligne tirée était
+                          # TRANSPARENTE (`--surface-card` = 5 % de blanc, `--card-shadow` =
+                          # `none`), deux noms superposés. Corrigé, revérifié dans les deux thèmes.
+                          # Latence tranchée par la mesure : 81 ms médians sur le BUILD DE
+                          # PRODUCTION contre ~1000 ms en développement — pas de mise à jour
+                          # optimiste, la question 2 est close.
+                          # ⚠️ RESTE AVANT FUSION : le glisser AU DOIGT (joué à la souris seulement ;
+                          # `touch-action: none` est mesuré, le geste ne l'est pas), la requête de
+                          # contrôle de migration sur la production, et les questions du gabarit de PR.
+                          #
+                          # 2026-07-30 — Story 2.2 contextualisée. Détail au niveau de son entrée ci-dessous.
+                          #
+                          # 2026-07-29 — Revue adversariale de la story 2.1. Elle a trouvé, hors du périmètre de
                           # la story, que `main` n'était pas protégée : depuis `vercel.json`, un
                           # commit sur `main` applique les migrations en production, gardé par le
                           # seul `next build`. Protection posée, job CI `isolation` ajouté — les 17
@@ -95,7 +111,30 @@ development_status:
   # parcours à l'écran dans les deux thèmes, job CI `isolation` sur un runner, état vide
   # en sombre observé. La portée de SUPABASE_DB_URL est confirmée par Florian.
   2-1-gerer-ses-rayons: done
-  2-2-reordonner-le-parcours-par-manipulation-directe: backlog
+  # Contextualisée le 2026-07-30. Le mécanisme a été ÉPROUVÉ sur le stack local avant
+  # d'être prescrit — huit contrôles, deux comptes, base remise à l'état du dépôt :
+  # fonction `reorder_aisles(uuid[])` en `security invoker` (le contraire exact de
+  # `seed_default_aisles`, dont la story 2.1 a dû refermer le trou), quatre gardes, et
+  # un renumérotage complet qui RÉSORBE les ex æquo (1 position distincte → 11).
+  # Le seul contrôle qui attrape un appel forgé à cardinal exact est le comptage de
+  # lignes après l'`update` : sous RLS, écrire sur une ligne masquée ne rend AUCUNE
+  # erreur. La sonde a aussi trouvé deux faux positifs de test — sous RLS, A ne peut
+  # pas lire les identifiants de B, donc un test inter-foyers doit les obtenir du
+  # client `admin`, sans quoi il passe en ne prouvant rien.
+  #
+  # Les 4 questions ont été TRANCHÉES par Florian le 2026-07-30, avant démarrage. La
+  # première contre la recommandation : le GLISSER entre dans le périmètre, en plus des
+  # flèches. Fait main sur événements de pointeur — `draggable` HTML5 n'émet rien au
+  # toucher sur iOS, l'appareil de référence de NFR-1. ⚠️ Les flèches restent
+  # obligatoires : WCAG 2.5.7 exige une alternative à pointeur simple à tout mouvement
+  # de glissement, et elles sont le seul chemin clavier (UX-DR11). Ordre de construction
+  # imposé — le chemin flèches en entier, puis le glisser par-dessus le même primitif pur.
+  # Coût dit d'avance : ~200 lignes de JSX qu'aucun test ne couvre (NFR-10), et une
+  # vérification manuelle DÉDOUBLÉE souris/doigt.
+  # Décisions 2 à 4 conformes aux prescriptions : pas de mise à jour optimiste mais le
+  # ressenti doit être MESURÉ et rapporté ; pas de contrainte d'unicité sur `sort_order`
+  # (l'invariant se mesure par test) ; une 4e région de statut sous la liste.
+  2-2-reordonner-le-parcours-par-manipulation-directe: review
   2-3-definir-des-regles-mot-cle-rayon: backlog
   2-4-composant-carte-rayon: backlog
   epic-2-retrospective: optional

@@ -40,6 +40,32 @@ const PAR_MESSAGE: ReadonlyArray<[string, RefusRayon]> = [
   ["aisles_name_non_vide", "nom-vide"],
 ];
 
+/**
+ * Les refus de `reorder_aisles`, qui sont d'une autre nature que ceux d'un
+ * `insert` ou d'un `update` de rayon — d'où une fonction distincte plutôt qu'une
+ * branche de plus dans `refusRayon`.
+ */
+export type RefusOrdre = "liste-changee" | "echec";
+
+/**
+ * ⚠️ **`raise exception` sans `errcode` rend `P0001`** — mesuré sur le stack
+ * local. Les quatre gardes de `reorder_aisles` le rendent toutes, et c'est
+ * voulu : du point de vue de l'utilisateur, elles disent une seule et même
+ * chose — *la liste que tu m'as envoyée ne correspond plus à celle qui est en
+ * base*. Laquelle des quatre a parlé n'intéresse que le développeur, et part
+ * dans `console.error`.
+ *
+ * ⚠️ **Aucun repli sur le texte, contrairement à `refusRayon`.** Là-bas, le
+ * repli couvre la fenêtre où le JS servi ne correspond pas encore à la base, et
+ * il s'appuie sur des **noms de contraintes**, qui sont stables. Ici il faudrait
+ * s'appuyer sur une phrase française rédigée dans le corps de la fonction : la
+ * reformuler casserait l'écran en silence. Le message n'est pas un contrat.
+ */
+export function refusOrdre(erreur: ErreurBase | null): RefusOrdre {
+  if (!erreur) return "echec";
+  return erreur.code === "P0001" ? "liste-changee" : "echec";
+}
+
 export function refusRayon(erreur: ErreurBase | null): RefusRayon {
   if (!erreur) return "echec";
 
