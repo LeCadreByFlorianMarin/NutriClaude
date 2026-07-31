@@ -329,14 +329,19 @@ la discipline réelle.
 les applique ; en local, on ne joue que sur le stack `supabase start`. Mécanisme : `vercel.json` →
 `scripts/migrer-au-deploiement.mjs`, exécuté **après** `next build`.
 
-**À contrôler au premier déploiement — ce n'est pas encore prouvé :**
+**~~À contrôler au premier déploiement~~ — contrôlé le 2026-07-31, et la prédiction était fausse :**
 
-- **La connexion depuis un conteneur de construction Vercel vers Supabase n'a jamais été jouée.**
-  Le script a été éprouvé de bout en bout contre le stack **local** (gardes, chemin nominal, et
-  rattrapage réel d'une migration rembobinée à la main), jamais contre le distant. Le point de rupture
-  probable est l'URI : il faut celle du **pooler de session** (port `5432`), pas du pooler de
-  transaction (`6543`), qui ne tient pas les instructions de définition de schéma. *« Les quatre
-  portes ne voient pas le déploiement »* — c'est le journal de construction de la PR qui fait foi.
+- ~~**La connexion depuis un conteneur de construction Vercel vers Supabase n'a jamais été jouée.**~~
+  **Jouée le 2026-07-30, échouée, corrigée le 07-31.** L'attente portait sur le port — pooler de
+  session (`5432`) contre pooler de transaction (`6543`) — et une garde couvrait déjà ce cas. Le point
+  de rupture réel était l'**hôte** : `SUPABASE_DB_URL` portait la connexion directe
+  `db.<ref>.supabase.co`, qui ne publie plus qu'un enregistrement `AAAA` et n'est donc joignable qu'en
+  IPv6, quand un conteneur de construction Vercel n'en a pas. Les deux hôtes écoutant tous deux sur
+  `5432`, la garde du port ne pouvait pas le voir. Garde sur l'hôte ajoutée, et le mode de défaillance
+  documenté dans `docs/migrations.md` § « Le premier déploiement réel, et ce qu'il a démenti ».
+  **Ce que ça coûte de retenir :** l'échec n'a rien signalé pendant 23 h, la PR #14 restant fusionnée
+  mais non servie. *« Les quatre portes ne voient pas le déploiement »* était juste — c'est bien le
+  journal de construction qui fait foi, et personne ne l'a regardé.
 
 **Ce que ce mécanisme ne rattrape pas, et qu'il faut savoir :**
 
