@@ -81,7 +81,15 @@ L'ordre compte, et il est expliqué en tête de `scripts/migrer-au-deploiement.m
 
 ⚠️ **Mais « ça a échoué » ne veut PAS dire « rien n'a bougé », et ce document l'a affirmé à tort jusqu'au 2026-07-29.** `supabase db push` n'est pas atomique sur un lot : il applique les fichiers un par un et enregistre chacun au fur et à mesure. Sur un lot de deux migrations dont la seconde échoue, **la première est appliquée** et le code n'est pas promu. Ce qui rend cet état supportable est l'**additivité** (voir plus haut), pas une propriété du script. Après un déploiement rouge qui touchait des migrations : lire la sortie de la CLI dans le journal Vercel, qui nomme les fichiers passés, puis `npx supabase migration list --linked`.
 
-**Le seul secret nécessaire** est `SUPABASE_DB_URL`, portée **Production uniquement** dans Vercel. C'est l'URI du **pooler de session** (port `5432`), pas celle du pooler de transaction (`6543`) : ce dernier ne tient pas les instructions de définition de schéma. Le mot de passe doit être **encodé pour URL** s'il contient des caractères spéciaux.
+**Le seul secret nécessaire** est `SUPABASE_DB_URL`, portée **Production uniquement** dans Vercel. C'est l'URI du **pooler de session**, et le tableau de bord en propose trois — les deux autres sont des impasses :
+
+| Ce que propose Supabase | Hôte | Port | Depuis Vercel |
+| --- | --- | --- | --- |
+| Connexion directe | `db.<ref>.supabase.co` | 5432 | ❌ **IPv6 seulement** |
+| Pooler de transaction | `aws-N-<région>.pooler.supabase.com` | 6543 | ❌ ne tient pas le DDL |
+| **Pooler de session** | `aws-N-<région>.pooler.supabase.com` | **5432** | ✅ |
+
+⚠️ **Le nom d'utilisateur change avec l'hôte** : le pooler attend `postgres.<ref>`, pas `postgres`. Recopier l'URI entière depuis le panneau *Connect*, ne pas fabriquer l'hôte à la main dans une URI existante. Le mot de passe doit être **encodé pour URL** s'il contient des caractères spéciaux.
 
 > ⚠️ **Ce secret n'est pas une variable d'environnement ordinaire.** C'est le rôle `postgres` : il **traverse la RLS de bout en bout**, par conception — une migration doit pouvoir tout faire. Or toute l'isolation entre foyers (NFR-5) repose sur la RLS : onze politiques, une garde `security definer`, dix-sept tests. Cette URI est la clé qui ouvre l'ensemble.
 >
@@ -92,6 +100,7 @@ Ce que le script refuse de faire :
 - **Rien hors production.** `VERCEL_ENV` doit valoir `production`.
 - **Rien hors de `main`.** `VERCEL_ENV === "production"` ne veut pas dire « branche fusionnée » : un `vercel --prod` depuis n'importe quelle branche produit un déploiement de production. Le script contrôle donc aussi `VERCEL_GIT_COMMIT_REF`. (Ajouté le 2026-07-29 : la garde promise par l'en-tête n'existait pas.)
 - **Rien sur le pooler de transaction.** Une URI en `:6543` est refusée avant tout appel, plutôt que de laisser `db push` échouer sur une erreur pgbouncer opaque.
+- **Rien sur l'hôte de connexion directe.** Un hôte en `db.<ref>.supabase.co` est refusé, parce qu'il est joignable en IPv6 seulement. (Ajouté le 2026-07-31, après qu'il eut coûté un déploiement : voir ci-dessous.)
 - **Passer son tour en silence.** Si `SUPABASE_DB_URL` manque sur un déploiement de production, le script **échoue**. Un contrôle qui rend « vert » en n'ayant rien fait est précisément le motif de défaut que ce dépôt a rencontré trois fois.
 
 ### Relire une PR : sur le stack local, jamais sur la prévisualisation
@@ -111,7 +120,20 @@ La prévisualisation reste le seul témoin du **déploiement** lui-même (`engin
 - **Un « Redeploy » avec reconstruction d'un déploiement antérieur** réclamera `supabase migration repair` : le dossier local y a moins de migrations que le distant. Le repli « revenir au code d'avant » passe donc par l'**Instant Rollback** de Vercel, qui ne reconstruit pas — pas par un redéploiement.
 - **Une migration à horodatage antérieur à la dernière appliquée** fait refuser `db push`, et **tous** les déploiements suivants échouent jusqu'à intervention manuelle — y compris ceux qui ne touchent aucune migration. Cas d'école : deux branches ouvertes dans un ordre et fusionnées dans l'autre. Créer sa migration **au moment de l'écrire**, pas au moment d'ouvrir la branche.
 - **Deux déploiements de production simultanés** pourraient tenter d'appliquer la même migration. La table d'historique a une clé sur la version : l'un des deux échouerait, donc ne serait pas promu. Sans portée à ce rythme, mais ce n'est pas impossible.
-- **Le premier déploiement après ce changement est le vrai test.** La connexion depuis un conteneur de construction Vercel vers Supabase n'a jamais été jouée. Regarder le journal de construction de la PR, pas seulement la CI — *« les quatre portes ne voient pas le déploiement »*.
+- **`db push` avertit sur Docker, à chaque déploiement, et ce n'est pas un échec.** `failed to cache migrations catalog: error exporting pg-delta catalog: failed to run docker` porte sur la mise en cache du catalogue `pg-delta`, une étape **postérieure** à l'application, qui réclame un Docker que le conteneur de construction n'a pas. Les migrations sont passées : `Finished supabase db push.` et le code de sortie 0 font foi, pas ce « Warning ».
+
+### Le premier déploiement réel, et ce qu'il a démenti (2026-07-30 → 07-31)
+
+Ce document annonçait que le premier déploiement serait le vrai test, la connexion depuis un conteneur de construction Vercel n'ayant jamais été jouée. Elle l'a été, elle a échoué, et **le point de rupture n'était pas celui qu'on avait prévu**. C'est la raison d'être de cette section : la prédiction était plausible et fausse.
+
+On attendait le pooler de transaction (`:6543`), contre lequel une garde existait déjà. C'était l'**hôte**, pas le port. La connexion directe `db.<ref>.supabase.co` ne publie plus d'enregistrement `A`, seulement un `AAAA` : elle est joignable en IPv6 seulement, et un conteneur de construction Vercel n'a pas d'IPv6. Or l'hôte direct et le pooler de session écoutent **tous les deux sur 5432** — la garde du port ne pouvait donc pas voir passer une URI structurellement injoignable.
+
+Le diagnostic a coûté plus que le correctif, pour deux raisons qu'il vaut la peine de savoir reconnaître :
+
+1. **La CLI accuse le mauvais coupable.** `failed to connect to postgres` s'accompagne d'une invitation de Supabase à vérifier *Network Restrictions* et *Network Bans*. On cherche un pare-feu ; la cause est un enregistrement DNS absent. Contrôler l'hôte **avant** d'ouvrir le tableau de bord réseau : `dig +short A db.<ref>.supabase.co` — vide, c'est celui-là.
+2. **L'échec est resté silencieux 23 heures.** La PR #14 a été fusionnée le 30/07 à 15 h 33 ; son déploiement a échoué à cette étape, donc la production a continué de servir le code de la PR #13 **sans que rien ne le signale**. Fusionner n'est plus mettre en ligne : depuis la décision du 29/07, il faut regarder le déploiement de `main` réussir, pas seulement la PR passer au vert.
+
+Ce qui a rendu ces 23 heures sans conséquence est l'**additivité** (voir plus haut) : code d'avant contre schéma d'avant, cohérents entre eux. Encore une fois, elle est la condition de sûreté, pas une commodité.
 
 ## Régénérer les types TypeScript
 

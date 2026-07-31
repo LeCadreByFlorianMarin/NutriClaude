@@ -98,7 +98,7 @@ if (branche && branche !== BRANCHE_DE_PRODUCTION) {
     `[migrations] déploiement de production depuis « ${branche} », ` +
       `pas « ${BRANCHE_DE_PRODUCTION} ».\n` +
       "  Les migrations ne sont appliquées que depuis la branche fusionnée et revue.\n" +
-      "  Voir docs/migrations.md § « Le déploiement applique les migrations »."
+      "  Voir docs/migrations.md § « En production »."
   );
   process.exit(1);
 }
@@ -120,7 +120,7 @@ if (!urlBase) {
     "[migrations] SUPABASE_DB_URL est absente du déploiement de production.\n" +
       "  Sans elle, les migrations ne peuvent pas être appliquées, et laisser\n" +
       "  passer le déploiement livrerait du code en avance sur son schéma.\n" +
-      "  Voir docs/migrations.md § « Le déploiement applique les migrations »."
+      "  Voir docs/migrations.md § « En production »."
   );
   process.exit(1);
 }
@@ -144,23 +144,59 @@ if (!urlBase) {
  */
 const urlPropre = urlBase.trim();
 
-let porte;
+let url;
 try {
-  porte = new URL(urlPropre).port;
+  url = new URL(urlPropre);
 } catch {
   console.error(
     "[migrations] SUPABASE_DB_URL n'est pas une URL analysable.\n" +
-      "  Forme attendue : postgresql://postgres:<mot-de-passe>@<hôte>:5432/postgres\n" +
+      "  Forme attendue, celle du pooler de session :\n" +
+      "  postgresql://postgres.<ref>:<mot-de-passe>@aws-N-<région>.pooler.supabase.com:5432/postgres\n" +
       "  Le mot de passe doit être encodé pour URL s'il contient des caractères spéciaux."
   );
   process.exit(1);
 }
 
-if (porte === "6543") {
+if (url.port === "6543") {
   console.error(
     "[migrations] SUPABASE_DB_URL emploie le port 6543 (pooler de transaction).\n" +
       "  Ce pooler ne tient pas les instructions de définition de schéma.\n" +
       "  Employer le pooler de SESSION, port 5432."
+  );
+  process.exit(1);
+}
+
+/*
+ * ⚠️ **Le port ne suffit pas à distinguer les deux hôtes, et c'est ce qui a
+ * coûté le déploiement du 2026-07-30.**
+ *
+ * La connexion *directe* (`db.<ref>.supabase.co`) et le pooler de *session*
+ * (`aws-N-<région>.pooler.supabase.com`) écoutent **tous les deux sur 5432**.
+ * La garde ci-dessus laissait donc passer la première, qui est pourtant
+ * structurellement injoignable d'ici : Supabase ne publie plus d'enregistrement
+ * A pour l'hôte direct, seulement un AAAA — il est en **IPv6 seulement**, et un
+ * conteneur de construction Vercel n'a pas d'IPv6.
+ *
+ * Le mode de défaillance est particulièrement trompeur : la CLI rend
+ * « failed to connect to postgres », et Supabase y accole une invitation à
+ * vérifier les restrictions et bannissements réseau. On cherche donc un
+ * pare-feu qui n'y est pour rien, pendant que la cause est un enregistrement
+ * DNS absent. Ce commentaire existe pour couper court à cette chasse.
+ *
+ * On refuse le motif **connu-mauvais** plutôt que d'exiger un hôte de pooler :
+ * une liste blanche refuserait une base auto-hébergée ou un nommage Supabase à
+ * venir, et ce fichier a déjà appris une fois — sur l'expression rationnelle du
+ * port, ci-dessus — qu'une garde peut se tromper dans les deux sens.
+ */
+if (url.hostname.startsWith("db.") && url.hostname.endsWith(".supabase.co")) {
+  console.error(
+    `[migrations] SUPABASE_DB_URL emploie l'hôte de connexion directe (${url.hostname}).\n` +
+      "  Cet hôte est joignable en IPv6 seulement ; un conteneur de construction\n" +
+      "  Vercel n'a pas d'IPv6, donc la connexion échouera sur un « failed to\n" +
+      "  connect » qui accuse à tort les restrictions réseau.\n" +
+      "  Employer le pooler de SESSION : aws-N-<région>.pooler.supabase.com:5432\n" +
+      "  ⚠️ Le nom d'utilisateur change aussi : « postgres.<ref> », pas « postgres ».\n" +
+      "  Voir docs/migrations.md § « En production »."
   );
   process.exit(1);
 }
