@@ -392,3 +392,45 @@ n'a plus les migrations au moment où l'on génère, si bien que `--linked` rend
 - **Un temps de préparation ou de cuisson négatif est accepté par la base.** `prep_time_min` et `cook_time_min` n'ont pas de contrainte, et l'écran pose seulement `min={0}` — qui n'est pas une frontière. C'est **délibéré et non un oubli** : `servings` a reçu sa contrainte parce qu'il est *consommé par un calcul* (`generate_grocery_list_from_menu` divise par lui), là où les deux temps ne sont qu'affichés. Inventer un contrôle applicatif sans contrepartie en base contredirait AD-1/AD-2 ; ajouter une troisième contrainte sortirait du périmètre de la story. À rouvrir si un écran se met à calculer avec ces temps.
 - **Le repli `borne === "" ? null` de `normaliserTexte` et `normaliserMultiligne` est inatteignable** pour tout `maximum >= 1` : le `trim()` qui précède garantit que le premier caractère n'est pas un blanc, donc la tranche le contient toujours. Il reste — il est inoffensif et défensif — mais il ne fait pas ce qu'un lecteur pressé lui prête. Figé par un test dans `lib/texte.test.ts` plutôt que retiré, pour ne pas toucher à `normaliserTexte`, qui est du code livré hors périmètre de cette story.
 - **Le répertoire n'est pas trié par un index.** `recettesDuFoyer` range par `title` ; `idx_recipes_household` porte sur `(household_id, created_at desc)`. Sans portée à l'échelle d'un foyer (des dizaines de recettes), et un index sur `(household_id, title)` serait un coût d'écriture pour un gain nul. À rouvrir si le répertoire dépasse quelques milliers de lignes, ce que le produit n'envisage pas.
+## Deferred from: story 2.2 (2026-07-31)
+
+**Refermé par cette story — l'arête que la 2.1 lui avait adressée.** L'entrée « Le bouton *Remettre
+les rayons de départ* reste réservé à l'état vide » demandait de vérifier ici que son arête perdait
+sa portée. **Elle la perd, et c'est mesuré** : l'ordre du parcours est désormais entièrement
+ressaisissable — flèches et glisser — donc supprimer dix rayons sur onze n'enferme plus dans un état
+irréparable. Il reste à retaper les noms, mais c'était déjà vrai et ce n'est pas ce que l'entrée
+signalait. Le bouton reste réservé à l'état vide, conformément à la décision de Florian du
+2026-07-29 : **rien à rouvrir**.
+
+**Reporté, avec la raison :**
+
+- **Le glisser n'a pas de défilement automatique en bord d'écran.** Limite assumée et annoncée dès
+  l'écriture de la story, pas découverte après coup : on ne peut donc glisser un rayon qu'à
+  l'intérieur de la zone visible. Les longs trajets passent par les flèches monter/descendre, qui
+  couvrent le cas sans limite — c'est précisément la complémentarité des deux mécanismes. Un
+  défilement automatique demande une boucle d'animation, une zone morte en bord d'écran et une
+  recalibration des centres mesurés au début du geste ; à traiter le jour où la liste dépassera
+  franchement un écran, ce qu'onze rayons ne font pas.
+- **La géométrie du glisser se fige au `pointerdown` : défiler la page pendant qu'on tire décale la
+  cible.** Les centres des lignes sont mesurés une seule fois, en coordonnées de fenêtre, et c'est ce
+  qui garantit que l'index visé n'oscille pas. Corollaire : si l'utilisateur défile *pendant* le
+  geste, les mesures se décalent d'autant. Sans défilement automatique, le seul défilement possible
+  est délibéré, et le trait d'insertion montre en permanence où le rayon atterrira — l'écart est donc
+  visible avant le relâchement, jamais subi. Compenser exigerait de relire `window.scrollY` à chaque
+  `pointermove` ; à faire en même temps que le défilement automatique, pas avant.
+- **Le chemin TACTILE du glisser n'a pas été observé.** Le mécanisme qui le conditionne est vérifié —
+  `touch-action: none` est bien appliqué sur la poignée et sur elle seule (mesuré dans les styles
+  calculés), et les gestionnaires sont agnostiques au `pointerType`. Mais le geste lui-même n'a été
+  joué qu'à la **souris**. Un vrai doigt sur un vrai iPhone reste à faire : c'est le seul chemin où
+  `touch-action` et le défilement concurrent existent, et c'est exactement la classe d'erreur qui a
+  fait écarter `draggable` HTML5. **À faire par Florian avant la fusion.**
+- **La latence mesurée l'a été contre un Supabase LOCAL.** 81 ms médians par déplacement sur le build
+  de production, 771 ms pour remonter un rayon du onzième rang au premier. Le trajet réseau vers un
+  projet distant n'y est pas : en production réelle, compter le temps d'aller-retour en plus. La
+  décision « pas de mise à jour optimiste » repose sur ce chiffre — s'il se dégrade nettement en
+  production, c'est la question 2 de la story qui se rouvre, avec `useOptimistic` pour réponse.
+- **`indexCibleDuGlisser` compare des centres, pas des bords.** Conséquence : tirer une ligne
+  *haute* (nom sur deux lignes) au-dessus d'une ligne *basse* demande de dépasser le centre de
+  celle-ci, ce qui peut sembler exiger un pixel de plus qu'attendu. Le trait d'insertion le rend
+  visible en continu, donc l'écart s'observe avant de relâcher. Un modèle par bords serait plus
+  fidèle mais demande de gérer les recouvrements ; sans portée tant que les hauteurs restent proches.
