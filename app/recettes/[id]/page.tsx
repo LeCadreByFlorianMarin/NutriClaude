@@ -80,7 +80,7 @@ export default async function RecettePage({
     <main className="flex-1 p-6">
       <div className="mx-auto w-full max-w-2xl py-6">
         <Link href="/recettes" className="btn-quiet px-0">
-          ← Tes recettes
+          ← Mes recettes
         </Link>
 
         <h1 className="titre-ecran mt-2 break-all">{recette.titre}</h1>

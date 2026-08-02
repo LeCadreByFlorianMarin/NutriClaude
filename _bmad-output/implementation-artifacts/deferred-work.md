@@ -513,3 +513,97 @@ L'échéance de la `Content-Security-Policy` a été repoussée à l'**Epic 6, a
 - **La quantité s'affiche encore avec un point sur l'ÉCRAN D'ÉDITION** (`app/recettes/[id]/modifier/IngredientsRecette.tsx`, la ligne repliée affiche `{i.quantite}` brut). Le membre tape « 0,5 » — `normaliserQuantite` accepte explicitement la virgule française — et la ligne lui répond « 0.5 ». `formaterQuantite` (`lib/recettes/lecture.ts`) existe désormais et règle le cas ; *reporté parce que déborder sur l'écran d'une autre story rend sa propre revue plus difficile*. Une ligne à changer, et le module est déjà là.
 - **Aucun `loading.tsx` sur `/recettes/[id]`.** Décision de Florian du 2026-08-02 : aucun AC ne le demande — l'AC4 de la story 3.1 portait sur le répertoire — et `app/recettes/loading.tsx` ne couvre pas cette route. En poser un est un travail réel (forme, deux thèmes, vérification réseau bridé) pour un écran qui se charge en deux lectures. **Absence décidée, pas subie.**
 - **`generateMetadata` refait une lecture de la recette.** Next met en cache les requêtes d'un même rendu, mais notre client Supabase n'est pas instrumenté pour ça : la métadonnée et le composant lisent deux fois. Sans portée sur un écran de configuration ; à rouvrir seulement si un écran chaud adopte le même motif.
+
+---
+
+## Deferred from: code review of 3-3-consulter-une-recette-en-lecture (2026-08-02)
+
+Revue adversariale à trois couches sur `8f91f52..cfcc75e`. Cinq constats réels, mais
+préexistants ou hors du périmètre de la story — reportés pour ne pas faire déborder une
+revue sur du code qu'elle n'a pas mandat de juger.
+
+- **`break-all` sur le `<h1>` de titre d'écran coupe les mots français au caractère.**
+  `word-break: break-all` coupe **même quand le mot tiendrait à la ligne suivante**,
+  contrairement au `break-words` employé deux lignes plus bas sur la description et sur les
+  instructions. La justification écrite du motif (`app/page.tsx:22-23`) porte sur un nom de
+  foyer « sans garantie d'espace où couper » ; `saisie.ts:22-25` décrit au contraire un titre
+  de recette comme « une phrase courte » de 80 caractères, avec des espaces. À 390 px et 200 %
+  de zoom, « Curry de pois chiches » se rend « Curry de pois chic / hes ».
+  *Reporté parce que c'est le motif déjà en place sur `app/page.tsx:24` et
+  `FormulaireRecette.tsx:330` : le changer ici seul créerait l'incohérence qu'on reproche.*
+  À traiter comme une décision de `titre-ecran`, sur les trois écrans à la fois.
+
+- **« ← Retour » subsiste sur trois écrans.** `app/foyer/page.tsx:56`,
+  `app/rayons/page.tsx:36`, `app/recettes/page.tsx:47`. La table Microcopy de la story 3.3 le
+  range explicitement en colonne « N'écris jamais » — motif : *deux parents possibles*, donc le
+  lien ne dit pas où il mène. La passe `cfcc75e` a traversé ces trois fichiers sans y toucher.
+  *Reporté parce que hors périmètre* — mais cela montre que la passe microcopy est
+  **incomplète**, ce qui affaiblit l'argument qui justifiait de l'embarquer dans cette story.
+
+- **Le piège du « voisinage » n'est pas refermé sur l'accueil.** `app/page.tsx:24` rend
+  `{nom ?? "Chez toi"}` — le repli **nomme le foyer du membre à la deuxième personne**, dix-huit
+  lignes au-dessus du bouton « Mon foyer » (`:42`). Deux libellés voisins, la même chose nommée,
+  deux personnes différentes. C'est le cas exact décrit par le paragraphe que `cfcc75e` vient
+  d'ajouter à `project-context.md:219-223`, sur l'écran qui a servi d'exemple, et pour un état
+  que le produit atteint réellement (`app/foyer/page.tsx:65` affiche « Sans nom »). Même
+  famille : `app/not-found.tsx:26` « Revenir chez toi ».
+  *Reporté parce que hors périmètre de la story 3.3.*
+
+- **Course entre les deux lectures de l'écran de recette.** Si l'autre membre supprime la
+  recette entre `recetteParId` (`page.tsx:72`) et `ingredientsDeRecette` (`:76`), la suppression
+  cascade sur `recipe_ingredients` et la seconde lecture rend `[]` **sans erreur**. L'écran rend
+  alors intégralement une recette qui n'existe plus, et une recette qui avait dix ingrédients
+  annonce « Tu n'as pas encore mis d'ingrédients. » avec un lien « Les ajouter » qui mène à un
+  404. Même famille : l'onglet peut porter le titre au-dessus de « Il n'y a rien ici. ».
+  Le projet traite déjà cette course **côté écriture** (`FormulaireRecette` → `"disparue"`, en
+  contrôlant `data` autant qu'`error`) ; côté lecture, zéro ligne est indistinguable de
+  « recette vide ». *Reporté : fenêtre étroite, écran en lecture seule, aucune perte de donnée.*
+
+- **Un texte fait de marques combinantes traverse `normaliserMultiligne`.** `\p{Mn}` n'est ni
+  dans `INVISIBLES_HORS_SAUT_DE_LIGNE` (`lib/texte.ts:109-110`) ni retiré par `trim()`. Des
+  instructions valant `"́́́"` sont donc non vides pour le JSX et **invisibles à
+  l'œil** : le titre « Comment on la fait » s'affiche au-dessus d'un paragraphe vide — le titre
+  orphelin qu'AC3 bannit. À mesurer en complément : le même texte comme **titre** passerait
+  probablement `recipes_titre_non_vide`, dont l'expression est `[^[:graph:]]` plus une
+  énumération, et les marques combinantes sont `graph` — ce qui rendrait `<h1>` et `<title>`
+  vides à l'œil. *Reporté : saisie délibérée, préexistant à cette story.*
+  ⚠️ C'est la **règle §3** qui mord ici (une énumération ne peut pas gagner contre une
+  catégorie) — sur `INVISIBLES` **et** sur la contrainte SQL, qui doivent rester d'accord.
+
+### Ajouts de la résolution des décisions (2026-08-02)
+
+- **Aucune contrainte en base sur le texte libre ni sur les temps — reporté par Florian,
+  « pas de limite pour l'instant ».**
+  `20260801124553_require_valid_recipe_fields.sql:80-87` ne pose que `recipes_titre_non_vide`
+  et `recipes_servings_positif`. Ce qui reste **non contraint côté base** : `description`,
+  `instructions` (ni contenu ni longueur), `prep_time_min` et `cook_time_min` (ni signe ni
+  borne). Les gardes existantes — `MAX_TITRE=80`, `MAX_DESCRIPTION=300`, `MAX_INSTRUCTIONS=5000`,
+  `normaliserMultiligne`, et les attributs `min={0}` de `FormulaireRecette.tsx:394,408` — vivent
+  **toutes dans le navigateur**.
+  *Modèle de menace, et il est écrit par le code lui-même* (`lib/recettes/saisie.ts:17-21`) :
+  « un champ libre partagé par tout le foyer, qu'aucun autre membre ne peut corriger, ne doit
+  pas pouvoir casser les écrans de chacun ». L'écriture est **client-direct** — le membre
+  possède sa clé anon et son jeton de session, `recipes_all` ne contrôle que `household_id` —
+  et l'**Epic 7 ouvre une seconde surface (MCP) sur la même base**. Un `PATCH` PostgREST direct
+  suffit à poser 2 Mo d'instructions ou `prep_time_min = -30`.
+  ⚠️ **Deux choses distinctes sous un seul report.** « Pas de limite » répond aux bornes de
+  **longueur**. Le signe des temps est une **validité**, pas une limite de taille : `-30` est
+  stockable aujourd'hui et `formaterTemps` l'imprimera tel quel (`lib/recettes/lecture.ts:73-74`).
+  Signalé à Florian au moment de la décision ; gardé ici faute d'arbitrage séparé.
+  ⚠️ **La migration `20260801124553` a EXPLICITEMENT refusé une contrainte sur les deux temps**,
+  au motif qu'ils « ne sont qu'affichés » — c'est-à-dire en désignant l'écran de la story 3.3,
+  qui n'existait pas encore. C'est la **règle §5** : une prémisse qui sert à reporter un défaut
+  se rouvre avant d'être réinvoquée. Elle vient d'être réinvoquée ; la rouvrir reste dû.
+  *AD-1 / AD-2 : la règle métier vit en Postgres, jamais dans la vigilance d'une surface.*
+
+- **`/recettes/[id]/modifier` hérite du squelette de la FICHE.** Effet de bord **mesuré** de la
+  pose de `app/recettes/[id]/loading.tsx` (résolution de la décision 1) : `modifier` étant un
+  enfant de `[id]`, son build charge le même module
+  (`.next/server/app/recettes/[id]/modifier/page.js` → `app_recettes_[id]_loading_tsx_090cap9._.js`).
+  C'est un progrès — il affichait jusque-là le squelette du **répertoire**, avec un champ
+  « Ajouter une recette » sans rapport — mais ce n'est toujours pas sa forme : l'écran d'édition
+  est un formulaire (titre, description, portions, deux temps, instructions, ingrédients).
+  *Reporté : poser un `[id]/modifier/loading.tsx` est un travail réel (forme, deux thèmes,
+  vérification réseau bridé) sur l'écran d'une AUTRE story, et déborder rendrait sa propre revue
+  plus difficile.* Le motif est désormais écrit deux fois dans le dépôt, il n'y a rien à
+  inventer.

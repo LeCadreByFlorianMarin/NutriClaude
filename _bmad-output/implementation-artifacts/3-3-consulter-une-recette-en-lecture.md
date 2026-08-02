@@ -49,8 +49,19 @@ de balisage brut
 
 ## Tasks / Subtasks
 
-- [x] **Task 1 — `lib/recettes/lecture.ts` : le pur de l'affichage, en TDD** (AC1, AC3)
-  - [x] Phase rouge **constatée** avant l'implémentation
+- [ ] **Task 1 — `lib/recettes/lecture.ts` : le pur de l'affichage, en TDD** (AC1, AC3)
+      <!-- Le module est livré, testé et éprouvé par mutation. Seule la sous-tâche « phase rouge »
+           est décochée : c'est la MÉTHODE qui n'est pas attestée, pas le résultat. -->
+
+  - [ ] Phase rouge **constatée** avant l'implémentation
+        <!-- DÉCOCHÉE par la revue du 2026-08-02 (règle §1, décision de Florian). Aucune sortie
+             de commande, aucun compte de tests en échec, aucun horodatage n'a été consigné, et
+             `git show --stat 5beb4fc` montre `lecture.ts` et `lecture.test.ts` ajoutés dans le
+             MÊME unique commit — l'historique ne peut pas corroborer non plus. La story cite
+             pourtant « 152 → 151 » pour la mutation : elle sait produire cette preuve, elle ne
+             l'a pas produite ici. Une preuve du passé ne se fabrique pas après coup ; la case
+             reste vide. -->
+
   - [x] `formaterQuantite(q: number | null): string | null` — **le séparateur décimal français**
         (piège n°3). `null` pour « rien à afficher », jamais `""`
   - [x] `formaterTemps(prep, cuisson): string | null` — les **quatre** combinaisons, `null` quand
@@ -72,9 +83,20 @@ de balisage brut
         ⚠️ elle **ne lève jamais** sur une recette introuvable ; c'est le composant qui décide
         du `notFound()` (piège n°7)
 
-- [x] **Task 3 — Les trous, un par un** (AC3)
-  - [x] Description absente, instructions absentes, **aucun ingrédient**, les deux temps absents,
+- [ ] **Task 3 — Les trous, un par un** (AC3)
+      <!-- Le CODE traite les trous, et la revue l'a confirmé en le lisant. C'est le PARCOURS
+           cas par cas que la story demandait qui n'a pas eu lieu — les deux extrêmes seulement. -->
+
+  - [ ] Description absente, instructions absentes, **aucun ingrédient**, les deux temps absents,
         et la combinaison de tous
+        <!-- DÉCOCHÉE par la revue du 2026-08-02 (règle §1, décision de Florian). Le tableau du
+             parcours ne porte que les DEUX EXTRÊMES — « Recette complète » et « Recette au titre
+             seul ». Les combinaisons intermédiaires (description présente + instructions
+             absentes, ingrédients présents + temps absents…) ne sont attestées nulle part : elles
+             sont DÉDUITES de l'indépendance des conditionnelles JSX. La déduction est solide —
+             `page.tsx:107`, `:180`, `:96` sont bien indépendants — mais la sous-tâche demandait
+             le cas par cas, et une déduction s'écrit « déduit ». -->
+
   - [x] ⚠️ Un temps à **`0`** s'affiche (décision 3) — le test est `!== null`, jamais
         `if (!temps)`, qui attraperait `0` ET `null` en silence (piège n°4)
   - [x] ⚠️ **Une section vide ne s'affiche pas** — pas de titre orphelin, pas de tiret, pas de
@@ -91,17 +113,43 @@ de balisage brut
   - [x] Le lien de retour de l'écran d'édition reste **« ← Tes recettes »** — décision 1,
         rien à changer. Vérifie-le, ne le touche pas
 
-- [x] **Task 5 — Le parcours à l'écran, dans les deux thèmes** (AC1, AC2, AC3)
-  - [x] Stack local, `localhost:3333`. ⚠️ `.env.local` pointe sur la **production** : bascule et
+- [ ] **Task 5 — Le parcours à l'écran, dans les deux thèmes** (AC1, AC2, AC3)
+      <!-- DÉCOCHÉE EN ENTIER, et pas seulement pour ses trois sous-tâches vides. Le parcours a
+           été consigné dans `5beb4fc` ; `cfcc75e` a ENSUITE modifié `app/recettes/[id]/page.tsx`
+           et `app/recettes/loading.tsx`, et la revue y a ajouté `app/recettes/[id]/loading.tsx`.
+           Les lignes « Recette complète ✅ », « Zoom 200 % ✅ », « Thème sombre ✅ » attestent donc
+           d'un état que HEAD n'est plus. Aucune porte automatique ne le dit : typage, lint, build
+           et tests passent tous. C'est la règle §7 — le rendu est ce qu'aucune porte ne voit.
+           À REJOUER EN ENTIER avant fusion, réseau bridé compris pour le nouveau squelette. -->
+
+  - [ ] Stack local, `localhost:3333`. ⚠️ `.env.local` pointe sur la **production** : bascule et
         **restaure en comparant l'empreinte SHA-256**
+        <!-- DÉCOCHÉE par la revue du 2026-08-02 (règle §1, décision de Florian). Le dossier
+             affirme « restauré à l'identique, SHA-256 comparé » (§ Parcours et File List) sans
+             une seule commande ni une seule empreinte. C'est le SEUL point du dossier qui touche
+             à la PRODUCTION, donc celui qui méritait le plus une ligne de sortie. Le fichier est
+             très probablement restauré — mais « probablement » n'est pas « vérifié ». -->
+
   - [x] Une recette complète, puis une **totalement vide** (titre seul)
   - [x] ⚠️ **Les instructions sur un texte à lignes vides intérieures**, relues à l'écran : c'est
         AC2, et c'est la dette que la story 3.1 a payée d'avance
-  - [x] Les deux thèmes au réglage système, **remis après**
-  - [x] 200 % de zoom, largeur 390 px, focus mesuré dans le DOM
+  - [ ] Les deux thèmes au réglage système, **remis après**
+        <!-- DÉCOCHÉE par la revue du 2026-08-02 (règle §1, décision de Florian). Le dossier ne
+             porte qu'UNE ligne, sur le thème SOMBRE (« ✅ lisible, séparateurs et texte
+             secondaire compris »). Rien sur le thème clair, rien sur l'`osascript` que
+             `project-context.md:110-112` impose pour basculer ET remettre. Le titre du tableau
+             annonce « les deux thèmes » ; son contenu n'en documente qu'un. -->
+  - [ ] 200 % de zoom, largeur 390 px, focus mesuré dans le DOM
+        <!-- DÉCOCHÉE par la revue du 2026-08-02 (règle §1, décision de Florian). Le zoom et la
+             largeur sont attestés (« ✅ aucun débordement »). Le FOCUS ne l'est pas : aucune
+             mesure, ni `document.activeElement`, ni relevé d'anneau, nulle part dans le Dev Agent
+             Record — alors que le dossier sait produire ce genre de preuve (le bloc JSON d'AC2 le
+             fait pour `whiteSpace`). L'écran porte trois liens. -->
   - [x] Les six portes
-  - [x] ⚠️ **Aucun `loading.tsx` sur cette route** (décision 4). Écris-le dans les notes de
-        complétion : c'est une absence décidée, pas subie
+  - [x] ⚠️ ~~**Aucun `loading.tsx` sur cette route** (décision 4)~~ — **DÉCISION RENVERSÉE par la
+        revue du 2026-08-02.** La décision reposait sur « `app/recettes/loading.tsx` ne couvre pas
+        cette route », qui est FAUX et mesuré comme tel. `app/recettes/[id]/loading.tsx` est posé
+        (option (a), décision de Florian). Voir § Review Findings
 
 - [x] **Task 6 — Trancher la CSP, une bonne fois** (hors AC, mais c'est ici que ça se joue)
   - [x] ⚠️ **C'est cette story qui rend du texte écrit par le membre.** L'échéance de la CSP a été
@@ -325,8 +373,16 @@ Supabase, RLS, cache.
 | Aucun ingrédient | « Tu n'as pas encore mis d'ingrédients. » + un lien « Les ajouter » | « Aucun enregistrement » · un tableau vide |
 | Section instructions | « Comment on la fait » | « Instructions » · « Mode opératoire » |
 | Lien vers l'édition | « Modifier » | « Éditer la recette » · « Mode édition » |
-| Lien de retour | « ← Tes recettes » | « ← Retour » (deux parents possibles) |
+| Lien de retour | **« ← Mes recettes »** | « ← Retour » (deux parents possibles) |
 | Recette introuvable | l'écran `not-found` existant | **jamais** « Réessaie » |
+
+⚠️ **Le lien de retour de CET écran est « ← Mes recettes », et il est en avance sur le reste de
+l'application** — décision de Florian du 2026-08-02, prise pendant la revue. La règle des
+possessifs (première personne pour ce qui NOMME, tutoiement pour ce que l'application DIT) vit
+dans la branche `refactor/microcopy-possessifs`, extraite de cette story par la même revue.
+**Tant que cette branche n'est pas fusionnée, cet écran dit « Mes recettes » quand l'écran
+d'édition dit encore « Tes recettes ».** Incohérence connue, bornée, et qui se referme dans
+l'ordre de fusion : **la PR microcopy passe en premier**.
 
 **Pas d'abricot** : UX-DR2 le réserve à l'action courses. L'anneau de focus reste la seule
 exception, déjà globale.
@@ -667,10 +723,63 @@ adversariale**, ce que la règle n°6 de `project-context.md` impose. Celle-ci a
 
 ---
 
+### Review Findings
+
+Revue adversariale du 2026-08-02, périmètre `8f91f52..cfcc75e`. Trois couches lancées en
+parallèle **sans contexte de conversation préalable**. Les sévérités des sous-agents ont été
+écartées et réattribuées après lecture du code (asymétrie d'information par construction).
+
+> **Ce qui tient, et il faut le dire :** AC1, AC2 et AC3 sont tenus **par le code**. Les huit
+> pièges sont évités — aucun `"use client"`, `whitespace-pre-wrap` seul, `!== null` sur les
+> temps avec sa dent prouvée par mutation (152 → 151), sections conditionnelles, exception
+> ingrédients, `notFound()` sans réécrire la garde. La découverte U+202F est réelle, hors story,
+> et épinglée par un test qui interdit *toute* espace plutôt qu'une liste de points de code —
+> la règle §3 appliquée spontanément. Aucune dépendance, aucune migration.
+
+#### Décisions attendues
+
+- [x] [Review][Decision] **RÉSOLU — option (a), décision de Florian du 2026-08-02 : `app/recettes/[id]/loading.tsx` posé.** Un squelette à la forme de la FICHE (lien retour, titre, repères, une ligne de description, « Ce qu'il faut » et ses quatre lignes, « Comment on la fait », le bouton). **Mesuré après `rm -rf .next && npm run build`** — `.next/server/app/recettes/[id]/page.js` charge désormais `app_recettes_[id]_loading_tsx_090cap9._.js` en plus du parent, `/recettes` ne charge que le parent. Typage, lint et build verts. ⚠️ **DÉDUIT, PAS MESURÉ** : que ce soit bien le repli le plus profond qui s'affiche — c'est la sémantique d'imbrication de Next, pas une observation. **Le parcours réseau bridé reste à jouer** (règle §7 : le rendu est ce qu'aucune porte ne voit). ⚠️ **Effet de bord mesuré** : `/recettes/[id]/modifier` hérite lui aussi de ce squelette — mieux que celui du répertoire qu'il affichait, mais ce n'est pas sa forme, l'écran d'édition étant un formulaire. Reporté dans `deferred-work.md`. ⚠️ **Les trois affirmations fausses restent à corriger** (`:510`, `:627`, `deferred-work.md:462`) — voir le correctif dédié. Constat d'origine ci-dessous :
+- [x] [Review][Decision] ~~**`app/recettes/loading.tsx` COUVRE `/recettes/[id]` — la décision 4 repose sur une prémisse fausse**~~ — Trouvé par DEUX couches indépendantes, puis **mesuré** : `.next/server/app/recettes/[id]/page.js:14` charge `app_recettes_loading_tsx_10777hp._.js`. Il n'y a aucun `layout.tsx` sous `app/recettes/`, donc le `loading.tsx` du segment enveloppe **tous ses enfants**, `[id]` et `[id]/modifier` compris. La story affirme le contraire en trois endroits (`:510`, `:627`, `deferred-work.md:462`) et la décision « aucun `loading.tsx`, absence décidée » en découle entièrement. Conséquence à l'écran, réseau lent : avant sa recette, le membre voit le squelette **du répertoire** — lien retour, titre, bloc « Mon répertoire », trois lignes de liste et le champ « Ajouter une recette » (`loading.tsx:40-69`) — puis tout est remplacé par une fiche. Le squelette promet une liste qui n'arrivera jamais : exactement le saut de mise en page que son propre en-tête dit vouloir éviter. Vaut aussi pour `/recettes/[id]/modifier` depuis la 3.1. Sévérité **medium**. Affirmé sans commande (règle §1)
+- [x] [Review][Defer] **REPORTÉ — décision de Florian du 2026-08-02 : « pas de limite pour l'instant ».** Aucune contrainte de longueur n'est posée sur `description` et `instructions`. ⚠️ **Ce que le report laisse passer, et qui n'est pas une limite de taille** : `prep_time_min` et `cook_time_min` restent sans contrainte de signe, donc `-30` est stockable et l'écran imprimera « -30 min de préparation ». Signalé à Florian au moment de la décision, gardé dans le même report faute d'arbitrage distinct. Détail et modèle de menace dans `deferred-work.md`. Constat d'origine ci-dessous :
+- [x] [Review][Defer] **Rien ne borne en base le texte libre que cet écran est le premier à rendre** — AD-1/AD-2 : la règle métier vit en Postgres, jamais dans la vigilance d'une surface. `20260801124553_require_valid_recipe_fields.sql:80-87` ne pose que `recipes_titre_non_vide` et `recipes_servings_positif`. **Rien sur `description`, rien sur `instructions`, aucune borne de longueur, et aucune contrainte sur `prep_time_min`/`cook_time_min`** — alors que `lib/recettes/saisie.ts:17-21` énonce lui-même le modèle de menace (« un champ libre partagé par tout le foyer, qu'aucun autre membre ne peut corriger »). `MAX_TITRE`, `MAX_DESCRIPTION`, `MAX_INSTRUCTIONS` et `min={0}` vivent tous dans le navigateur ; l'écriture est client-direct et l'Epic 7 ouvre une seconde surface sur la même base. Conséquences vérifiables : `-30 min de préparation` est stockable et sera imprimé par `formaterTemps` ; 2 Mo d'instructions casseraient l'écran de l'autre membre, qui ne les a pas écrites. Sévérité **medium**. Poser la contrainte coûterait une migration — or cette story n'en a aucune, c'est ta décision
+- [x] [Review][Decision] **RÉSOLU — option 1, décision de Florian du 2026-08-02 : extrait dans sa propre PR.** Branche `refactor/microcopy-possessifs`, commit `c6ab0b2` depuis `main` (`8f91f52`). ⚠️ **`cfcc75e` ne se coupait pas en deux mais en 14 + 2** — un seul de ses 16 fichiers n'existe pas sur `main` (`app/recettes/[id]/page.tsx`, que cette story crée), et un second (`app/recettes/[id]/modifier/page.tsx`) n'avait rien à recevoir hors story : **tout le paragraphe que `cfcc75e` y retouchait a été introduit par `5beb4fc`**. Le delta a donc été appliqué en 3-way plutôt que le fichier repris entier — reprendre les fichiers aurait fait entrer du code de la story 3.3 dans la PR microcopy (`ListeRecettes.tsx` et `modifier/page.tsx` sont touchés par les deux commits). Diff de la branche microcopy contrôlé ligne à ligne : **purement des chaînes et des commentaires**. Quatre portes vertes sur `c6ab0b2` : typage, lint, **142/142**, build. Sur la story, `git reset --hard 5beb4fc`. ⚠️ **Une ligne de `cfcc75e` reste ici délibérément** : le libellé du lien de retour de l'écran de LECTURE, dans le fichier qui le fait naître — « ← Mes recettes », décision de Florian. **Conséquence bornée : cet écran est en avance sur l'écran d'édition tant que la PR microcopy n'est pas fusionnée. Ordre de fusion imposé — microcopy d'abord.** Constat d'origine ci-dessous :
+- [x] [Review][Decision] **`cfcc75e` déborde du périmètre et rend le dossier de la story faux** — Le commit microcopy touche 11 fichiers de code dans `login/`, `onboarding/`, `foyer/`, `rayons/`, `recettes/` — dont **`app/recettes/[id]/page.tsx` lui-même** et `app/recettes/loading.tsx`. Trois conséquences mesurées : (1) le parcours à l'écran de la Task 5 a été consigné dans `5beb4fc`, **avant** ce commit — les lignes « Recette complète ✅ », « Zoom 200 % ✅ », « Thème sombre ✅ » attestent d'un état que HEAD n'est plus, et aucune porte automatique ne le dit ; (2) la **File List** (`:645-667`) ne mentionne aucun des 11 fichiers ; (3) le commit modifie `_bmad-output/project-context.md` — le document qui fait foi — dans le même souffle que le code qu'il justifie. Le fond de la décision est cohérent et bien documenté ; c'est son **emballage dans une story en `review`** qui est le défaut. Sévérité **medium**
+- [x] [Review][Decision] **RÉSOLU — décision de Florian du 2026-08-02 : décocher.** C'est ce que la règle §1 prescrit littéralement (« une case vide honnête vaut mieux qu'une case cochée à tort »). Cinq sous-tâches décochées **avec leur raison écrite en commentaire à côté**, et trois tâches parentes avec elles : Task 1 (phase rouge), Task 3 (les trous un par un), Task 5 (**décochée en entier** — le parcours atteste d'un état que HEAD n'est plus, `cfcc75e` puis le nouveau `loading.tsx` étant passés après). ⚠️ **Conséquence : le parcours à l'écran est à rejouer EN ENTIER avant fusion**, réseau bridé compris pour le squelette neuf. Constat d'origine ci-dessous :
+- [x] [Review][Decision] **Cinq cases cochées que le dossier n'étaye pas (règle §1)** — Chacune est une déduction présentée comme une mesure : (a) « Les **deux** thèmes au réglage système, **remis après** » (`:100`) — le dossier ne porte qu'une ligne, sur le thème **sombre** (`:579`), rien sur le clair, aucune trace de l'`osascript` que `project-context.md:110-112` impose ni de la restauration ; (b) « **focus mesuré dans le DOM** » (`:101`) — aucune mesure de focus nulle part, alors que le dossier sait produire ce genre de preuve (bloc JSON d'AC2, `:553-555`) ; (c) « **Phase rouge constatée** » (`:53`, repris au Change Log) — aucune sortie, aucun compte, et `lecture.ts` + `lecture.test.ts` sont ajoutés dans le **même unique commit**, donc l'historique ne corrobore pas non plus ; (d) les trous « **un par un** » (`:76-77`) — le tableau ne porte que les deux extrêmes (recette complète, titre seul), les combinaisons intermédiaires sont déduites de l'indépendance des conditionnelles JSX ; (e) « `.env.local` … **SHA-256 comparé** » (`:590`) — aucune commande, aucune empreinte, et c'est le seul point du dossier qui touche à la **production**. Sévérité **low** pour le membre, mais c'est la règle qui a le plus coûté sur ce projet
+
+#### Correctifs
+
+- [ ] [Review][Patch] La prémisse CSP n'a été rouverte que dans **un** de ses deux domiciles — `deferred-work.md` porte le verdict, mais le commentaire dit toujours « la story **3.1** ouvre les recettes … il n'a pas ouvert de surface XSS », ce qui date la prémisse de la story qui ÉCRIT et ignore celle qui LIT. Règles §5 et §2 [next.config.ts:28-34]
+- [ ] [Review][Patch] Du **vouvoiement**, seule occurrence de tout l'applicatif, entre deux lignes que `cfcc75e` vient de réécrire — « Ce que **vous** savez faire à manger. » sous le `<h1>Mes recettes</h1>` et au-dessus de « Tu n'as encore aucune recette. ». UX-DR12/NFR-8 [app/recettes/page.tsx:51]
+- [ ] [Review][Patch] Le test de véracité que la story interdit sur trois pages, employé sur la valeur voisine — `{quantite || i.unite ? …}` ne fonctionne que par accident : `formaterQuantite` rend la **chaîne** `"0"`, qui est vraie. Or `0` est stockable (`recipe_ingredients_quantite_positive` vaut en réalité `quantity >= 0`, son nom ment). Le jour où la fonction rend un nombre ou `""`, la ligne « 0 g » perd sa quantité **en silence** — la confusion exacte que la décision 3 interdit, au même écran [app/recettes/[id]/page.tsx:150]
+- [ ] [Review][Patch] Une **unité orpheline** quand `quantity` est `null` et `unit` vaut `'g'` — la ligne affiche `Farine … g`, un suffixe sans nombre. Atteignable par l'éditeur de la 3.2 (`IngredientsRecette.tsx:102-111` laisse `quantity: null` et pose `unit` depuis le `<select>`), et aucune contrainte ne l'interdit. Le commentaire au-dessus (`:145-149`) ne raisonne que sur « ni quantité ni unité » [app/recettes/[id]/page.tsx:150-156]
+- [ ] [Review][Patch] `catch {}` nu : « recette introuvable » et « la lecture a échoué » deviennent indistinguables, sans une ligne de journal — le membre obtient une fiche parfaitement rendue dont l'onglet dit « Une recette · NutriClaude ». Pire, la preuve consignée (« titre d'onglet neutre — `generateMetadata` n'a pas levé ») **ne distingue pas les deux cas**, le titre neutre étant produit par les deux. `app/_lib/garde.ts:32` porte la règle du projet sur ce motif [app/recettes/[id]/page.tsx:33-41]
+- [ ] [Review][Patch] Le commentaire revendique **deux lectures**, l'écran en fait **quatre** avec trois constructions de client — `generateMetadata` construit un client et lit (`:34-35`), `requireProfile()` en construit un deuxième via `appartenance()`, `:71` en construit un troisième, `:72` relit la recette, `:76` lit les ingrédients. Le commentaire qui justifie le séquentiel « pour qu'une revue n'y voie pas une négligence » décrit un écran qui n'est pas celui-là. Règle §2 [app/recettes/[id]/page.tsx:58-61]
+- [ ] [Review][Patch] Le dossier affirme « lien de retour de l'édition **inchangé (vérifié, non touché)** », et c'est faux à HEAD — `cfcc75e` l'a passé à « ← Mes recettes ». La spec le cite verbatim et l'interdit (`:91` « Vérifie-le, ne le touche pas »), la table Microcopy (`:328`) et la décision 1 (`:488`) disent « ← Tes recettes ». La destination est conservée, le libellé non. C'est le défaut de « texte d'annonce périmé » que le **piège n°8 de cette story** énumère [3-3-…md:91, :328, :488, :620]
+- [ ] [Review][Patch] `formaterQuantite` réintroduit un **second arrondisseur** que `normaliserQuantite` avait explicitement retiré — `saisie.ts:129-140` pose que « la parade est de n'avoir qu'un seul arrondisseur : la colonne ». `maximumFractionDigits: 2` en pose un autre, avec la règle d'arrondi d'`Intl` (mesuré : `formaterQuantite(1.005)` → « 1,01 »). Sans portée tant que la colonne reste `numeric(8,2)` — mais c'est un invariant entre deux fichiers **affirmé** par un commentaire et par aucun test. Règle §4 [lib/recettes/lecture.ts:42-50]
+- [ ] [Review][Patch] Un test dont le nom annonce deux cas et n'en éprouve aucun des deux — « les portions ne peuvent pas être nulles ou négatives, et on ne fait pas semblant » ne contient qu'une assertion, `formaterPortions(0)`. Ni `null` (impossible par typage, donc le nom ment) ni le négatif. `formaterPortions(-1)` rend « Pour -1 personne » au singulier, et rien ne l'épingle [lib/recettes/lecture.test.ts:92]
+
+#### Reportés
+
+- [x] [Review][Defer] `break-all` sur le `<h1>` coupe les mots français en plein milieu [app/recettes/[id]/page.tsx:86] — reporté, motif préexistant
+- [x] [Review][Defer] « ← Retour » subsiste sur trois écrans, que la table Microcopy de cette story range en « N'écris jamais » [app/foyer/page.tsx:56, app/rayons/page.tsx:36, app/recettes/page.tsx:47] — reporté, hors périmètre
+- [x] [Review][Defer] Le piège du « voisinage » n'est pas refermé sur l'accueil : « Chez toi » à dix-huit lignes du bouton « Mon foyer » [app/page.tsx:24] — reporté, hors périmètre
+- [x] [Review][Defer] Course entre les deux lectures : une recette supprimée entre-temps s'affiche comme une recette sans ingrédients [app/recettes/[id]/page.tsx:72-76] — reporté, préexistant
+- [x] [Review][Defer] Des instructions faites de marques combinantes (`\p{Mn}`, absentes d'`INVISIBLES`) rendent la section à titre orphelin qu'AC3 interdit [lib/texte.ts:109-110] — reporté, préexistant
+
+#### Écartés comme bruit (2)
+
+Divergence onglet/corps sur recette supprimée — même course que le report ci-dessus, fusionnée.
+Écart « 1 personne / 4 personnes » de la sous-tâche contre `1 / 2 / 12` dans le test — l'accord
+singulier/pluriel est couvert, la lettre de la sous-tâche non ; sans conséquence.
+
+---
+
 ## Change Log
 
 | Date | Changement |
 |---|---|
 | 2026-08-02 | **Implémentation.** Un module pur en TDD (phase rouge constatée), un écran de lecture **sans aucun `"use client"`**, la navigation recâblée. **Six portes vertes : 152/152 unitaires, 55/55 isolation**, typage, lint, build, en-têtes de migration — **aucune migration ajoutée**. **AC2 mesuré dans le DOM** : `pre-wrap`, 3 sauts de ligne, ligne vide intérieure, et **zéro nœud enfant** — donc aucun balisage injecté. Dent vérifiée : remplacer `!== null` par `if (temps)` fait tomber le test du zéro (152 → 151), l'erreur exacte que la décision 3 interdit. **Une découverte absente de la story** : `toLocaleString("fr-FR")` insère une espace insécable étroite (U+202F) sur les milliers — la famille d'invisibles que `lib/texte.ts` retire des saisies ; `useGrouping: false` l'évite et un test l'épingle. **Verdict CSP rendu** (Task 6) : aucun `dangerouslySetInnerHTML`, aucun parseur, tout est rendu par expression React — la prémisse tient, consignée avec la commande pour que la prochaine story la revérifie. Aucun test d'isolation ajouté, **délibérément**. Statut → `review` |
 | 2026-08-02 | **Les quatre questions tranchées par Florian**, conformes aux recommandations : lien de retour de l'édition inchangé, `generateMetadata` oui, un temps à `0` **s'affiche**, et **aucun `loading.tsx`** sur cette route. Le piège n°4 disait l'inverse sur le `0` — réécrit, avec l'avertissement qui compte : le test est `!== null`, jamais `if (!temps)`, qui attraperait `0` et `null` en silence et ferait passer le tableau des quatre cas à trois sans que rien ne le dise. Deux sous-tâches ajoutées pour acter les décisions 3 et 4 |
+| 2026-08-02 | **Revue adversariale** (3 couches : Blind Hunter, Edge Case Hunter, Acceptance Auditor, sans contexte préalable). 4 décisions, 9 correctifs, 5 reports, 2 écartés. **AC1, AC2 et AC3 sont tenus par le code** et les huit pièges sont évités. Les défauts sont ailleurs : dans ce que la story AFFIRME, et dans le second commit. Le fait marquant est **mesuré, pas déduit** — `app/recettes/loading.tsx` COUVRE `/recettes/[id]` (`.next/server/app/recettes/[id]/page.js:14` charge `app_recettes_loading_tsx_…js`), donc la décision 4 repose sur une prémisse fausse écrite en trois endroits. Constats en § Review Findings |
 | 2026-08-02 | Story créée. **La moitié d'AC2 est déjà tenue** — `normaliserMultiligne` (story 3.1) stocke les retours à la ligne, et la sonde confirme qu'ils survivent à l'aller-retour par l'API, ligne vide intérieure comprise. Il ne reste qu'un `whitespace-pre-wrap`, et le piège n°1 énumère les quatre façons de le rater. **Un défaut mesuré, hérité de la 3.2** : PostgREST rend `quantity` en nombre JSON, donc « 0,5 » saisi se réaffiche « 0.5 » — alors que `normaliserQuantite` accepte explicitement la virgule française et que NFR-8 exige le français. Corrigé ici seulement, consigné pour l'écran d'édition. **Et c'est cette story qui rouvre la CSP** : son échéance a été repoussée à l'Epic 6 au motif qu'aucune surface XSS n'existait — l'affirmation portait sur l'écriture, celle-ci est la story qui LIT. D'où une tâche sans critère d'acceptation qui n'est pas facultative. Quatre questions ouvertes, chacune avec sa recommandation |
