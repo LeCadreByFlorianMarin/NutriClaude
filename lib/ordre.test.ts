@@ -10,11 +10,11 @@ import {
  * Le pur du réordonnancement.
  *
  * **Ce que ce fichier existe pour tenir : l'AC2 au niveau du pur** — « positions
- * uniques, aucun rayon perdu ou dupliqué ». La moitié base de cet invariant est
+ * uniques, aucun élément perdu ou dupliqué ». La moitié base de cet invariant est
  * mesurée par `supabase/tests/isolation.test.ts` ; la moitié client est ici, et
  * elle se résume à une assertion qu'on oublie facilement : **l'ensemble des
  * identifiants rendus est exactement celui reçu**. Une permutation qui perd ou
- * duplique un rayon passerait tous les tests d'ordre et échouerait celui-là.
+ * duplique un élément passerait tous les tests d'ordre et échouerait celui-là.
  */
 
 /** Un parcours nommé par des lettres — l'`ordre` est là pour être ignoré. */
@@ -24,11 +24,11 @@ function parcours(...ids: string[]) {
 
 /**
  * L'assertion structurelle, à appeler sur CHAQUE cas qui rend un ordre.
- * Elle ne regarde pas la position : seulement qu'aucun rayon n'a disparu ni
+ * Elle ne regarde pas la position : seulement qu'aucun élément n'a disparu ni
  * n'est apparu deux fois.
  */
 function memeEnsemble(rendu: string[], depart: ReadonlyArray<{ id: string }>) {
-  assert.equal(rendu.length, depart.length, "aucun rayon perdu ni ajouté");
+  assert.equal(rendu.length, depart.length, "aucun élément perdu ni ajouté");
   assert.equal(new Set(rendu).size, rendu.length, "aucun doublon");
   assert.deepEqual(
     [...rendu].sort(),
@@ -39,14 +39,14 @@ function memeEnsemble(rendu: string[], depart: ReadonlyArray<{ id: string }>) {
 
 // ── ordreApresDeplacement — le chemin des flèches ────────────────────────
 
-test("monter un rayon du milieu l'échange avec son prédécesseur", () => {
+test("monter un élément du milieu l'échange avec son prédécesseur", () => {
   const p = parcours("a", "b", "c", "d");
   const rendu = ordreApresDeplacement(p, "c", "haut");
   assert.deepEqual(rendu, ["a", "c", "b", "d"]);
   memeEnsemble(rendu!, p);
 });
 
-test("descendre un rayon du milieu l'échange avec son successeur", () => {
+test("descendre un élément du milieu l'échange avec son successeur", () => {
   const p = parcours("a", "b", "c", "d");
   const rendu = ordreApresDeplacement(p, "b", "bas");
   assert.deepEqual(rendu, ["a", "c", "b", "d"]);
@@ -99,7 +99,7 @@ test("le dernier rayon peut aller en premier", () => {
   memeEnsemble(rendu!, p);
 });
 
-test("déplacer un rayon vers sa propre place ne fait rien", () => {
+test("déplacer un élément vers sa propre place ne fait rien", () => {
   // Le glisser relâché à son point de départ. Aucun appel à la base, aucun
   // message : il ne s'est rien passé.
   assert.equal(ordreDeplace(parcours("a", "b", "c"), "b", 1), null);
@@ -124,7 +124,7 @@ test("chaque déplacement possible conserve l'ensemble des identifiants", () => 
       const rendu = ordreDeplace(p, r.id, cible);
       if (rendu === null) continue;
       memeEnsemble(rendu, p);
-      assert.equal(rendu[cible], r.id, "le rayon atterrit bien à la place visée");
+      assert.equal(rendu[cible], r.id, "l'élément atterrit bien à la place visée");
     }
   }
 });

@@ -610,6 +610,10 @@ export type Database = {
         Returns: string
       }
       reorder_aisles: { Args: { p_ids: string[] }; Returns: undefined }
+      reorder_recipe_ingredients: {
+        Args: { p_ids: string[]; p_recipe_id: string }
+        Returns: undefined
+      }
       resolve_aisle_id: {
         Args: {
           p_fallback_kw: string

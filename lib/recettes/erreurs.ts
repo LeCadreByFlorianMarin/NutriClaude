@@ -64,3 +64,55 @@ export function refusRecette(erreur: ErreurBase | null): RefusRecette {
    */
   return "echec";
 }
+
+/**
+ * Les refus propres aux ingrédients. Trois contraintes `check` sur la même
+ * table — donc, comme pour `recipes`, c'est le **nom de contrainte** qui
+ * discrimine, jamais le seul SQLSTATE `23514`.
+ */
+export type RefusIngredient =
+  | "nom-vide"
+  | "unite-inconnue"
+  | "quantite-negative"
+  | "echec";
+
+const PAR_CONTRAINTE_INGREDIENT: ReadonlyArray<[string, RefusIngredient]> = [
+  ["recipe_ingredients_nom_non_vide", "nom-vide"],
+  ["recipe_ingredients_unite_fermee", "unite-inconnue"],
+  ["recipe_ingredients_quantite_positive", "quantite-negative"],
+];
+
+export function refusIngredient(erreur: ErreurBase | null): RefusIngredient {
+  if (!erreur) return "echec";
+
+  const message = erreur.message ?? "";
+  for (const [contrainte, refus] of PAR_CONTRAINTE_INGREDIENT) {
+    if (message.includes(contrainte)) return refus;
+  }
+  return "echec";
+}
+
+/**
+ * Les refus de `reorder_recipe_ingredients`, d'une autre nature que ceux d'un
+ * `insert` ou d'un `update`.
+ *
+ * ⚠️ **`raise exception` sans `errcode` rend `P0001`** — les quatre gardes de la
+ * fonction le rendent toutes, et c'est voulu : du point de vue de l'utilisateur
+ * elles disent une seule et même chose, *la liste que tu m'as envoyée ne
+ * correspond plus à celle qui est en base*. Laquelle a parlé n'intéresse que le
+ * développeur, et part dans `console.error`.
+ *
+ * ⚠️ **Aucun repli sur le texte**, contrairement à `refusIngredient` : il
+ * faudrait s'appuyer sur une phrase française écrite dans le corps de la
+ * fonction, et la reformuler casserait l'écran en silence. Un nom de contrainte
+ * fait partie du schéma ; un message n'est pas un contrat. Même raisonnement que
+ * `refusOrdre` pour les rayons.
+ */
+export type RefusOrdreIngredients = "liste-changee" | "echec";
+
+export function refusOrdreIngredients(
+  erreur: ErreurBase | null
+): RefusOrdreIngredients {
+  if (!erreur) return "echec";
+  return erreur.code === "P0001" ? "liste-changee" : "echec";
+}

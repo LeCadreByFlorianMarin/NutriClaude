@@ -2,7 +2,9 @@ import { notFound } from "next/navigation";
 import { requireProfile } from "@/app/_lib/garde";
 import { createServerComponentClient } from "@/lib/supabase/server";
 import { recetteParId } from "@/lib/recettes/recettes";
+import { ingredientsDeRecette } from "@/lib/recettes/ingredients";
 import { FormulaireRecette } from "./FormulaireRecette";
+import { IngredientsRecette } from "./IngredientsRecette";
 
 export const metadata = { title: "Modifier une recette · NutriClaude" };
 
@@ -45,10 +47,22 @@ export default async function ModifierRecettePage({
 
   if (!recette) notFound();
 
+  const ingredients = await ingredientsDeRecette(supabase, recette.id);
+
   return (
     <main className="flex-1 p-6">
       <div className="mx-auto w-full max-w-2xl py-6">
         <FormulaireRecette recette={recette} />
+        {/*
+          ⚠️ **Composant à part, monté SOUS le formulaire — pas dedans.** Les deux
+          n'ont pas le même modèle d'écriture : le formulaire de la recette
+          accumule puis enregistre en un geste, avec une garde sur les saisies non
+          enregistrées ; les ingrédients s'écrivent un par un, immédiatement. Les
+          mêler ferait entrer les ingrédients dans le périmètre de la garde, et un
+          ajout d'ingrédient réussi annoncerait « tu as des modifications non
+          enregistrées » — un message faux.
+        */}
+        <IngredientsRecette recetteId={recette.id} ingredients={ingredients} />
       </div>
     </main>
   );

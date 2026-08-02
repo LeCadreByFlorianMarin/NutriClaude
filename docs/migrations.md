@@ -154,7 +154,7 @@ un bloc `__InternalSupabase / PostgrestVersion` et, selon la version de la CLI, 
 `graphql_public`. Si le seul diff porte là-dessus, **ne le commite pas** : ça mêlerait une montée de
 version de la CLI à une story de fonctionnalité.
 
-**À rejouer après chaque migration**, dans le même commit. C'est ce qui fait qu'un nom de table, de colonne ou de fonction inexistant échoue au `typecheck` au lieu de casser à l'exécution. Contrôle rapide après génération : le bloc `Functions` doit lister **huit** fonctions (au 2026-07-31, `reorder_aisles` ajoutée par la story 2.2 ; il y en avait sept au 2026-07-29) — s'il est vide, la génération a échoué et il ne faut pas commiter le résultat.
+**À rejouer après chaque migration**, dans le même commit. C'est ce qui fait qu'un nom de table, de colonne ou de fonction inexistant échoue au `typecheck` au lieu de casser à l'exécution. Contrôle rapide après génération : le bloc `Functions` doit lister **neuf** fonctions (au 2026-08-02, `reorder_recipe_ingredients` ajoutée par la story 3.2 ; il y en avait huit au 2026-07-31 et sept au 2026-07-29) — s'il est vide, la génération a échoué et il ne faut pas commiter le résultat.
 
 > ⚠️ Ce compte est un **état de la base dans un document**, donc il se périme. Il porte sa date pour ça : si tu le lis après avoir ajouté une fonction, c'est `supabase/migrations/` qui fait foi, pas cette phrase.
 
