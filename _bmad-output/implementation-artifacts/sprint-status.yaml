@@ -258,8 +258,35 @@ development_status:
   # production, sa fermeture n'attend pas ces correctifs).
   # ⚠️ REPORTÉ à la story 4.10, décision de Florian : l'édition concurrente écrase
   # silencieusement celle de l'autre membre et affiche « C'est noté. ».
+  # ⚠️ NON LIVRÉ, et c'est un choix : le GLISSER. Les flèches suffisent aux critères et sont
+  # obligatoires dans les deux mondes (WCAG 2.5.7 + seul chemin clavier), donc rien n'est à
+  # jeter s'il est repris — il se poserait sur `lib/ordre.ts`, qui porte déjà
+  # `indexCibleDuGlisser`.
   3-2-gerer-les-ingredients-d-une-recette: done
-  3-3-consulter-une-recette-en-lecture: backlog
+  # Contextualisée le 2026-08-02. Aucune migration — première story de l'Epic 3 dans ce cas.
+  # LA MOITIÉ D'AC2 EST DÉJÀ TENUE : `normaliserMultiligne` (story 3.1) stocke les retours à
+  # la ligne, et la sonde confirme qu'ils survivent à l'aller-retour par l'API, ligne vide
+  # intérieure comprise. Il ne reste qu'un `whitespace-pre-wrap` — et le piège n°1 énumère
+  # les quatre façons de le rater, dont `dangerouslySetInnerHTML`, qui ouvrirait une vraie
+  # surface XSS sur un produit SANS CSP.
+  #
+  # ⚠️ C'EST CETTE STORY QUI ROUVRE LA CSP. Son échéance a été repoussée à l'Epic 6 le
+  # 2026-08-01 au motif que « cet epic n'a pas ouvert de surface XSS ». L'affirmation portait
+  # sur l'ÉCRITURE ; celle-ci est la story qui LIT du texte écrit par le membre. D'où une
+  # tâche sans critère d'acceptation, et qui n'est pas facultative : revérifier la prémisse
+  # et écrire la conclusion (règle §5 de project-context.md).
+  #
+  # ⚠️ Un défaut MESURÉ, hérité de la 3.2 : PostgREST rend `quantity` en nombre JSON, donc
+  # « 0,5 » saisi se réaffiche « 0.5 » — alors que `normaliserQuantite` accepte explicitement
+  # la virgule française et que NFR-8 exige le français. Corrigé dans l'écran de lecture
+  # seulement ; consigné dans deferred-work pour l'écran d'édition, pour ne pas déborder.
+  #
+  # 4 questions ouvertes (lien de retour de l'édition, generateMetadata, un temps de cuisson
+  # à 0, un loading.tsx pour cet écran), chacune avec sa recommandation.
+  # Les 4 questions TRANCHÉES par Florian le 2026-08-02, conformes aux recommandations :
+  # lien de retour de l'édition inchangé, generateMetadata oui, un temps à 0 S'AFFICHE
+  # (distinct de null), et AUCUN loading.tsx sur cette route — absence décidée, pas subie.
+  3-3-consulter-une-recette-en-lecture: review
   3-4-etiquettes-filtre-et-recherche-du-repertoire: backlog
   3-5-planifier-le-menu-de-la-semaine-sans-defilement-horizontal: backlog
   3-6-assigner-recettes-et-nombre-de-personnes-aux-cases-du-menu: backlog

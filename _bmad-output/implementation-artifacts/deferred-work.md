@@ -484,3 +484,32 @@ sans case cochée à tort.
   (`supabase gen types --local` + `diff`, écart strictement limité à `__InternalSupabase` ↔
   `graphql_public`) : le compte est donc exact aujourd'hui.* *Reporté : la faiblesse est celle du
   contrôle, pas de la donnée.*
+
+---
+
+## Deferred from: story 3-3-consulter-une-recette-en-lecture (2026-08-02)
+
+**La CSP : prémisse REVÉRIFIÉE au moment où elle est réinvoquée, et elle tient.**
+
+L'échéance de la `Content-Security-Policy` a été repoussée à l'**Epic 6, avec la story PWA**, le 2026-08-01, au motif que « cet epic n'a pas ouvert de surface XSS ». **Cette affirmation portait sur l'écriture** ; la story 3.3 est celle qui *lit* du texte écrit par le membre, et c'est donc elle qui devait la revérifier — règle §5 de `project-context.md` : *une prémisse qui sert à reporter un défaut se rouvre avant d'être réinvoquée*.
+
+**Contrôlé le 2026-08-02, sur l'arbre complet :**
+
+| Contrôle | Résultat |
+|---|---|
+| `dangerouslySetInnerHTML`, `innerHTML`, `__html` dans `app/` et `lib/` | **aucune occurrence** — la seule est dans un commentaire qui les interdit |
+| Parseur Markdown, sanitizer, bibliothèque HTML parmi les 14 dépendances | **aucune** |
+| Rendu des champs écrits par le membre (`titre`, `description`, `nom` d'ingrédient, `instructions`) | **expressions React**, donc échappées |
+| Mise en forme des instructions | **`white-space: pre-wrap`** — du CSS, vérifié émis dans le build |
+
+**La prémisse tient : cette story n'ouvre aucune surface XSS.** L'échéance Epic 6 reste valide, et pour la raison déjà écrite — la CSP exige un nonce dans le proxy, que l'Epic 6 rouvre de toute façon pour les icônes PWA.
+
+⚠️ **Ce qui reste vrai et n'a pas changé** : le cookie de session Supabase est lisible en JavaScript (`httpOnly: false`, imposé par la librairie) et dure 400 jours. Une XSS exfiltrerait un jeton porteur authentique que la RLS honorerait. Les quatre autres en-têtes (`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Strict-Transport-Security`) sont posés ; **seule une CSP fermerait ce risque-là.**
+
+⚠️ **La prochaine story qui rend du texte de membre doit refaire ce contrôle**, pas le supposer fait. Il tient en une commande : `grep -rn "dangerouslySetInnerHTML\|innerHTML\|__html" app/ lib/`.
+
+**Reporté, avec la raison :**
+
+- **La quantité s'affiche encore avec un point sur l'ÉCRAN D'ÉDITION** (`app/recettes/[id]/modifier/IngredientsRecette.tsx`, la ligne repliée affiche `{i.quantite}` brut). Le membre tape « 0,5 » — `normaliserQuantite` accepte explicitement la virgule française — et la ligne lui répond « 0.5 ». `formaterQuantite` (`lib/recettes/lecture.ts`) existe désormais et règle le cas ; *reporté parce que déborder sur l'écran d'une autre story rend sa propre revue plus difficile*. Une ligne à changer, et le module est déjà là.
+- **Aucun `loading.tsx` sur `/recettes/[id]`.** Décision de Florian du 2026-08-02 : aucun AC ne le demande — l'AC4 de la story 3.1 portait sur le répertoire — et `app/recettes/loading.tsx` ne couvre pas cette route. En poser un est un travail réel (forme, deux thèmes, vérification réseau bridé) pour un écran qui se charge en deux lectures. **Absence décidée, pas subie.**
+- **`generateMetadata` refait une lecture de la recette.** Next met en cache les requêtes d'un même rendu, mais notre client Supabase n'est pas instrumenté pour ça : la métadonnée et le composant lisent deux fois. Sans portée sur un écran de configuration ; à rouvrir seulement si un écran chaud adopte le même motif.
