@@ -397,3 +397,176 @@ test("la base refuse deux rayons de même nom dans un foyer", async () => {
   assert.notEqual(error, null, "le doublon doit être refusé");
   assert.equal(error!.code, "23505", "violation d'unicité — le code que `refusRayon` lit");
 });
+
+// ── `reorder_aisles` — story 2.2 ─────────────────────────────────────────────
+//
+// La fonction n'est **pas** `security definer`, à l'inverse de
+// `seed_default_aisles` : elle ne reçoit aucune identité, seulement des
+// identifiants de rayons, et c'est la RLS qui décide lesquels sont atteignables.
+//
+// ⚠️ **Le piège de CES tests, rencontré en éprouvant le mécanisme.** Sous RLS,
+// `a.client.from("aisles").select("id").eq("household_id", b.foyerId)` ne rend
+// AUCUNE ligne : A ne peut pas même LIRE les identifiants de B. Construire le
+// tableau depuis le client de A donnerait donc un tableau vide, et le refus
+// viendrait de la garde « aucun rayon à ordonner » — pas de celle qu'on veut
+// éprouver. Le test passerait en ne prouvant rien.
+//
+// Les tableaux d'identifiants viennent donc TOUS du client `admin`, qui traverse
+// la RLS. C'est la seule façon de forger l'appel qu'un attaquant forgerait.
+
+/** Les identifiants d'un foyer, dans l'ordre du parcours, vus par `admin`. */
+async function idsDuFoyer(foyerId: string): Promise<string[]> {
+  const { data } = await admin
+    .from("aisles")
+    .select("id")
+    .eq("household_id", foyerId)
+    .order("sort_order");
+  return (data ?? []).map((r) => r.id);
+}
+
+/** Les positions d'un foyer, pour le témoin négatif. */
+async function positionsDuFoyer(foyerId: string): Promise<number[]> {
+  const { data } = await admin
+    .from("aisles")
+    .select("sort_order")
+    .eq("household_id", foyerId)
+    .order("sort_order");
+  return (data ?? []).map((r) => r.sort_order);
+}
+
+test("A ne peut pas réordonner le parcours de B", async () => {
+  const idsB = await idsDuFoyer(b.foyerId);
+  const avant = await positionsDuFoyer(b.foyerId);
+  assert.equal(idsB.length, 11, "B a bien ses onze rayons avant l'essai");
+
+  // Bon cardinal (11), mais tous les identifiants sont étrangers. Les gardes de
+  // cardinal les laissent passer : seul le comptage des lignes affectées
+  // l'attrape, parce qu'un `update` sur une ligne masquée par la RLS ne rend
+  // AUCUNE erreur — il ne touche simplement rien.
+  const { error } = await a.client.rpc("reorder_aisles", { p_ids: idsB });
+  assert.notEqual(error, null, "un parcours étranger doit être refusé");
+
+  const apres = await positionsDuFoyer(b.foyerId);
+  assert.deepEqual(apres, avant, "le parcours de B n'a pas bougé");
+});
+
+test("A ne peut pas glisser un rayon de B dans son propre parcours", async () => {
+  const idsA = await idsDuFoyer(a.foyerId);
+  const idsB = await idsDuFoyer(b.foyerId);
+  const avantA = await positionsDuFoyer(a.foyerId);
+  const avantB = await positionsDuFoyer(b.foyerId);
+
+  // Cardinal correct, mais un intrus : 10 des siens + 1 de B.
+  const forge = [...idsA.slice(0, 10), idsB[0]];
+  assert.equal(forge.length, idsA.length, "le cardinal est bien celui du parcours de A");
+
+  const { error } = await a.client.rpc("reorder_aisles", { p_ids: forge });
+  assert.notEqual(error, null, "un identifiant étranger doit être refusé");
+
+  assert.deepEqual(await positionsDuFoyer(a.foyerId), avantA, "A n'a pas bougé");
+  assert.deepEqual(await positionsDuFoyer(b.foyerId), avantB, "B n'a pas bougé");
+});
+
+test("un parcours partiel est refusé — c'est ce qui interdit les ex æquo", async () => {
+  const idsA = await idsDuFoyer(a.foyerId);
+  const avant = await positionsDuFoyer(a.foyerId);
+
+  // Renuméroter 5 rayons sur 11 laisserait les six autres à leur ancienne
+  // position : des positions en double, donc l'AC2 violée.
+  const { error } = await a.client.rpc("reorder_aisles", { p_ids: idsA.slice(0, 5) });
+  assert.notEqual(error, null, "une liste partielle doit être refusée");
+  assert.deepEqual(await positionsDuFoyer(a.foyerId), avant, "rien n'a bougé");
+});
+
+test("un rayon cité deux fois est refusé", async () => {
+  const idsA = await idsDuFoyer(a.foyerId);
+  const avant = await positionsDuFoyer(a.foyerId);
+
+  const doublon = [...idsA.slice(0, idsA.length - 1), idsA[0]];
+  assert.equal(doublon.length, idsA.length, "le cardinal reste correct");
+
+  const { error } = await a.client.rpc("reorder_aisles", { p_ids: doublon });
+  assert.notEqual(error, null, "un doublon doit être refusé");
+  assert.deepEqual(await positionsDuFoyer(a.foyerId), avant, "rien n'a bougé");
+});
+
+test("un appel anonyme est refusé", async () => {
+  const anonyme = createClient(apiUrl, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const idsA = await idsDuFoyer(a.foyerId);
+  const avant = await positionsDuFoyer(a.foyerId);
+
+  const { error } = await anonyme.rpc("reorder_aisles", { p_ids: idsA });
+  assert.notEqual(error, null, "sans session, aucun parcours n'est réordonnable");
+  assert.deepEqual(await positionsDuFoyer(a.foyerId), avant, "rien n'a bougé");
+});
+
+test("A réordonne son propre parcours : positions uniques, ordre respecté", async () => {
+  // Le chemin légitime. Il prouve aussi que `authenticated` a bien `execute` sur
+  // la fonction — aucun `grant` n'est écrit par la migration, qui s'appuie sur
+  // `alter default privileges` de `20260729094500`.
+  const idsA = await idsDuFoyer(a.foyerId);
+  const inverse = [...idsA].reverse();
+
+  const { error } = await a.client.rpc("reorder_aisles", { p_ids: inverse });
+  assert.equal(error, null, "le chemin légitime doit rester ouvert");
+
+  const { data } = await admin
+    .from("aisles")
+    .select("id, sort_order")
+    .eq("household_id", a.foyerId)
+    .order("sort_order");
+  const lignes = data ?? [];
+
+  // AC2 : « positions uniques, aucun rayon perdu ou dupliqué ».
+  assert.equal(lignes.length, idsA.length, "aucun rayon perdu ni ajouté");
+  assert.equal(
+    new Set(lignes.map((l) => l.sort_order)).size,
+    lignes.length,
+    "toutes les positions sont distinctes"
+  );
+  assert.deepEqual(
+    lignes.map((l) => l.sort_order),
+    idsA.map((_, i) => (i + 1) * 10),
+    "renumérotées au pas de 10"
+  );
+  // AC1 : l'ordre persisté est bien celui qui a été demandé.
+  assert.deepEqual(
+    lignes.map((l) => l.id),
+    inverse,
+    "l'ordre lu est celui qui a été envoyé"
+  );
+});
+
+test("le renumérotage résorbe des ex æquo préexistants", async () => {
+  // `sort_order` n'a aucune contrainte d'unicité et vaut 100 par défaut : des
+  // ex æquo sont légaux et existent dès qu'une ligne est insérée sans calcul.
+  // Un simple échange de deux valeurs serait un no-op silencieux sur ce cas ;
+  // le renumérotage complet, lui, le répare.
+  await admin.from("aisles").update({ sort_order: 100 }).eq("household_id", a.foyerId);
+
+  const { data: avant } = await admin
+    .from("aisles")
+    .select("sort_order")
+    .eq("household_id", a.foyerId);
+  assert.equal(
+    new Set((avant ?? []).map((l) => l.sort_order)).size,
+    1,
+    "une seule position distincte avant"
+  );
+
+  const idsA = await idsDuFoyer(a.foyerId);
+  const { error } = await a.client.rpc("reorder_aisles", { p_ids: idsA });
+  assert.equal(error, null, "le renumérotage doit passer");
+
+  const { data: apres } = await admin
+    .from("aisles")
+    .select("sort_order")
+    .eq("household_id", a.foyerId);
+  assert.equal(
+    new Set((apres ?? []).map((l) => l.sort_order)).size,
+    idsA.length,
+    "autant de positions distinctes que de rayons"
+  );
+});

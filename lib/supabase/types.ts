@@ -609,6 +609,7 @@ export type Database = {
         Args: { p_code: string; p_display_name: string }
         Returns: string
       }
+      reorder_aisles: { Args: { p_ids: string[] }; Returns: undefined }
       resolve_aisle_id: {
         Args: {
           p_fallback_kw: string
