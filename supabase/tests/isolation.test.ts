@@ -767,3 +767,274 @@ test("le renumérotage résorbe des ex æquo préexistants", async () => {
     "autant de positions distinctes que de rayons"
   );
 });
+
+// ── Ingrédients : la table n'avait JAMAIS été éprouvée ──────────────────────
+//
+// `recipe_ingredients_all` ancre l'isolation par un `exists` sur `recipes` — une
+// forme différente des autres politiques, et jamais exercée jusqu'ici.
+//
+// ⚠️ Les identifiants de B sont obtenus du client `admin`, jamais du client de A :
+// sous RLS, A ne peut pas les lire, et un test qui les cherche avec le mauvais
+// client passe EN NE PROUVANT RIEN.
+
+/** Pose une recette et un ingrédient en traversant la RLS. */
+async function ingredientDeService(
+  foyerId: string,
+  titreRecette: string,
+  nomIngredient: string,
+): Promise<{ recetteId: string; ingredientId: string }> {
+  const { data: r, error: er } = await admin
+    .from("recipes")
+    .insert({ household_id: foyerId, title: titreRecette })
+    .select("id")
+    .single();
+  assert.equal(er, null, `création de la recette « ${titreRecette} »`);
+
+  const { data: i, error: ei } = await admin
+    .from("recipe_ingredients")
+    .insert({ recipe_id: r!.id, name: nomIngredient })
+    .select("id")
+    .single();
+  assert.equal(ei, null, `création de l'ingrédient « ${nomIngredient} »`);
+
+  return { recetteId: r!.id as string, ingredientId: i!.id as string };
+}
+
+test("A ne lit pas les ingrédients de B", async () => {
+  const chezB = await ingredientDeService(b.foyerId, "Recette de B", "Secret de B");
+  const chezA = await ingredientDeService(a.foyerId, "Recette de A", "Oignon de A");
+
+  const { data: vus } = await a.client.from("recipe_ingredients").select("id, name");
+  const noms = (vus ?? []).map((l) => l.name);
+  assert.ok(noms.includes("Oignon de A"), "A doit voir le sien");
+  assert.ok(!noms.includes("Secret de B"), "A ne doit pas voir celui de B");
+
+  const { data: cible } = await a.client
+    .from("recipe_ingredients")
+    .select("id")
+    .eq("id", chezB.ingredientId);
+  assert.deepEqual(cible, [], "connaître l'UUID ne doit rien ouvrir");
+  assert.ok(chezA.ingredientId);
+});
+
+test("A ne peut ni poser, ni modifier, ni supprimer un ingrédient chez B", async () => {
+  const chezB = await ingredientDeService(b.foyerId, "Intouchable", "Carotte de B");
+
+  const { error: erreurInsert } = await a.client
+    .from("recipe_ingredients")
+    .insert({ recipe_id: chezB.recetteId, name: "Ingrédient forgé" });
+  assert.notEqual(erreurInsert, null, "le `with check` doit refuser");
+
+  /*
+   * ⚠️ Sous RLS, écrire sur une ligne masquée ne rend AUCUNE erreur : la ligne est
+   * invisible, donc zéro ligne touchée. Un test qui se contenterait de
+   * `assert.equal(error, null)` passerait en ne prouvant rien. C'est la relecture
+   * par `admin` qui fait la preuve.
+   */
+  const { data: modifiees, error: erreurUpdate } = await a.client
+    .from("recipe_ingredients")
+    .update({ name: "Nom volé" })
+    .eq("id", chezB.ingredientId)
+    .select("id");
+  assert.equal(erreurUpdate, null, "pas d'erreur — la ligne est invisible");
+  assert.deepEqual(modifiees, [], "aucune ligne touchée");
+
+  const { data: supprimees } = await a.client
+    .from("recipe_ingredients")
+    .delete()
+    .eq("id", chezB.ingredientId)
+    .select("id");
+  assert.deepEqual(supprimees, [], "aucune ligne supprimée");
+
+  const { data: apres } = await admin
+    .from("recipe_ingredients")
+    .select("name")
+    .eq("id", chezB.ingredientId)
+    .single();
+  assert.equal(apres!.name, "Carotte de B", "l'ingrédient de B est intact");
+});
+
+test("A gère les ingrédients de SA recette de bout en bout", async () => {
+  // Le pendant positif : sans lui, une politique qui refuserait TOUT passerait.
+  const { data: recette } = await admin
+    .from("recipes")
+    .insert({ household_id: a.foyerId, title: "Ma recette à ingrédients" })
+    .select("id")
+    .single();
+
+  const { data: cree, error: erreurCreation } = await a.client
+    .from("recipe_ingredients")
+    .insert({
+      recipe_id: recette!.id,
+      name: "Pois chiches",
+      quantity: 400,
+      unit: "g",
+      aisle_keyword: "conserves",
+      optional: false,
+      sort_order: 10,
+    })
+    .select("id, name, quantity, unit, aisle_keyword, optional")
+    .single();
+  assert.equal(erreurCreation, null, "A doit pouvoir ajouter chez elle");
+  // AC1 : les cinq attributs sont bien rattachés.
+  assert.equal(cree!.name, "Pois chiches");
+  assert.equal(Number(cree!.quantity), 400);
+  assert.equal(cree!.unit, "g");
+  assert.equal(cree!.aisle_keyword, "conserves");
+  assert.equal(cree!.optional, false);
+
+  // AC2 : modification EN PLACE, sans suppression-recréation.
+  const { data: modifie, error: erreurEdition } = await a.client
+    .from("recipe_ingredients")
+    .update({ quantity: 250, unit: "kg", optional: true })
+    .eq("id", cree!.id)
+    .select("id, quantity, unit, optional")
+    .single();
+  assert.equal(erreurEdition, null);
+  assert.equal(modifie!.id, cree!.id, "MÊME ligne — pas une recréation");
+  assert.equal(Number(modifie!.quantity), 250);
+  assert.equal(modifie!.unit, "kg");
+  assert.equal(modifie!.optional, true);
+
+  const { data: supprime, error: erreurSuppression } = await a.client
+    .from("recipe_ingredients")
+    .delete()
+    .eq("id", cree!.id)
+    .select("id");
+  assert.equal(erreurSuppression, null);
+  assert.equal(supprime?.length, 1, "A doit pouvoir retirer chez elle");
+});
+
+// ── `reorder_recipe_ingredients` — LE test de cette story ────────────────────
+
+test("A réordonne SA recette, et les ex æquo sont résorbés", async () => {
+  const { data: recette } = await admin
+    .from("recipes")
+    .insert({ household_id: a.foyerId, title: "Recette à ordonner" })
+    .select("id")
+    .single();
+
+  // `sort_order` vaut 0 PAR DÉFAUT pour tous : les ex æquo sont l'état de départ.
+  const { data: poses } = await admin
+    .from("recipe_ingredients")
+    .insert([
+      { recipe_id: recette!.id, name: "Un" },
+      { recipe_id: recette!.id, name: "Deux" },
+      { recipe_id: recette!.id, name: "Trois" },
+    ])
+    .select("id, name, sort_order");
+  assert.equal(new Set((poses ?? []).map((l) => l.sort_order)).size, 1,
+    "au départ, une seule position distincte");
+
+  const parNom = Object.fromEntries((poses ?? []).map((l) => [l.name, l.id]));
+  const { error } = await a.client.rpc("reorder_recipe_ingredients", {
+    p_recipe_id: recette!.id,
+    p_ids: [parNom.Trois, parNom.Un, parNom.Deux],
+  });
+  assert.equal(error, null, "A doit pouvoir réordonner sa recette");
+
+  const { data: apres } = await admin
+    .from("recipe_ingredients")
+    .select("name, sort_order")
+    .eq("recipe_id", recette!.id)
+    .order("sort_order");
+  assert.deepEqual((apres ?? []).map((l) => l.name), ["Trois", "Un", "Deux"]);
+  assert.equal(new Set((apres ?? []).map((l) => l.sort_order)).size, 3,
+    "autant de positions distinctes que d'ingrédients");
+});
+
+test("LE TROU : une recette annoncée, les identifiants d'une AUTRE recette du même foyer", async () => {
+  /*
+   * ⚠️ Le test le plus important de cette story. La RLS ne peut RIEN refuser ici :
+   * les deux recettes appartiennent au foyer de A, donc tout lui est visible. La
+   * version de la fonction calquée à l'identique sur `reorder_aisles` acceptait
+   * cet appel et renumérotait l'autre recette — mesuré le 2026-08-02 en éprouvant
+   * le mécanisme avant de le prescrire.
+   *
+   * Seul le filtre `and ri.recipe_id = p_recipe_id` dans l'`update` le referme :
+   * zéro ligne touchée, donc la garde de comptage lève.
+   */
+  const { data: recettes } = await admin
+    .from("recipes")
+    .insert([
+      { household_id: a.foyerId, title: "Cible" },
+      { household_id: a.foyerId, title: "Victime" },
+    ])
+    .select("id, title");
+  const cible = recettes!.find((r) => r.title === "Cible")!.id;
+  const victime = recettes!.find((r) => r.title === "Victime")!.id;
+
+  await admin.from("recipe_ingredients").insert([
+    { recipe_id: cible, name: "C1", sort_order: 10 },
+    { recipe_id: cible, name: "C2", sort_order: 20 },
+  ]);
+  const { data: ingrVictime } = await admin
+    .from("recipe_ingredients")
+    .insert([
+      { recipe_id: victime, name: "V1", sort_order: 10 },
+      { recipe_id: victime, name: "V2", sort_order: 20 },
+    ])
+    .select("id, name, sort_order");
+
+  // Cardinal correct (2 = 2), aucun doublon, tout appartient au foyer de A.
+  const { error } = await a.client.rpc("reorder_recipe_ingredients", {
+    p_recipe_id: cible,
+    p_ids: [ingrVictime![1].id, ingrVictime![0].id],
+  });
+  assert.notEqual(error, null, "l'appel forgé DOIT être refusé");
+  assert.equal(error!.code, "P0001");
+
+  const { data: apres } = await admin
+    .from("recipe_ingredients")
+    .select("name, sort_order")
+    .eq("recipe_id", victime)
+    .order("name");
+  assert.deepEqual(apres, ingrVictime!.map((l) => ({ name: l.name, sort_order: l.sort_order }))
+    .sort((x, y) => x.name.localeCompare(y.name)),
+    "la recette victime est INTACTE");
+});
+
+test("A ne peut pas réordonner les ingrédients d'une recette de B", async () => {
+  const chezB = await ingredientDeService(b.foyerId, "Recette de B à ordonner", "Ingrédient de B");
+
+  const { error } = await a.client.rpc("reorder_recipe_ingredients", {
+    p_recipe_id: chezB.recetteId,
+    p_ids: [chezB.ingredientId],
+  });
+  // Sous RLS, A voit 0 ingrédient dans cette recette : la garde de cardinal lève.
+  assert.notEqual(error, null, "la RLS rend 0, donc le cardinal ne correspond pas");
+  assert.equal(error!.code, "P0001");
+});
+
+test("les gardes de cardinal et de doublon de reorder_recipe_ingredients", async () => {
+  const { data: recette } = await admin
+    .from("recipes")
+    .insert({ household_id: a.foyerId, title: "Recette des gardes" })
+    .select("id")
+    .single();
+  const { data: poses } = await admin
+    .from("recipe_ingredients")
+    .insert([
+      { recipe_id: recette!.id, name: "G1" },
+      { recipe_id: recette!.id, name: "G2" },
+    ])
+    .select("id");
+
+  const { error: partiel } = await a.client.rpc("reorder_recipe_ingredients", {
+    p_recipe_id: recette!.id,
+    p_ids: [poses![0].id],
+  });
+  assert.notEqual(partiel, null, "un tableau partiel doit être refusé");
+
+  const { error: doublon } = await a.client.rpc("reorder_recipe_ingredients", {
+    p_recipe_id: recette!.id,
+    p_ids: [poses![0].id, poses![0].id],
+  });
+  assert.notEqual(doublon, null, "un identifiant cité deux fois doit être refusé");
+
+  const { error: vide } = await a.client.rpc("reorder_recipe_ingredients", {
+    p_recipe_id: recette!.id,
+    p_ids: [],
+  });
+  assert.notEqual(vide, null, "un tableau vide doit être refusé");
+});

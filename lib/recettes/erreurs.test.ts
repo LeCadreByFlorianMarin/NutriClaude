@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { refusRecette } from "./erreurs.ts";
+import {
+  refusIngredient,
+  refusOrdreIngredients,
+  refusRecette,
+} from "./erreurs.ts";
 
 /**
  * Les deux messages ci-dessous sont **mesurés**, pas inventés : ce sont les
@@ -60,4 +64,32 @@ test("les deux noms de contrainte sont ceux de la migration, à la lettre", () =
     refusRecette({ message: "…constraint \"recipes_servings_positif\"" }),
     "portions-invalides"
   );
+});
+
+/* ── Ingrédients ──────────────────────────────────────────────────────────── */
+
+const msg = (contrainte: string) => ({
+  code: "23514",
+  message: `new row for relation "recipe_ingredients" violates check constraint "${contrainte}"`,
+});
+
+test("les TROIS contraintes d'ingrédient se distinguent, sous le même 23514", () => {
+  assert.equal(refusIngredient(msg("recipe_ingredients_nom_non_vide")), "nom-vide");
+  assert.equal(refusIngredient(msg("recipe_ingredients_unite_fermee")), "unite-inconnue");
+  assert.equal(refusIngredient(msg("recipe_ingredients_quantite_positive")), "quantite-negative");
+});
+
+test("un refus d'ingrédient inconnu reste générique", () => {
+  assert.equal(refusIngredient(msg("contrainte_inventee")), "echec");
+  assert.equal(refusIngredient({ code: "23503", message: "foreign key" }), "echec");
+  assert.equal(refusIngredient(null), "echec");
+  assert.equal(refusIngredient({ code: null, message: null }), "echec");
+});
+
+test("les quatre gardes de reorder_recipe_ingredients disent la même chose", () => {
+  // Toutes rendent P0001 : l'utilisateur n'a qu'une action possible, rafraîchir.
+  assert.equal(refusOrdreIngredients({ code: "P0001", message: "cardinal" }), "liste-changee");
+  assert.equal(refusOrdreIngredients({ code: "P0001", message: "doublon" }), "liste-changee");
+  assert.equal(refusOrdreIngredients({ code: "42501", message: "denied" }), "echec");
+  assert.equal(refusOrdreIngredients(null), "echec");
 });

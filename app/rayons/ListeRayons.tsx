@@ -14,7 +14,7 @@ import {
   ordreApresDeplacement,
   ordreDeplace,
   type Sens,
-} from "@/lib/rayons/ordre";
+} from "@/lib/ordre";
 import {
   MAX_NOM_RAYON,
   iconeTropLongue,

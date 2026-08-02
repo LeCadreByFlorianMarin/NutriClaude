@@ -109,6 +109,61 @@ export function normaliserEntier(saisie: string): number | null {
   return valeur;
 }
 
+/**
+ * Bornes de `recipe_ingredients.quantity`, qui est un `numeric(8,2)` : huit
+ * chiffres significatifs dont deux décimales.
+ */
+const QUANTITE_MAX = 999999.99;
+
+/**
+ * La valeur d'un champ de quantité, en nombre décimal ou `null`.
+ *
+ * ⚠️ **Distincte de `normaliserEntier`, et pas par commodité.** « 0,5 cuillère »
+ * et « 1.5 kg » sont des quantités légitimes ; le prédicat entier `/^-?\d+$/` les
+ * refuserait toutes les deux.
+ *
+ * ⚠️ **La virgule française est acceptée.** Un clavier français produit une
+ * virgule, et `Number("0,5")` vaut `NaN` — donc, sans cette conversion, une
+ * saisie parfaitement normale serait refusée.
+ *
+ * ⚠️ **N'ARRONDIT PAS, et c'est une correction.** La première rédaction arrondissait
+ * à deux décimales « pour que le client et la base s'accordent ». Mesuré le
+ * 2026-08-02, elle les faisait **diverger** : sur un demi exact, Postgres arrondit
+ * au plus loin de zéro (`1.005::numeric(8,2)` → **1.01**, `2.675` → **2.68**),
+ * là où `Number("1.005").toFixed(2)` rend **1.00** — le flottant valant en réalité
+ * 1.00499…. Répliquer l'arithmétique décimale de Postgres en virgule flottante,
+ * c'est affirmer un invariant entre deux endroits au lieu de le mesurer ; le
+ * projet a déjà payé ça trois fois.
+ *
+ * La parade est de **n'avoir qu'un seul arrondisseur** : la colonne. `0,333`
+ * part tel quel, Postgres stocke `0.33`, et l'écran le relit — la réduction est
+ * donc visible, ce qui est le seul point qui comptait vraiment.
+ *
+ * ⚠️ **Au-delà de `numeric(8,2)`, on refuse** plutôt que de laisser Postgres
+ * rendre `22003` — un code que rien ne traduit, donc « Réessaie » en boucle sur
+ * une saisie que retenter à l'identique ne corrigera jamais.
+ *
+ * **Le négatif est RENDU, pas refusé.** « Ce n'est pas un nombre » est une règle
+ * de forme ; « une quantité négative n'a pas de sens » est une règle métier, et
+ * elle vit dans `recipe_ingredients_quantite_positive`. Même partage que pour
+ * `normaliserEntier` et le zéro.
+ *
+ * `\d` reste ASCII même sous le drapeau `u` : `Number("٤")` vaut 4, et accepter
+ * en silence une forme qu'aucun clavier du produit n'émet ouvrirait un chemin que
+ * rien n'éprouve.
+ */
+export function normaliserQuantite(saisie: string): number | null {
+  const net = saisie.trim().replace(",", ".");
+  // Une partie entière et/ou une partie décimale, l'une des deux au moins.
+  if (!/^-?(\d+(\.\d*)?|\.\d+)$/.test(net)) return null;
+
+  const valeur = Number(net);
+  if (!Number.isFinite(valeur)) return null;
+  if (valeur > QUANTITE_MAX || valeur < -QUANTITE_MAX) return null;
+
+  return valeur;
+}
+
 /** Les cinq groupes d'un uuid canonique. Insensible à la casse. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

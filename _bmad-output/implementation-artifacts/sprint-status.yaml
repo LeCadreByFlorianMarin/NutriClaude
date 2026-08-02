@@ -232,7 +232,7 @@ development_status:
   # 2.2 — qui est déjà générique et doit être EXTRAIT en `lib/ordre.ts`, pas recopié.
   # 5 questions ouvertes (branche, suppression d'un ingrédient, glisser ou flèches seules,
   # contrainte sur la quantité, sort du module extrait).
-  3-2-gerer-les-ingredients-d-une-recette: ready-for-dev
+  3-2-gerer-les-ingredients-d-une-recette: review
   3-3-consulter-une-recette-en-lecture: backlog
   3-4-etiquettes-filtre-et-recherche-du-repertoire: backlog
   3-5-planifier-le-menu-de-la-semaine-sans-defilement-horizontal: backlog

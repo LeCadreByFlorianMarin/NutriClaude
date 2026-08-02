@@ -4,7 +4,8 @@ import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { stackLocal } from "./stack-local.ts";
 import { normaliserNomRayon } from "../../lib/rayons/saisie.ts";
-import { normaliserEntier, normaliserTitre } from "../../lib/recettes/saisie.ts";
+import { normaliserEntier, normaliserQuantite, normaliserTitre } from "../../lib/recettes/saisie.ts";
+import { UNITES, estUniteConnue } from "../../lib/recettes/unites.ts";
 
 /**
  * Les contraintes de la base, confrontées à la normalisation applicative.
@@ -265,5 +266,118 @@ test("la base refuse 0 et le négatif, que le client les ait vus ou non", async 
       .insert({ household_id: foyerId, title: `Direct ${portions}`, servings: portions });
     assert.notEqual(error, null, `servings=${portions} doit être refusé`);
     assert.match(error!.message, /recipes_servings_positif/);
+  }
+});
+
+// ── Ingrédients : le vocabulaire d'unités, contrat avec l'Epic 4 ─────────────
+
+/** Une recette de service, pour y accrocher des ingrédients. */
+let recetteDesContraintes: string;
+
+test("chaque jeton de UNITES est accepté par la base, et rien d'autre", async () => {
+  /*
+   * ⚠️ L'invariant central de la story 3.2. `UNITES` (code) et
+   * `recipe_ingredients_unite_fermee` (base) prétendent nommer le même ensemble.
+   * Un commentaire qui l'affirmerait serait faux un jour sans que rien ne le
+   * dise — et la conséquence ne se verrait qu'en Epic 4, sous la forme de deux
+   * lignes de courses qui refusent de fusionner.
+   */
+  const { data: r } = await admin
+    .from("recipes")
+    .insert({ household_id: foyerId, title: "Recette des unités" })
+    .select("id")
+    .single();
+  recetteDesContraintes = r!.id as string;
+
+  for (const unite of UNITES) {
+    const { data, error } = await admin
+      .from("recipe_ingredients")
+      .insert({ recipe_id: recetteDesContraintes, name: `test ${unite}`, unit: unite })
+      .select("id");
+    assert.equal(error, null, `la base a refusé le jeton « ${unite} » que le code publie`);
+    await admin.from("recipe_ingredients").delete().eq("id", data![0].id);
+  }
+});
+
+test("une unité hors vocabulaire est refusée par la base, comme par le code", async () => {
+  for (const faux of ["piece", "l", "G", "litre", "oz", "cuillère", " g"]) {
+    assert.equal(estUniteConnue(faux), false, `le code accepte « ${faux} »`);
+    const { error } = await admin
+      .from("recipe_ingredients")
+      .insert({ recipe_id: recetteDesContraintes, name: "hors vocabulaire", unit: faux });
+    assert.notEqual(error, null, `la base accepte « ${faux} »`);
+    assert.match(error!.message, /recipe_ingredients_unite_fermee/);
+  }
+});
+
+test("« pièce » DÉCOMPOSÉ est refusé — le cas qui casserait la clé canonique", async () => {
+  /*
+   * Mesuré : NFC 5 points de code / 6 octets, NFD 6 / 7, et Postgres les juge
+   * inégaux. Sans cette contrainte, deux « pièce » visuellement identiques
+   * seraient deux unités distinctes pour l'agrégation de l'Epic 4.
+   */
+  const decomposee = "pièce".normalize("NFD");
+  assert.notEqual(decomposee, "pièce");
+  const { error } = await admin
+    .from("recipe_ingredients")
+    .insert({ recipe_id: recetteDesContraintes, name: "pièce NFD", unit: decomposee });
+  assert.notEqual(error, null, "la base a accepté une forme décomposée");
+  assert.match(error!.message, /recipe_ingredients_unite_fermee/);
+});
+
+test("une unité absente reste permise — « du sel » est légitime", async () => {
+  const { data, error } = await admin
+    .from("recipe_ingredients")
+    .insert({ recipe_id: recetteDesContraintes, name: "sel" })
+    .select("id, unit, quantity");
+  assert.equal(error, null);
+  assert.equal(data![0].unit, null);
+  assert.equal(data![0].quantity, null);
+  await admin.from("recipe_ingredients").delete().eq("id", data![0].id);
+});
+
+test("le client n'est jamais plus laxiste que la base sur un NOM d'ingrédient", async () => {
+  const laxistes: string[] = [];
+  for (const [nom, saisie] of [...INVISIBLES_REELS, ...NOMS_LEGITIMES]) {
+    const normalise = normaliserTitre(saisie);
+    if (normalise === null) continue;
+    const { data, error } = await admin
+      .from("recipe_ingredients")
+      .insert({ recipe_id: recetteDesContraintes, name: normalise })
+      .select("id");
+    if (error) laxistes.push(nom);
+    else await admin.from("recipe_ingredients").delete().eq("id", data![0].id);
+  }
+  assert.deepEqual(laxistes, [], "le client laisse passer ce que la base refuse");
+});
+
+test("la quantité : le client n'est jamais plus laxiste que la base", async () => {
+  /*
+   * Le client refuse ce qui n'est pas un nombre et ce qui dépasse numeric(8,2) ;
+   * la base tient la seule règle métier, `>= 0`. L'invariant reste le même.
+   */
+  const laxistes: string[] = [];
+  for (const saisie of ["", "0", "0,5", "400", "-1", "-0,5", "999999.99", "1000000", "2e3"]) {
+    const valeur = saisie === "" ? null : normaliserQuantite(saisie);
+    // La règle d'écran : un nombre lisible, et jamais négatif.
+    if (saisie !== "" && (valeur === null || valeur < 0)) continue;
+
+    const { data, error } = await admin
+      .from("recipe_ingredients")
+      .insert({ recipe_id: recetteDesContraintes, name: `q ${saisie}`, quantity: valeur })
+      .select("id");
+    if (error) laxistes.push(saisie);
+    else await admin.from("recipe_ingredients").delete().eq("id", data![0].id);
+  }
+  assert.deepEqual(laxistes, [], "le client laisse passer une quantité que la base refuse");
+});
+
+test("la base refuse une quantité négative, que le client l'ait vue ou non", async () => {
+  for (const q of [-0.01, -1, -999]) {
+    const { error } = await admin
+      .from("recipe_ingredients")
+      .insert({ recipe_id: recetteDesContraintes, name: "négatif", quantity: q });
+    assert.notEqual(error, null, `quantity=${q} doit être refusée`);
+    assert.match(error!.message, /recipe_ingredients_quantite_positive/);
   }
 });

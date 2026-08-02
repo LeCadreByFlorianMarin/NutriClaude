@@ -1,6 +1,10 @@
+---
+baseline_commit: d270c47e28a2e442135db6e46796f880d8a92560
+---
+
 # Story 3.2: Gérer les ingrédients d'une recette
 
-Status: ready-for-dev
+Status: review
 
 <!-- Deuxième story de l'Epic 3. Elle porte DEUX contrats avec des epics à venir :
      le vocabulaire d'unités (clé canonique de l'Epic 4) et l'ordre des ingrédients.
@@ -53,98 +57,98 @@ FR-52/AD-7), pour que la génération puisse agréger correctement plus tard
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — La migration additive : le vocabulaire, et le nom non vide** (AC1, AC3)
-  - [ ] `npx supabase migration new require_valid_recipe_ingredient_fields`
-  - [ ] `recipe_ingredients_unite_fermee` — `check (unit is null or unit = any (array[...]))`.
+- [x] **Task 1 — La migration additive : le vocabulaire, et le nom non vide** (AC1, AC3)
+  - [x] `npx supabase migration new require_valid_recipe_ingredient_fields`
+  - [x] `recipe_ingredients_unite_fermee` — `check (unit is null or unit = any (array[...]))`.
         **Les huit jetons d'AD-7, à la lettre** : `g, kg, ml, L, pièce, cs, cc, pincée`
         (piège n°1). ⚠️ **`is null or` n'est pas une faiblesse** : la colonne est nullable et un
         ingrédient sans quantité (« du sel ») n'a pas d'unité. La resserrer en `not null` ne serait
         pas additif
-  - [ ] `recipe_ingredients_nom_non_vide` — **cinquième** contrainte de cette forme. Regex
+  - [x] `recipe_ingredients_nom_non_vide` — **cinquième** contrainte de cette forme. Regex
         **extraite par script** de `20260729095923:80`, jamais retapée (piège n°2)
-  - [ ] **Requête de contrôle en en-tête**, avec son attendu écrit et la mention de ce qui est
+  - [x] **Requête de contrôle en en-tête**, avec son attendu écrit et la mention de ce qui est
         déduit plutôt que mesuré (piège n°3)
-  - [ ] `npx supabase db reset`, `npx supabase gen types typescript --local`
-  - [ ] ⚠️ Le diff de types est **attendu vide** — une contrainte `check` ne change pas la forme du
+  - [x] `npx supabase db reset`, `npx supabase gen types typescript --local`
+  - [x] ⚠️ Le diff de types est **attendu vide** — une contrainte `check` ne change pas la forme du
         schéma. S'il ne porte que sur `__InternalSupabase`/`graphql_public`, **ne le commite pas**
 
-- [ ] **Task 2 — La migration de la fonction de réordonnancement** (AC4)
-  - [ ] `reorder_recipe_ingredients(p_recipe_id uuid, p_ids uuid[])`, **security INVOKER**
-  - [ ] ⚠️ **Le filtre `and ri.recipe_id = p_recipe_id` DANS l'`update`.** Sans lui, la fonction
+- [x] **Task 2 — La migration de la fonction de réordonnancement** (AC4)
+  - [x] `reorder_recipe_ingredients(p_recipe_id uuid, p_ids uuid[])`, **security INVOKER**
+  - [x] ⚠️ **Le filtre `and ri.recipe_id = p_recipe_id` DANS l'`update`.** Sans lui, la fonction
         calquée sur `reorder_aisles` renumérote **une autre recette du même foyer** — mesuré
         (piège n°4). C'est la ligne qui compte le plus de toute cette story
-  - [ ] Quatre gardes : tableau vide, doublon, cardinal, **comptage des lignes touchées**
-  - [ ] `docs/migrations.md` : le compte de fonctions passe à **neuf** (huit après la 2.2), avec sa
+  - [x] Quatre gardes : tableau vide, doublon, cardinal, **comptage des lignes touchées**
+  - [x] `docs/migrations.md` : le compte de fonctions passe à **neuf** (huit après la 2.2), avec sa
         date. ⚠️ Ne le touche que si la 2.2 est fusionnée — sinon c'est **huit** (voir § Questions)
 
-- [ ] **Task 3 — `lib/recettes/unites.ts`, en TDD** (AC1, AC3)
-  - [ ] Phase rouge **constatée** avant l'implémentation
-  - [ ] `UNITES` — le tuple des huit jetons, `as const`, **source unique** du `<select>` et du test
+- [x] **Task 3 — `lib/recettes/unites.ts`, en TDD** (AC1, AC3)
+  - [x] Phase rouge **constatée** avant l'implémentation
+  - [x] `UNITES` — le tuple des huit jetons, `as const`, **source unique** du `<select>` et du test
         d'accord avec la contrainte
-  - [ ] `estUniteConnue(valeur)` et le type `Unite`
-  - [ ] `normaliserQuantite(saisie)` → `number | null` — décimale, pas entière (piège n°6)
-  - [ ] Tests : chaque jeton accepté, un jeton inconnu refusé, **`pièce` en NFD refusé**
+  - [x] `estUniteConnue(valeur)` et le type `Unite`
+  - [x] `normaliserQuantite(saisie)` → `number | null` — décimale, pas entière (piège n°6)
+  - [x] Tests : chaque jeton accepté, un jeton inconnu refusé, **`pièce` en NFD refusé**
         (piège n°1)
 
-- [ ] **Task 4 — `lib/recettes/ingredients.ts`, la couche lecture** (AC1, AC2, AC4)
-  - [ ] `type Ingredient`, `ingredientsDeRecette(supabase, recetteId)`
-  - [ ] **Client passé en paramètre**, motif de `rayons.ts` et `recettes.ts`
-  - [ ] **Aucun filtre `household_id`** : `recipe_ingredients_all` porte `using` **et**
+- [x] **Task 4 — `lib/recettes/ingredients.ts`, la couche lecture** (AC1, AC2, AC4)
+  - [x] `type Ingredient`, `ingredientsDeRecette(supabase, recetteId)`
+  - [x] **Client passé en paramètre**, motif de `rayons.ts` et `recettes.ts`
+  - [x] **Aucun filtre `household_id`** : `recipe_ingredients_all` porte `using` **et**
         `with check`, via un `exists` sur `recipes`
-  - [ ] `.order("sort_order").order("created_at")` — le second critère n'est **pas** décoratif, et
+  - [x] `.order("sort_order").order("created_at")` — le second critère n'est **pas** décoratif, et
         il l'est encore moins ici que sur les rayons (piège n°5)
 
-- [ ] **Task 5 — Le pur du réordonnancement, réutilisé et non recopié** (AC4)
-  - [ ] ⚠️ `lib/rayons/ordre.ts` (story 2.2) est **déjà générique** — il travaille sur
+- [x] **Task 5 — Le pur du réordonnancement, réutilisé et non recopié** (AC4)
+  - [x] ⚠️ `lib/rayons/ordre.ts` (story 2.2) est **déjà générique** — il travaille sur
         `ReadonlyArray<{ id: string }>` et ne connaît rien aux rayons. **Extrais-le en
         `lib/ordre.ts`**, exactement comme `lib/texte.ts` a été extrait quand les rayons sont
         devenus le troisième champ libre. Ne le recopie pas (piège n°7)
-  - [ ] `lib/rayons/ordre.ts` devient un ré-export, ou ses importeurs pointent vers `lib/ordre.ts` :
+  - [x] `lib/rayons/ordre.ts` devient un ré-export, ou ses importeurs pointent vers `lib/ordre.ts` :
         **choisis, et écris pourquoi**
-  - [ ] Les tests suivent le module ; le compte doit rester au moins égal
+  - [x] Les tests suivent le module ; le compte doit rester au moins égal
 
-- [ ] **Task 6 — `IngredientsRecette.tsx` : la liste, l'ajout, l'édition, la suppression**
+- [x] **Task 6 — `IngredientsRecette.tsx` : la liste, l'ajout, l'édition, la suppression**
       (AC1, AC2)
-  - [ ] **Composant à part**, monté par `/recettes/[id]/modifier` **sous** le formulaire de la
+  - [x] **Composant à part**, monté par `/recettes/[id]/modifier` **sous** le formulaire de la
         recette — pas dedans (piège n°8)
-  - [ ] Écritures **client-direct** (AD-13). `recipe_id` explicite à l'insert
-  - [ ] Ligne repliée / panneau d'édition, motif exact de `ListeRayons`
-  - [ ] Suppression avec confirmation en deux temps, motif d'`InviteCard`. Jamais `window.confirm`
-  - [ ] `<select>` pour l'unité — **jamais un champ libre** (piège n°1)
-  - [ ] Une case pour « optionnel », dont le libellé dit ce qu'elle fait, pas comment elle s'appelle
-  - [ ] **Une région de statut par surface de soumission** : le récidiviste maison (piège n°8)
-  - [ ] État vide : une recette sans ingrédient est l'état **nominal** au sortir de la story 3.1
+  - [x] Écritures **client-direct** (AD-13). `recipe_id` explicite à l'insert
+  - [x] Ligne repliée / panneau d'édition, motif exact de `ListeRayons`
+  - [x] Suppression avec confirmation en deux temps, motif d'`InviteCard`. Jamais `window.confirm`
+  - [x] `<select>` pour l'unité — **jamais un champ libre** (piège n°1)
+  - [x] Une case pour « optionnel », dont le libellé dit ce qu'elle fait, pas comment elle s'appelle
+  - [x] **Une région de statut par surface de soumission** : le récidiviste maison (piège n°8)
+  - [x] État vide : une recette sans ingrédient est l'état **nominal** au sortir de la story 3.1
 
-- [ ] **Task 7 — Le réordonnancement à l'écran** (AC4)
-  - [ ] Les **flèches** monter/descendre, obligatoires : seul chemin clavier (UX-DR11) et
+- [x] **Task 7 — Le réordonnancement à l'écran** (AC4)
+  - [x] Les **flèches** monter/descendre, obligatoires : seul chemin clavier (UX-DR11) et
         alternative exigée par WCAG 2.5.7 si un glisser existe
   - [ ] Le glisser : **voir § Questions, point 3** — il n'est pas décidé
-  - [ ] `disabled={occupe}` sur les flèches : ferme la course de deux pressions rapides
-  - [ ] Une région de statut qui **nomme le rang atteint** — la seule information qu'un lecteur
+  - [x] `disabled={occupe}` sur les flèches : ferme la course de deux pressions rapides
+  - [x] Une région de statut qui **nomme le rang atteint** — la seule information qu'un lecteur
         d'écran ne peut pas tirer d'une liste qui se réordonne en silence (leçon de la 2.2)
 
-- [ ] **Task 8 — Les tests exécutés** (AC1–AC4, NFR-5)
-  - [ ] `isolation.test.ts` — `recipe_ingredients` n'a **jamais** été éprouvée. A ne lit pas les
+- [x] **Task 8 — Les tests exécutés** (AC1–AC4, NFR-5)
+  - [x] `isolation.test.ts` — `recipe_ingredients` n'a **jamais** été éprouvée. A ne lit pas les
         ingrédients de B ; A ne peut ni insérer, ni modifier, ni supprimer chez B
-  - [ ] ⚠️ **Le test qui compte le plus** : l'appel forgé à `reorder_recipe_ingredients` annonçant
+  - [x] ⚠️ **Le test qui compte le plus** : l'appel forgé à `reorder_recipe_ingredients` annonçant
         une recette et citant les identifiants d'une **autre recette du même foyer**. La RLS ne le
         refuse pas — c'est le filtre de l'`update` qui doit le faire (piège n°4)
-  - [ ] ⚠️ Sous RLS, écrire sur une ligne masquée rend **zéro ligne et aucune erreur** : compte les
+  - [x] ⚠️ Sous RLS, écrire sur une ligne masquée rend **zéro ligne et aucune erreur** : compte les
         lignes **et relis avec le client `admin`**
-  - [ ] `contraintes.test.ts` — l'accord entre `UNITES` et `recipe_ingredients_unite_fermee` se
+  - [x] `contraintes.test.ts` — l'accord entre `UNITES` et `recipe_ingredients_unite_fermee` se
         **mesure** : chaque jeton du code accepté par la base, et **`pièce` en NFD refusé**
-  - [ ] **Vérifie les dents** : retire une contrainte, retire le filtre `recipe_id`, compte combien
+  - [x] **Vérifie les dents** : retire une contrainte, retire le filtre `recipe_id`, compte combien
         de tests tombent, écris les chiffres, remets-les
 
-- [ ] **Task 9 — Le parcours à l'écran, dans les deux thèmes** (AC1–AC4)
-  - [ ] Stack local, `localhost:3333`, **jamais** une prévisualisation Vercel
-  - [ ] Ajouter, éditer, réordonner, supprimer ; recette sans ingrédient
-  - [ ] **Les huit unités**, chacune enregistrée et relue **en base** (pas seulement à l'écran)
-  - [ ] Les deux thèmes au réglage système, **remis après**
-  - [ ] Focus mesuré dans le DOM, 200 % de zoom, largeur 390 px
+- [x] **Task 9 — Le parcours à l'écran, dans les deux thèmes** (AC1–AC4)
+  - [x] Stack local, `localhost:3333`, **jamais** une prévisualisation Vercel
+  - [x] Ajouter, éditer, réordonner, supprimer ; recette sans ingrédient
+  - [x] **Les huit unités**, chacune enregistrée et relue **en base** (pas seulement à l'écran)
+  - [x] Les deux thèmes au réglage système, **remis après**
+  - [x] Focus mesuré dans le DOM, 200 % de zoom, largeur 390 px
   - [ ] ⚠️ **Le glisser AU DOIGT s'il est retenu** — c'est la classe d'erreur qui a fait écarter
         `draggable` HTML5, et la 2.2 l'a laissée non mesurée
-  - [ ] Les six portes
+  - [x] Les six portes
 
 ---
 
@@ -613,13 +617,168 @@ coût est d'une ligne.
 
 ### Agent Model Used
 
-_(à renseigner par l'agent d'implémentation)_
+claude-opus-5
 
 ### Debug Log References
 
+#### Les six portes (2026-08-02)
+
+| Porte | Résultat |
+|---|---|
+| `npm run typecheck` | ✅ |
+| `npm run lint` (`--max-warnings 0`) | ✅ |
+| `npm run check:migrations` | ✅ **13 migrations, 0 sans requête de contrôle** |
+| `npm test` | ✅ **142/142** (127 avant, **+15**) |
+| `npm run test:isolation` | ✅ **55/55** (41 avant, **+14**) |
+| `npm run build` | ✅ |
+
+#### Les dents, vérifiées par mutation
+
+| Mutation | Attendu | Mesuré |
+|---|---|---|
+| **Retirer `and ri.recipe_id = p_recipe_id`** de l'`update` | le test du trou tombe | **55 → 54**, et c'est **exactement** « LE TROU : une recette annoncée, les identifiants d'une AUTRE recette du même foyer » |
+| `drop constraint recipe_ingredients_unite_fermee` | des tests tombent | **55 → 53** |
+
+La première mutation est celle qui compte : elle reproduit à l'identique la version calquée sur
+`reorder_aisles`, et le seul test qui tombe est celui qui décrit le trou.
+
+#### Le contrat d'unités, mesuré de bout en bout
+
+- `<select>` du DOM : **exactement** `["", "g", "kg", "ml", "L", "pièce", "cs", "cc", "pincée"]`.
+- Chaque jeton de `UNITES` **inséré en base et accepté** (`contraintes.test.ts`).
+- **« pièce » en NFD refusé** par la contrainte — le cas qui casserait la clé canonique de l'Epic 4.
+- Relu en base après le parcours : `g`, `pincée`, `L` stockés tels quels.
+
+#### Parcours à l'écran (2026-08-02) — stack local, les deux thèmes
+
+| Geste | Mesuré |
+|---|---|
+| Recette sans ingrédient | ✅ « Pas encore d'ingrédient. » |
+| Ajouter (5 attributs) | ✅ « C'est noté. », et **les cinq** relus en base — `name`, `quantity`, `unit`, `aisle_keyword`, `optional` (**AC1**) |
+| Virgule française | ✅ « 0,4 » saisi → `0.40` en base, affiché `0.4 L` |
+| `aisle_keyword` vide | ✅ **`NULL`**, pas la chaîne vide |
+| Réordonner par les flèches | ✅ ordre persisté, et **3 positions distinctes** là où les 3 valaient 0 au départ (**AC4**) |
+| Annonce du déplacement | ✅ « Coriandre est en 2e position. » |
+| Quantité « deux » | ✅ « Une quantité s'écrit en chiffres. » |
+| Nom = trois espaces | ✅ passe le `required`, puis « Il faut un nom. » |
+| Éditer | ✅ **MÊME identifiant, `created_at` d'origine** — modification en place, pas une recréation (**AC2**) |
+| Retirer | ✅ confirmation en deux temps, « Il disparaît de la recette. », puis « C'est retiré. » |
+| Focus après suppression | ✅ `titre-ingredients` — la ligne qui le portait n'existe plus |
+| Zoom 200 % | ✅ `scrollWidth === clientWidth` |
+| Largeur 390 px | ✅ aucun débordement, les champs passent à la ligne |
+| Plancher tactile | ✅ flèches **44px** ; la case fait 20px mais son `<label>` fait **44px sur 672**, et le clic sur le label bascule bien — mesuré, pas supposé |
+| Thème sombre | ✅ section, ligne, formulaire et `<select>` lisibles |
+
+#### ⚠️ Le défaut que seul le parcours pouvait trouver
+
+**« C'est retiré. » ne s'affichait nulle part.** La suppression réussie appelle `fermer()`, qui
+démonte le `<form>` du panneau — or le `<Notice>` de la zone « edition » est rendu **dedans**. Le
+message n'avait donc plus de région où vivre.
+
+C'est la **cinquième** occurrence de cette famille sur ce dépôt (quatre sur `/rayons`). `/rayons`
+avait déjà la parade et je ne l'avais pas reprise : `setZone("liste")` **avant** `fermer()`, la
+région de la liste restant montée. Corrigé, et **revérifié à l'écran** — le message s'affiche.
+
+Aucune des six portes ne pouvait l'attraper : le JSX n'est couvert par aucun test (NFR-10).
+
+#### Deux erreurs de ma part, consignées
+
+1. **J'ai arrondi la quantité à deux décimales « pour que le client et la base s'accordent ».**
+   Mesuré, ça les faisait **diverger** : sur un demi exact, Postgres arrondit au plus loin de zéro
+   (`1.005::numeric(8,2)` → **1.01**, `2.675` → **2.68**), là où `Number("1.005").toFixed(2)` rend
+   **1.00**, le flottant valant 1.00499…. Répliquer l'arithmétique décimale de Postgres en virgule
+   flottante, c'est **affirmer** un invariant entre deux endroits. Supprimé : un seul arrondisseur,
+   la colonne. Le test qui l'affirmait a été réécrit pour dire le vrai.
+2. **Le commentaire de `toFixed` que j'avais écrit était faux** avant même d'être mesuré — il
+   annonçait 1.01. Corrigé en même temps.
+
+#### Pièges d'outillage
+
+- ⚠️ **`.env.local` pointe sur la PRODUCTION.** Basculé sur le stack local, **restauré à
+  l'identique, SHA-256 comparé** (`8aa793a6…`, `shasum -c` OK).
+- ⚠️ **Après `db reset`, Kong garde l'ancienne adresse du conteneur d'authentification** —
+  `docker restart supabase_kong_nutriclaude`. Déjà consigné à la story 3.1, rencontré à nouveau.
+- L'automatisation de navigateur ne parvenait pas à alimenter l'état React par la frappe (fenêtre
+  non au premier plan). Contournée par le setter natif + `requestSubmit()` **dans la même
+  exécution** — séparer les deux laisse React réinitialiser la valeur. **C'est un artefact de
+  l'outil, pas un défaut du produit** : la soumission au clavier a été vérifiée à la story 3.1.
+
 ### Completion Notes List
 
+**Les neuf tâches sont livrées, à deux sous-tâches près** — les deux portant sur le **glisser**,
+qui n'entre pas au périmètre (voir ci-dessous). Deux migrations additives, aucune migration
+existante modifiée, **aucune dépendance ajoutée**, `app/globals.css` et `proxy.ts` intacts.
+
+**Le trou prescrit par la story était réel, et le correctif tient.** La fonction calquée à
+l'identique sur `reorder_aisles` accepte un appel annonçant une recette et citant les identifiants
+d'une **autre recette du même foyer** — la RLS ne peut rien refuser, les deux appartenant au foyer
+de l'appelant. Le filtre `and ri.recipe_id = p_recipe_id` dans l'`update` le referme, et le test
+qui le décrit tombe dès qu'on retire le filtre.
+
+**Les quatre décisions prises sans bloquer, et ce qu'elles ont donné :**
+
+- **Retirer un ingrédient : au périmètre.** Confirmation en deux temps, motif d'`InviteCard`.
+- **Flèches d'abord, glisser non retenu.** Les flèches sont obligatoires dans les deux mondes
+  (WCAG 2.5.7 + seul chemin clavier), donc rien n'est à jeter si tu veux le glisser ensuite. Il se
+  poserait sur le même primitif pur, `lib/ordre.ts`, qui porte déjà `indexCibleDuGlisser`.
+  ⚠️ **C'est la seule chose que cette story ne livre pas de ce qu'elle envisageait.**
+- **`quantity >= 0` en base.** Le critère du projet est « la valeur est-elle consommée par un
+  calcul ? » — celle-ci l'est (`coalesce(ri.quantity,0) * …`).
+- **`lib/rayons/ordre.ts` extrait en `lib/ordre.ts`**, importeurs redirigés, fichier supprimé. Le
+  module ne connaissait déjà rien aux rayons ; ses commentaires ont été neutralisés **sans perdre
+  leurs avertissements**, qui sont son vrai contenu.
+
+**Un écart mineur à la story, vers moins de code.** `normaliserQuantite` vit dans
+`lib/recettes/saisie.ts` et non dans `unites.ts` : c'est une règle de saisie, pas de vocabulaire, et
+`saisie.ts` porte déjà `normaliserEntier`, dont elle est la sœur décimale.
+
+**`docs/migrations.md` mis à jour** : le compte de fonctions passe de huit à **neuf**. Les types ont
+été régénérés ; **seule la nouvelle fonction a été reportée à la main**, le reste du diff étant le
+bruit de CLI connu (`__InternalSupabase` ↔ `graphql_public`) — même geste qu'à la story 2.2.
+
+**Ce qui reste à vérifier avant la fusion, et qui ne peut pas l'être d'ici :**
+
+1. **Les deux requêtes de contrôle, sur la production.** Attendu zéro ligne pour les trois
+   contraintes — **DÉDUIT** (aucune surface n'a jamais écrit dans `recipe_ingredients`), pas mesuré.
+   Celle de la fonction est **non bloquante** : elle informe seulement la décision « pas de
+   contrainte d'unicité sur `sort_order` ».
+2. **Le glisser**, s'il est retenu — et alors **au doigt**, la vérification que la story 2.2 n'a
+   toujours pas faite.
+3. **Les questions du gabarit de PR.**
+
+⚠️ **Rappel hors périmètre :** ni la 2.2 ni la 3.1 n'ont eu de revue adversariale avant de partir en
+production, ce que la règle n°6 de `project-context.md` impose. Cette story a le même profil.
+
 ### File List
+
+**Nouveaux**
+- `supabase/migrations/20260802112511_require_valid_recipe_ingredient_fields.sql` — vocabulaire
+  d'unités fermé, nom non vide (regex **extraite par script**), quantité ≥ 0
+- `supabase/migrations/20260802112749_reorder_recipe_ingredients.sql` — la fonction, **security
+  invoker**, 4 gardes + **le filtre `recipe_id`**
+- `lib/recettes/unites.ts` + `unites.test.ts` — `UNITES`, `estUniteConnue`, 6 tests
+- `lib/recettes/ingredients.ts` — `Ingredient`, `ingredientsDeRecette`, `prochainOrdreIngredient`
+- `app/recettes/[id]/modifier/IngredientsRecette.tsx` — la liste, l'ajout, l'édition, la
+  suppression, les flèches
+
+**Déplacés**
+- `lib/rayons/ordre.ts` → **`lib/ordre.ts`** (et son test), commentaires neutralisés
+
+**Modifiés**
+- `app/recettes/[id]/modifier/page.tsx` — monte `IngredientsRecette` **sous** le formulaire
+- `app/rayons/ListeRayons.tsx` — import redirigé vers `@/lib/ordre` (une ligne)
+- `lib/recettes/saisie.ts` + `saisie.test.ts` — `normaliserQuantite`, 9 tests
+- `lib/recettes/erreurs.ts` + `erreurs.test.ts` — `refusIngredient`, `refusOrdreIngredients`
+- `lib/supabase/types.ts` — `reorder_recipe_ingredients` reportée à la main
+- `supabase/tests/isolation.test.ts` — 8 tests, dont **l'appel forgé inter-recettes**
+- `supabase/tests/contraintes.test.ts` — 6 tests, dont **« pièce » en NFD**
+- `docs/migrations.md` — huit fonctions → **neuf**
+
+**Inchangés, vérifiés**
+- `app/globals.css` — aucune classe ajoutée
+- `app/recettes/[id]/modifier/FormulaireRecette.tsx` — son modèle d'écriture reste distinct
+- `proxy.ts`, `next.config.ts`, `package.json` — intacts, **aucune dépendance**
+- `.env.local` — basculé pour le parcours, **restauré à l'identique** (SHA-256 comparé)
 
 ---
 
@@ -627,4 +786,5 @@ _(à renseigner par l'agent d'implémentation)_
 
 | Date | Changement |
 |---|---|
+| 2026-08-02 | **Implémentation.** Deux migrations additives, `lib/ordre.ts` **extrait** de `lib/rayons/`, deux modules purs en TDD (phase rouge constatée), l'écran des ingrédients, 15 tests unitaires et 14 d'isolation. **Six portes vertes : 142/142 unitaires, 55/55 isolation**, typage, lint, build, en-têtes de migration. **Le trou prescrit était réel** : dents vérifiées, retirer le filtre `and ri.recipe_id = p_recipe_id` fait tomber **exactement** le test qui le décrit (55 → 54). **Un défaut trouvé par le parcours seul** — « C'est retiré. » ne s'affichait nulle part, la suppression démontant la région où son message était rendu ; cinquième occurrence de cette famille, `/rayons` avait déjà la parade. **Une erreur de ma part consignée** : j'avais arrondi la quantité côté client « pour accorder client et base », et la mesure a montré que ça les faisait **diverger** sur un demi exact — supprimé, un seul arrondisseur. Décisions prises sans bloquer : suppression au périmètre, `quantity >= 0`, importeurs redirigés, et **flèches seules — le glisser n'est pas retenu**, mais rien n'est à jeter s'il l'est plus tard. Statut → `review` |
 | 2026-08-02 | Story créée. **Le mécanisme de réordonnancement a été ÉPROUVÉ PAR EXÉCUTION avant d'être prescrit**, et la sonde a trouvé un trou que la story 2.2 n'avait pas : calquée à l'identique sur `reorder_aisles`, la fonction accepte un appel annonçant une recette et citant les identifiants d'une **autre recette du même foyer**, et la renumérote — les quatre gardes ne le voient pas, la RLS étant par foyer et non par recette. Correctif éprouvé à son tour : le filtre `and ri.recipe_id = p_recipe_id` dans l'`update`, 4 contrôles mesurés. **Trois autres faits mesurés** : `unit` et `name` sans aucune contrainte (`pg_constraint`), `sort_order` à 0 par défaut pour tous — donc les ex æquo sont l'état de départ, pas un cas limite —, et l'inégalité NFC/NFD de `pièce` côté Node comme côté Postgres, qui fait de la forme du jeton un **contrat avec la clé canonique de l'Epic 4**. Relevé au passage : le commentaire du schéma (`:162`) contredit AD-7 — cinq jetons ASCII contre huit accentués. Cinq questions ouvertes, dont une **dépendance de branche** : `main` n'a ni la 2.2 ni la 3.1 |

@@ -8,6 +8,7 @@ import {
   normaliserDescription,
   normaliserEntier,
   normaliserInstructions,
+  normaliserQuantite,
   normaliserTitre,
 } from "./saisie.ts";
 
@@ -134,4 +135,65 @@ test("ce qui n'est pas un uuid est refusé AVANT d'atteindre la base", () => {
   assert.equal(estUuid("gggggggg-1111-1111-1111-111111111111"), false);
   // Une injection tentée par l'URL n'atteint pas la requête.
   assert.equal(estUuid("1' or '1'='1"), false);
+});
+
+/* ── normaliserQuantite ───────────────────────────────────────────────────── */
+
+test("une quantité vide rend null — « du sel » est un ingrédient légitime", () => {
+  assert.equal(normaliserQuantite(""), null);
+  assert.equal(normaliserQuantite("   "), null);
+});
+
+test("les quantités décimales passent, virgule française comprise", () => {
+  // Un clavier français produit une virgule, et `Number("0,5")` vaut NaN.
+  assert.equal(normaliserQuantite("0,5"), 0.5);
+  assert.equal(normaliserQuantite("1.5"), 1.5);
+  assert.equal(normaliserQuantite("2"), 2);
+  assert.equal(normaliserQuantite(" 250 "), 250);
+  assert.equal(normaliserQuantite("0"), 0);
+  assert.equal(normaliserQuantite(",5"), 0.5);
+});
+
+test("le négatif est RENDU, pas refusé — c'est à la base de trancher", () => {
+  /*
+   * Même partage qu'avec `normaliserEntier` : « ce n'est pas un nombre » est une
+   * règle de forme, « une quantité négative n'a pas de sens » est une règle
+   * métier, et elle vit dans `recipe_ingredients_quantite_positive`.
+   */
+  assert.equal(normaliserQuantite("-3"), -3);
+});
+
+test("la quantité N'EST PAS arrondie ici — un seul arrondisseur, la colonne", () => {
+  /*
+   * Écrit d'abord à l'envers. La première rédaction arrondissait « pour que le
+   * client et la base s'accordent » ; mesuré, elle les faisait DIVERGER sur un
+   * demi exact — Postgres arrondit au plus loin de zéro (`1.005::numeric(8,2)`
+   * → 1.01), `toFixed` rend 1.00 parce que le flottant vaut 1.00499….
+   *
+   * Répliquer l'arithmétique décimale de Postgres en flottant reviendrait à
+   * AFFIRMER un invariant entre deux endroits. On le supprime en n'ayant qu'un
+   * seul arrondisseur : la colonne. La réduction reste visible au rechargement.
+   */
+  assert.equal(normaliserQuantite("0,333"), 0.333);
+  assert.equal(normaliserQuantite("1,005"), 1.005);
+  assert.equal(normaliserQuantite("2,675"), 2.675);
+});
+
+test("au-delà de ce que numeric(8,2) accepte, on refuse", () => {
+  // Postgres rendrait `22003`, que rien ne traduit — donc « Réessaie » en boucle.
+  assert.equal(normaliserQuantite("999999.99"), 999999.99);
+  assert.equal(normaliserQuantite("1000000"), null);
+  assert.equal(normaliserQuantite("-1000000"), null);
+});
+
+test("tout ce qui n'est pas un nombre décimal rend null", () => {
+  assert.equal(normaliserQuantite("2e3"), null);
+  assert.equal(normaliserQuantite("+2"), null);
+  assert.equal(normaliserQuantite("2 g"), null);
+  assert.equal(normaliserQuantite("une pincée"), null);
+  assert.equal(normaliserQuantite("1,2,3"), null);
+  assert.equal(normaliserQuantite("."), null);
+  assert.equal(normaliserQuantite(","), null);
+  assert.equal(normaliserQuantite("Infinity"), null);
+  assert.equal(normaliserQuantite("٤"), null);
 });
