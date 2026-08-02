@@ -4,7 +4,7 @@ import { createServerComponentClient } from "@/lib/supabase/server";
 import { recettesDuFoyer } from "@/lib/recettes/recettes";
 import { ListeRecettes } from "./ListeRecettes";
 
-export const metadata = { title: "Tes recettes · NutriClaude" };
+export const metadata = { title: "Mes recettes · NutriClaude" };
 
 /**
  * Le répertoire des recettes du foyer.
@@ -47,7 +47,7 @@ export default async function RecettesPage() {
           ← Retour
         </Link>
 
-        <h1 className="titre-ecran mt-2">Tes recettes</h1>
+        <h1 className="titre-ecran mt-2">Mes recettes</h1>
         <p className="hint mt-1">Ce que vous savez faire à manger.</p>
 
         <div className="mt-12">

@@ -9,7 +9,7 @@ import { seDeconnecter } from "./actions";
 import { DisplayNameForm } from "./DisplayNameForm";
 import { InviteCard } from "./InviteCard";
 
-export const metadata = { title: "Ton foyer · NutriClaude" };
+export const metadata = { title: "Mon foyer · NutriClaude" };
 
 /**
  * Écran du foyer : ton prénom, qui est là, comment faire venir quelqu'un, et
@@ -61,12 +61,12 @@ export default async function FoyerPage({
           foyer en `<h1>`, si bien que les deux pages portaient le même titre et
           que rien à l'écran ne disait où l'on était.
         */}
-        <h1 className="titre-ecran mt-2">Ton foyer</h1>
+        <h1 className="titre-ecran mt-2">Mon foyer</h1>
         <p className="hint mt-1 break-words">{nom ?? "Sans nom"}</p>
 
         {/* ── Groupe 1 : toi et ton foyer ── */}
         <section className="mt-12">
-          <h2 className="titre-section">Ton prénom</h2>
+          <h2 className="titre-section">Mon prénom</h2>
           <div className="mt-2">
             <DisplayNameForm profilId={profile.id} prenom={profile.display_name} />
           </div>

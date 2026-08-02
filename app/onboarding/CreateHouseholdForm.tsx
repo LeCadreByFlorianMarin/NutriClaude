@@ -147,7 +147,7 @@ export function CreateHouseholdForm({
       />
 
       <label htmlFor="prenom" className="label mt-4">
-        Ton prénom
+        Mon prénom
       </label>
       <input
         id="prenom"

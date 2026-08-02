@@ -119,7 +119,7 @@ export function LoginForm({ next, error }: { next: string; error?: string }) {
       <Notice reserve className="mt-4">{message}</Notice>
 
       <label htmlFor="email" className="label">
-        Ton adresse email
+        Mon adresse email
       </label>
       {/* Pas d'`autoFocus` : il place le curseur virtuel après le `<h1>` et
           l'intro, qui ne sont donc jamais restitués, et sur mobile le clavier

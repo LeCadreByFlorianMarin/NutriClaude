@@ -301,7 +301,7 @@ export function FormulaireRecette({ recette }: { recette: Recette }) {
         }}
         className="btn-quiet px-0"
       >
-        ← Tes recettes
+        ← Mes recettes
       </Link>
 
       {/*
