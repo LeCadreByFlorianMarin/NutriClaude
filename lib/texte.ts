@@ -93,3 +93,60 @@ export function normaliserTexte(saisie: string, maximum: number): string | null 
   const borne = [...net].slice(0, maximum).join("").trim();
   return borne === "" ? null : borne;
 }
+
+/**
+ * Même plage, **sans le saut de ligne**. À employer sur tout champ dont les
+ * retours à la ligne sont porteurs de sens.
+ *
+ * ⚠ **Écrite par EXCLUSION, jamais en listant ce qu'on garde.** Même forme et
+ * même raison qu'`INVISIBLES_HORS_JOINTURE` : la plage de départ est une
+ * catégorie Unicode qui s'enrichit à chaque version, et une énumération écrite à
+ * la main ne peut pas gagner contre elle.
+ *
+ * ⚠ **Pas le drapeau `v`** (soustraction d'ensembles) : la cible TypeScript de
+ * ce projet ne l'accepte pas. L'anticipation négative fait le même travail.
+ */
+const INVISIBLES_HORS_SAUT_DE_LIGNE =
+  /(?!\n)[\p{Default_Ignorable_Code_Point}\p{Cc}\p{Cf}\p{Cn}⠀]/gu;
+
+/**
+ * Comme `normaliserTexte`, **mais les retours à la ligne survivent**.
+ *
+ * ⚠ **LA RAISON D'ÊTRE DE CETTE FONCTION, ET IL FAUT LA LIRE AVANT DE CHOISIR
+ * ENTRE LES DEUX.** `normaliserTexte` **détruit tous les sauts de ligne** : sa
+ * plage `INVISIBLES` contient `\p{Cc}`, la catégorie « contrôle », qui comprend
+ * U+000A. Mesuré :
+ *
+ *     normaliserTexte("Étape 1\nÉtape 2\n\nÉtape 3", 4000)
+ *     // → "Étape 1Étape 2Étape 3"
+ *
+ * Sur un champ d'une ligne — prénom, nom de foyer, nom de rayon — c'est
+ * exactement ce qu'on veut : un saut de ligne collé y est une saisie cassée.
+ * Sur `recipes.instructions`, c'est une **perte de données silencieuse**. Le
+ * texte s'enregistre, il s'affiche, il est simplement aplati, et rien ne le
+ * signale — ni typage, ni lint, ni test, ni contrainte. C'est pour ça que les
+ * deux fonctions vivent côte à côte : les séparer ferait resurgir le piège.
+ *
+ * Ce qu'elle fait de plus que sa voisine : les fins de ligne Windows (`\r\n`) et
+ * Mac historiques (`\r` seul) sont ramenées à `\n`. Un copier-coller depuis un
+ * traitement de texte ou un PDF en transporte, et rien d'autre ne les
+ * retirerait — `\r` est lui aussi dans `\p{Cc}`, donc il partirait sans laisser
+ * de saut de ligne à sa place, collant deux lignes l'une à l'autre.
+ *
+ * ⚠ **Seuls les BORDS sont rognés.** « Étape 1\n\nÉtape 2 » porte une ligne
+ * vide intérieure qui est une mise en forme voulue, pas une saisie sale.
+ */
+export function normaliserMultiligne(
+  saisie: string,
+  maximum: number
+): string | null {
+  const net = saisie
+    .normalize("NFC")
+    .replace(/\r\n?/g, "\n")
+    .replace(INVISIBLES_HORS_SAUT_DE_LIGNE, "")
+    .trim();
+  if (net === "") return null;
+
+  const borne = [...net].slice(0, maximum).join("").trim();
+  return borne === "" ? null : borne;
+}

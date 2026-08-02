@@ -398,6 +398,203 @@ test("la base refuse deux rayons de même nom dans un foyer", async () => {
   assert.equal(error!.code, "23505", "violation d'unicité — le code que `refusRayon` lit");
 });
 
+// ── Recettes : la table n'avait JAMAIS été éprouvée ─────────────────────────
+//
+// La story 3.1 ouvre le premier chemin d'écriture vers `recipes`. La table et sa
+// politique `recipes_all` existent depuis le squelette (`20260502000000:294-296`),
+// mais aucune surface ne les avait touchées — le prototype qui le faisait a été
+// retiré à la story 1.1. Une politique jamais exercée est une politique
+// supposée, pas une politique prouvée (AD-17).
+//
+// ⚠️ Les identifiants de B sont obtenus du client `admin`, jamais du client de
+// A : sous RLS, A ne peut pas les lire, et un test qui les cherche avec le
+// mauvais client passe EN NE PROUVANT RIEN. Deux faux positifs de cette forme
+// ont été attrapés à la story 2.2.
+
+/** Pose une recette dans un foyer en traversant la RLS. Rend son identifiant. */
+async function recetteDeService(foyerId: string, titre: string): Promise<string> {
+  const { data, error } = await admin
+    .from("recipes")
+    .insert({ household_id: foyerId, title: titre })
+    .select("id")
+    .single();
+  assert.equal(error, null, `création de la recette « ${titre} »`);
+  return data!.id as string;
+}
+
+test("A ne lit pas les recettes de B, même en nommant leur identifiant", async () => {
+  const recetteDeB = await recetteDeService(b.foyerId, "Le curry de Bruno");
+  const recetteDeA = await recetteDeService(a.foyerId, "Le curry d'Alice");
+
+  const { data: vues } = await a.client.from("recipes").select("id, household_id");
+  assert.equal(vues?.length, 1, "A ne voit que sa propre recette");
+  assert.equal(vues![0].id, recetteDeA);
+  assert.equal(vues![0].household_id, a.foyerId);
+
+  const { data: cible } = await a.client
+    .from("recipes")
+    .select("id")
+    .eq("id", recetteDeB);
+  assert.deepEqual(cible, [], "connaître l'UUID d'une recette ne doit rien ouvrir");
+});
+
+test("A ne peut pas poser une recette dans le foyer de B", async () => {
+  const { error } = await a.client
+    .from("recipes")
+    .insert({ household_id: b.foyerId, title: "Recette forgée" });
+  assert.notEqual(error, null, "le `with check` de recipes_all doit refuser");
+
+  const { data: chezB } = await admin
+    .from("recipes")
+    .select("id")
+    .eq("household_id", b.foyerId)
+    .eq("title", "Recette forgée");
+  assert.deepEqual(chezB, [], "rien ne doit avoir atterri chez B");
+});
+
+test("A ne peut pas modifier la recette de B", async () => {
+  const recetteDeB = await recetteDeService(b.foyerId, "Titre d'origine");
+
+  const { data, error } = await a.client
+    .from("recipes")
+    .update({ title: "Titre volé" })
+    .eq("id", recetteDeB)
+    .select("id");
+
+  /*
+   * ⚠️ Sous RLS, écrire sur une ligne masquée ne rend AUCUNE erreur : la ligne
+   * est simplement invisible, donc zéro ligne touchée. Un test qui se
+   * contenterait de `assert.equal(error, null)` passerait en ne prouvant rien.
+   * C'est la relecture par le client `admin` qui fait la preuve.
+   */
+  assert.equal(error, null, "pas d'erreur — la ligne est invisible, pas refusée");
+  assert.deepEqual(data, [], "aucune ligne touchée");
+
+  const { data: apres } = await admin
+    .from("recipes")
+    .select("title")
+    .eq("id", recetteDeB)
+    .single();
+  assert.equal(apres!.title, "Titre d'origine", "la recette de B est intacte");
+});
+
+test("A ne peut pas supprimer la recette de B", async () => {
+  const recetteDeB = await recetteDeService(b.foyerId, "À ne pas supprimer");
+
+  const { data, error } = await a.client
+    .from("recipes")
+    .delete()
+    .eq("id", recetteDeB)
+    .select("id");
+
+  // Même piège que ci-dessus, et il est PIRE sur un `delete` : « pas d'erreur »
+  // se lit spontanément comme « ça a marché ».
+  assert.equal(error, null);
+  assert.deepEqual(data, [], "aucune ligne supprimée");
+
+  const { count } = await admin
+    .from("recipes")
+    .select("id", { count: "exact", head: true })
+    .eq("id", recetteDeB);
+  assert.equal(count, 1, "la recette de B est toujours là");
+});
+
+test("A crée, modifie et supprime SA recette de bout en bout", async () => {
+  /*
+   * Le pendant positif des quatre tests ci-dessus : sans lui, une politique qui
+   * refuserait TOUT les ferait passer, et l'écran serait mort.
+   */
+  const { data: creee, error: erreurCreation } = await a.client
+    .from("recipes")
+    .insert({ household_id: a.foyerId, title: "Ma recette", created_by: a.id })
+    .select("id, servings")
+    .single();
+  assert.equal(erreurCreation, null, "A doit pouvoir créer chez elle");
+  assert.equal(creee!.servings, 2, "le défaut de la colonne s'applique");
+
+  const { data: modifiee, error: erreurEdition } = await a.client
+    .from("recipes")
+    .update({ title: "Ma recette revue", servings: 4, instructions: "Étape 1\nÉtape 2" })
+    .eq("id", creee!.id)
+    .select("title, servings, instructions")
+    .single();
+  assert.equal(erreurEdition, null);
+  assert.equal(modifiee!.title, "Ma recette revue");
+  assert.equal(modifiee!.servings, 4);
+  // Le saut de ligne survit à l'aller-retour : c'est ce que la story 3.3 exige,
+  // et ce que `normaliserTexte` aurait détruit côté client.
+  assert.equal(modifiee!.instructions, "Étape 1\nÉtape 2");
+
+  const { data: supprimee, error: erreurSuppression } = await a.client
+    .from("recipes")
+    .delete()
+    .eq("id", creee!.id)
+    .select("id");
+  assert.equal(erreurSuppression, null);
+  assert.equal(supprimee?.length, 1, "A doit pouvoir supprimer chez elle");
+});
+
+test("supprimer une recette vide les cases de menu qui la portaient", async () => {
+  /*
+   * `meal_plan_entries.recipe_id` est `on delete cascade`. Aucun écran n'expose
+   * encore le menu (stories 3.5 et 3.6), donc la confirmation de suppression ne
+   * peut RIEN en dire aujourd'hui — et c'est précisément ce qui rend la
+   * suppression bon marché maintenant. Ce test fige la conséquence pour que la
+   * story 3.6 la trouve écrite plutôt que de la découvrir à l'écran.
+   */
+  const recette = await recetteDeService(a.foyerId, "Recette au menu");
+  const { error: erreurMenu } = await admin.from("meal_plan_entries").insert({
+    household_id: a.foyerId,
+    recipe_id: recette,
+    meal_date: "2026-08-04",
+    meal_type: "dinner",
+  });
+  assert.equal(erreurMenu, null, "assignation de la recette au menu");
+
+  await a.client.from("recipes").delete().eq("id", recette);
+
+  const { data: cases } = await admin
+    .from("meal_plan_entries")
+    .select("id")
+    .eq("recipe_id", recette);
+  assert.deepEqual(cases, [], "la cascade a vidé la case du menu, en silence");
+});
+
+test("la base refuse un titre de recette vide", async () => {
+  // Contrepartie de `normaliserTitre`. L'accord entre les deux est mesuré par
+  // `contraintes.test.ts` ; ici on prouve seulement que la garde existe.
+  for (const titre of ["", " ", "\t", "​", "ㅤ"]) {
+    const { error } = await a.client
+      .from("recipes")
+      .insert({ household_id: a.foyerId, title: titre });
+    assert.notEqual(error, null, `titre invisible refusé : ${JSON.stringify(titre)}`);
+    assert.equal(error!.code, "23514");
+    assert.match(error!.message, /recipes_titre_non_vide/);
+  }
+});
+
+test("la base refuse un nombre de portions nul ou négatif", async () => {
+  /*
+   * L'AC3 en entier. Sans cette contrainte,
+   * `generate_grocery_list_from_menu` diviserait par `nullif(servings, 0)` —
+   * qui ne lève pas, mais rend NULL : les quantités de la recette
+   * disparaîtraient de la liste de courses, en silence, deux epics plus tard.
+   */
+  for (const portions of [0, -1]) {
+    const { error } = await a.client
+      .from("recipes")
+      .insert({ household_id: a.foyerId, title: `Portions ${portions}`, servings: portions });
+    assert.notEqual(error, null, `servings=${portions} doit être refusé`);
+    assert.equal(error!.code, "23514");
+    assert.match(error!.message, /recipes_servings_positif/);
+  }
+
+  const { error: erreurUn } = await a.client
+    .from("recipes")
+    .insert({ household_id: a.foyerId, title: "Portions 1", servings: 1 });
+  assert.equal(erreurUn, null, "une personne reste une valeur légitime");
+});
+
 // ── `reorder_aisles` — story 2.2 ─────────────────────────────────────────────
 //
 // La fonction n'est **pas** `security definer`, à l'inverse de

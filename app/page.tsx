@@ -23,8 +23,12 @@ export default async function HomePage() {
             d'espace où couper. Voir `lib/foyer/saisie.ts`. */}
         <h1 className="titre-ecran break-all">{nom ?? "Chez toi"}</h1>
         <p className="mt-3 text-base break-all">Salut {profile.display_name}.</p>
+        {/* ⚠️ Cette phrase rangeait les recettes parmi ce qui « arrive » ; elle
+            est devenue fausse avec la story 3.1. C'est le défaut de texte
+            d'annonce périmé que les stories 1.6, 1.7, 2.1 et 2.2 ont chacune eu
+            à réparer — il se répare en même temps que l'écran, jamais après. */}
         <p className="hint mt-6">
-          Ton foyer est prêt, tes rayons aussi. Les courses, les recettes et le
+          Ton foyer est prêt, tes rayons et tes recettes aussi. Les courses et le
           menu arrivent.
         </p>
         <p className="mt-6">
@@ -35,6 +39,11 @@ export default async function HomePage() {
         <p className="mt-3">
           <Link href="/rayons" className="btn w-full">
             Tes rayons
+          </Link>
+        </p>
+        <p className="mt-3">
+          <Link href="/recettes" className="btn w-full">
+            Tes recettes
           </Link>
         </p>
       </div>
