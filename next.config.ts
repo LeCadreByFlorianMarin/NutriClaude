@@ -23,9 +23,21 @@ const nextConfig: NextConfig = {
    *
    * Pas de `Content-Security-Policy` ici : Next 16 exige un nonce par requête
    * pour ses scripts inline, ce qui se règle dans le proxy et demande une
-   * vérification en conditions réelles. À traiter avec l'epic qui introduit du
-   * contenu libre saisi par le membre (recettes, articles), là où la surface XSS
-   * apparaît réellement.
+   * vérification en conditions réelles.
+   *
+   * ⚠️ **Échéance révisée le 2026-08-01 (décision de Florian) : Epic 6, avec la
+   * story PWA.** L'ancienne disait « l'epic qui introduit du contenu libre saisi
+   * par le membre (recettes, articles) ». Cet epic est arrivé — la story 3.1
+   * ouvre les recettes — et il n'a **pas** ouvert de surface XSS : React échappe
+   * tout ce qu'il rend, il n'y a ni `dangerouslySetInnerHTML`, ni parseur
+   * Markdown, ni rendu HTML brut, et NFR-10 interdit d'ajouter la dépendance qui
+   * en apporterait un.
+   *
+   * La nouvelle échéance n'est pas un report de plus : la CSP a besoin d'un
+   * nonce **dans le proxy**, et `deferred-work.md` note déjà que le matcher du
+   * proxy est à rouvrir avant l'Epic 6 pour les icônes PWA. Les deux travaux
+   * touchent le même fichier pour la même raison ; les séparer ferait ouvrir le
+   * proxy deux fois.
    */
   async headers() {
     return [

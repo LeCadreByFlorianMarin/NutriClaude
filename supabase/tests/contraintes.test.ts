@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { stackLocal } from "./stack-local.ts";
 import { normaliserNomRayon } from "../../lib/rayons/saisie.ts";
+import { normaliserEntier, normaliserTitre } from "../../lib/recettes/saisie.ts";
 
 /**
  * Les contraintes de la base, confrontées à la normalisation applicative.
@@ -147,4 +148,122 @@ test("le client n'est jamais plus laxiste que la base sur les invisibles réels"
     if (!(await baseAccepte(normalise))) laxistes.push(nom);
   }
   assert.deepEqual(laxistes, [], "le client laisse passer ce que la base refuse");
+});
+
+// ── Recettes : le même invariant, sur le titre et sur les portions ──────────
+//
+// `recipes_titre_non_vide` recopie **à la lettre** la regex de
+// `aisles_name_non_vide` — mêmes octets, extraits du fichier plutôt que retapés.
+// Les deux tables devraient donc se comporter à l'identique. « Devraient » n'est
+// pas « se comportent » : c'est ce fichier qui le mesure.
+
+/** Tente l'insertion d'une recette et dit si la base l'a acceptée. */
+async function baseAccepteTitre(titre: string): Promise<boolean> {
+  const { data, error } = await admin
+    .from("recipes")
+    .insert({ household_id: foyerId, title: titre })
+    .select("id");
+  if (!error) {
+    await admin.from("recipes").delete().eq("id", data![0].id);
+    return true;
+  }
+  if (error.code !== "23514") {
+    throw new Error(`erreur inattendue (${error.code}) : ${error.message}`);
+  }
+  return false;
+}
+
+test("le client n'est jamais plus laxiste que la base sur un TITRE de recette", async () => {
+  /*
+   * L'invariant qui blesse, dans le seul sens qui blesse : une saisie que le
+   * client laisse passer et que la base refuse produit « Il faut un titre. » sur
+   * un champ visiblement rempli, sans rien à corriger.
+   */
+  const laxistes: string[] = [];
+  for (const [nom, saisie] of [...INVISIBLES_REELS, ...NOMS_LEGITIMES]) {
+    const normalise = normaliserTitre(saisie);
+    if (normalise === null) continue;
+    if (!(await baseAccepteTitre(normalise))) laxistes.push(nom);
+  }
+  assert.deepEqual(laxistes, [], "le client laisse passer ce que la base refuse");
+});
+
+test("aucun invisible réel n'est accepté comme titre, ni par le client ni par la base", async () => {
+  for (const [nom, saisie] of INVISIBLES_REELS) {
+    assert.equal(normaliserTitre(saisie), null, `${nom} : le client l'a accepté`);
+    assert.equal(await baseAccepteTitre(saisie), false, `${nom} : la base l'a accepté`);
+  }
+});
+
+test("aucun titre légitime n'est refusé, ni par le client ni par la base", async () => {
+  for (const [nom, saisie] of NOMS_LEGITIMES) {
+    const normalise = normaliserTitre(saisie);
+    assert.notEqual(normalise, null, `${nom} : le client l'a refusé`);
+    assert.equal(await baseAccepteTitre(normalise as string), true, `${nom} : la base l'a refusé`);
+  }
+});
+
+test("titre et nom de rayon se comportent à l'identique — les deux regex sont les mêmes octets", async () => {
+  /*
+   * Ce que ce test empêche : qu'une des deux migrations soit un jour amendée
+   * sans l'autre. Elles portent la même règle ; le jour où elles divergent, le
+   * produit refuse un nom de rayon qu'il accepte comme titre de recette, ou
+   * l'inverse, et personne ne le voit.
+   */
+  const divergences: string[] = [];
+  for (const [nom, saisie] of [...INVISIBLES_REELS, ...NOMS_LEGITIMES]) {
+    const pourRayon = normaliserNomRayon(saisie);
+    const pourTitre = normaliserTitre(saisie);
+    if (pourRayon === null || pourTitre === null) {
+      if ((pourRayon === null) !== (pourTitre === null)) divergences.push(`${nom} (client)`);
+      continue;
+    }
+    const rayon = await baseAccepte(pourRayon);
+    const titre = await baseAccepteTitre(pourTitre);
+    if (rayon !== titre) divergences.push(`${nom} (base)`);
+  }
+  assert.deepEqual(divergences, [], "les deux contraintes ne disent plus la même chose");
+});
+
+test("les portions : le client et la base refusent exactement la même chose", async () => {
+  /*
+   * Ici le client fait DEUX choses que la base ne peut pas faire seule : il
+   * refuse ce qui n'est pas un entier (« 2e3 », « 2,5 »), et il refuse le vide.
+   * La base, elle, tient la seule règle qui compte pour l'Epic 4 : `> 0`.
+   * L'invariant à mesurer reste le même — le client ne doit jamais être plus
+   * laxiste.
+   */
+  const saisies = ["", "0", "-1", "1", "2", "4", "2e3", "2,5", "abc"];
+  const laxistes: string[] = [];
+
+  for (const saisie of saisies) {
+    const valeur = normaliserEntier(saisie);
+    // La règle d'écran : un entier, et au moins une personne.
+    const clientAccepte = valeur !== null && valeur >= 1;
+    if (!clientAccepte) continue;
+
+    const { data, error } = await admin
+      .from("recipes")
+      .insert({ household_id: foyerId, title: `Portions ${saisie}`, servings: valeur })
+      .select("id");
+    if (error) {
+      laxistes.push(saisie);
+      continue;
+    }
+    await admin.from("recipes").delete().eq("id", data![0].id);
+  }
+
+  assert.deepEqual(laxistes, [], "le client laisse passer un nombre de portions que la base refuse");
+});
+
+test("la base refuse 0 et le négatif, que le client les ait vus ou non", async () => {
+  // Le contrôle d'écran est contournable par un appel REST direct ; c'est la
+  // contrainte qui est la frontière (AD-2).
+  for (const portions of [0, -1, -2147483648]) {
+    const { error } = await admin
+      .from("recipes")
+      .insert({ household_id: foyerId, title: `Direct ${portions}`, servings: portions });
+    assert.notEqual(error, null, `servings=${portions} doit être refusé`);
+    assert.match(error!.message, /recipes_servings_positif/);
+  }
 });

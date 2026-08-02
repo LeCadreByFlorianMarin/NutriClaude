@@ -41,7 +41,16 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
-last_updated: 2026-07-29  # Revue adversariale de la story 2.1. Elle a trouvé, hors du périmètre de
+last_updated: 2026-08-01  # 2026-08-01 — Story 3.1 contextualisée puis EN COURS D'IMPLÉMENTATION,
+                          # hors de l'ordre du sprint : l'Epic 2 n'est pas clos (2.2 en revue dans
+                          # la PR #15, 2.3 et 2.4 en backlog). Choix visible, pas un oubli —
+                          # l'Epic 3 ne dépend d'aucune des deux. Détail à l'entrée de la story.
+                          #
+                          # ⚠️ Ce fichier entrera en conflit avec la PR #15 sur ce bloc et sur la
+                          # ligne de la story 2.2. C'est le conflit normal de deux stories
+                          # parallèles : garder LES DEUX notes, et la ligne 2-2 de la PR #15.
+                          #
+                          # 2026-07-29 — Revue adversariale de la story 2.1. Elle a trouvé, hors du périmètre de
                           # la story, que `main` n'était pas protégée : depuis `vercel.json`, un
                           # commit sur `main` applique les migrations en production, gardé par le
                           # seul `next build`. Protection posée, job CI `isolation` ajouté — les 17
@@ -101,8 +110,47 @@ development_status:
   epic-2-retrospective: optional
 
   # ── Epic 3 : Recettes & menu — les affluents de la liste ──
-  epic-3: backlog
-  3-1-creer-et-editer-une-recette: backlog
+  epic-3: in-progress
+  # Contextualisée le 2026-08-01, les 5 questions tranchées par Florian, périmètre dégonflé
+  # d'une route, puis implémentation lancée le jour même. Les deux contraintes prescrites ont
+  # été ÉPROUVÉES sur le stack local AVANT d'être écrites — huit contrôles SQL, deux appels
+  # PostgREST, base remise à l'état du dépôt.
+  #
+  # ⚠️ LE PIÈGE CENTRAL, MESURÉ ET NON DÉDUIT : `normaliserTexte` de `lib/texte.ts` DÉTRUIT
+  # tous les retours à la ligne — `INVISIBLES` contient `\p{Cc}`, qui comprend U+000A.
+  # `instructions` est le PREMIER champ multiligne du produit ; sans un normalisateur distinct,
+  # l'AC de la story 3.3 (« la mise en forme est préservée à la lecture ») serait indémontrable,
+  # la mise en forme ayant été détruite à l'écriture deux stories plus tôt. Aucun signal.
+  #
+  # Deux décisions CONTRE la recommandation initiale de la story : la suppression d'une recette
+  # entre au périmètre (créer sans supprimer est un aller simple ; /rayons supprime déjà ; et la
+  # cascade sur `meal_plan_entries` n'a rien à avertir tant que le menu n'existe pas), et la
+  # garde des saisies non enregistrées aussi. Le bouton Retour du navigateur reste
+  # DÉLIBÉRÉMENT découvert — la parade casserait le contrat du navigateur.
+  #
+  # ⚠️ Périmètre dégonflé : la création se fait AU TITRE SEUL depuis le répertoire, puis continue
+  # sur l'écran d'édition. Conséquence assumée : AC1 se lit EN DEUX TEMPS, signalé sous les AC.
+  #
+  # 2026-08-01 — IMPLÉMENTÉE, en attente de revue (branche `feat/recettes-creer-editer`, depuis
+  # `2ad08c4` = main). SIX portes vertes : 103/103 unitaires, 34/34 isolation, build, typage,
+  # lint, en-têtes de migration. Dents vérifiées par mutation (34 → 32 → 30 ; 103 → 100).
+  # ⚠️ Une 4e mutation n'a rien fait tomber, et c'était MOI qui avais tort : pour une politique
+  # `FOR ALL`, Postgres réutilise `using` comme `with check` quand celle-ci est omise. Rejouée
+  # en `with check (true)`, un seul test tombe — le bon.
+  # Le piège central mesuré de bout en bout : instructions sur 3 lignes → 3 sauts conservés en
+  # base. Une prédiction de la story CONFIRMÉE (« 2e3 » passe la validation native de Chrome et
+  # atteint `normaliserEntier`), une DÉMENTIE (les refus « portions » sont inatteignables depuis
+  # l'écran, `required` et `min={1}` bloquent avant — la contrainte en base reste la frontière).
+  # ⚠️ RESTE AVANT FUSION : la garde sur ses 3 autres chemins (seul le clic sur le lien de retour
+  # a été joué ; le bouton Retour du navigateur n'est couvert par RIEN, délibérément), le
+  # `<textarea>` sur un texte long, la requête de contrôle de migration sur la PRODUCTION
+  # (attendu zéro ligne — DÉDUIT, pas mesuré), et les questions du gabarit de PR.
+  # ⚠️ Piège d'outillage à connaître : après `supabase db reset`, Kong garde l'ancienne adresse
+  # du conteneur d'authentification — `AuthRetryableFetchError`, 25 tests rouges, /auth/v1/health
+  # en 502. `docker restart supabase_kong_nutriclaude` et tout revient. Ça ressemble à une
+  # régression et ça n'en est pas une.
+  # Une action de l'Epic 1 se ferme au passage : /onboarding vu en thème CLAIR.
+  3-1-creer-et-editer-une-recette: review
   3-2-gerer-les-ingredients-d-une-recette: backlog
   3-3-consulter-une-recette-en-lecture: backlog
   3-4-etiquettes-filtre-et-recherche-du-repertoire: backlog
