@@ -144,7 +144,14 @@ development_status:
   # Décisions 2 à 4 conformes aux prescriptions : pas de mise à jour optimiste mais le
   # ressenti doit être MESURÉ et rapporté ; pas de contrainte d'unicité sur `sort_order`
   # (l'invariant se mesure par test) ; une 4e région de statut sous la liste.
-  2-2-reordonner-le-parcours-par-manipulation-directe: review
+  # ⚠️ FUSIONNÉE le 2026-08-02 (PR #15, squash `86fafe7`), déploiement de production
+  # RÉUSSI — `reorder_aisles` est appliquée en production. **Sans revue adversariale** :
+  # passée de `review` à fusionnée sur décision de Florian, alors que la règle n°6 de
+  # `project-context.md` en demande une par story. À rattraper ou à acter.
+  # ⚠️ RESTE NON VÉRIFIÉ, ET C'EST MAINTENANT EN PRODUCTION : le glisser AU DOIGT n'a
+  # jamais été joué (souris seulement ; `touch-action: none` est mesuré, le geste ne
+  # l'est pas). C'est la classe d'erreur qui a fait écarter `draggable` HTML5.
+  2-2-reordonner-le-parcours-par-manipulation-directe: done
   2-3-definir-des-regles-mot-cle-rayon: backlog
   2-4-composant-carte-rayon: backlog
   epic-2-retrospective: optional
@@ -190,8 +197,42 @@ development_status:
   # en 502. `docker restart supabase_kong_nutriclaude` et tout revient. Ça ressemble à une
   # régression et ça n'en est pas une.
   # Une action de l'Epic 1 se ferme au passage : /onboarding vu en thème CLAIR.
-  3-1-creer-et-editer-une-recette: review
-  3-2-gerer-les-ingredients-d-une-recette: backlog
+  # ⚠️ FUSIONNÉE le 2026-08-02 (PR #17, squash `d270c47`), déploiement de production
+  # RÉUSSI. **Ce succès PROUVE ce que la requête de contrôle devait établir** : les deux
+  # contraintes `check` se sont appliquées sans échouer, donc aucune ligne de `recipes`
+  # ne les violait en production. Preuve plus forte que la requête elle-même — mais
+  # obtenue APRÈS coup, pas avant, ce que le gabarit de PR demandait.
+  # ⚠️ **Sans revue adversariale**, comme la 2.2 (règle n°6 de `project-context.md`).
+  # ⚠️ RESTE NON VÉRIFIÉ, EN PRODUCTION : la garde des saisies non enregistrées sur 3 de
+  # ses 4 chemins (seul le clic sur le lien de retour a été joué ; `beforeunload` est posé
+  # et typé mais non observé ; le bouton Retour du navigateur n'est couvert par RIEN,
+  # délibérément), et le `<textarea>` sur un texte long (éprouvé sur 4 lignes, pas 30).
+  3-1-creer-et-editer-une-recette: done
+  # Contextualisée le 2026-08-02. Le mécanisme de réordonnancement a été ÉPROUVÉ PAR
+  # EXÉCUTION avant d'être prescrit, et la sonde a trouvé un trou que la story 2.2 n'avait
+  # PAS : calquée à l'identique sur `reorder_aisles`, la fonction accepte un appel annonçant
+  # une recette et citant les identifiants d'une AUTRE RECETTE DU MÊME FOYER — et la
+  # renumérote. Les quatre gardes ne le voient pas : la RLS est par foyer, la portée de la
+  # garde est la recette, et les deux ne coïncident plus (elles coïncidaient pour les rayons).
+  # Correctif éprouvé à son tour : le filtre `and ri.recipe_id = p_recipe_id` DANS l'update.
+  #
+  # ⚠️ LE VOCABULAIRE D'UNITÉS EST UN CONTRAT AVEC L'EPIC 4, et il n'existe nulle part :
+  # `unit` est un `text` sans aucune contrainte, et le commentaire du schéma (`:162`)
+  # CONTREDIT AD-7 — cinq jetons ASCII (« piece ») contre huit accentués (« pièce »).
+  # `generate_grocery_list_from_menu` groupe par `ri.unit` brut et le recopie dans
+  # `grocery_list_items.unit`, qui est un morceau de la clé canonique d'AD-3. Mesuré :
+  # « pièce » en NFD est une chaîne DIFFÉRENTE, et Postgres les juge inégales — deux lignes
+  # de courses qui ne fusionneraient jamais. D'où `<select>` et jamais de saisie libre.
+  #
+  # Mesuré aussi : `sort_order` vaut 0 par défaut pour TOUS les ingrédients — les ex æquo
+  # sont ici l'état de départ, pas un cas limite comme sur les rayons.
+  #
+  # ⚠️ DÉPENDANCE DE BRANCHE, première question ouverte : `main` n'a NI la 2.2 (PR #15) NI
+  # la 3.1 (PR #17). Cette story a besoin de l'écran de la 3.1 et du module d'ordre de la
+  # 2.2 — qui est déjà générique et doit être EXTRAIT en `lib/ordre.ts`, pas recopié.
+  # 5 questions ouvertes (branche, suppression d'un ingrédient, glisser ou flèches seules,
+  # contrainte sur la quantité, sort du module extrait).
+  3-2-gerer-les-ingredients-d-une-recette: ready-for-dev
   3-3-consulter-une-recette-en-lecture: backlog
   3-4-etiquettes-filtre-et-recherche-du-repertoire: backlog
   3-5-planifier-le-menu-de-la-semaine-sans-defilement-horizontal: backlog
