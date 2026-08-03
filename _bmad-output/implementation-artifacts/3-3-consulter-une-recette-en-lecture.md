@@ -4,19 +4,26 @@ baseline_commit: 8f91f521d863c7f45dc1b1603d01efed03625832
 
 # Story 3.3: Consulter une recette en lecture
 
-Status: in-progress
+Status: review
 
-<!-- `review` → `in-progress` le 2026-08-02, au terme de la revue adversariale. Ce n'est PAS un
-     échec de la story : AC1, AC2 et AC3 sont tenus par le code, les huit pièges sont évités, et
-     les sept correctifs sont appliqués. C'est qu'il reste du travail EXÉCUTABLE avant fusion, et
-     qu'aucune porte automatique ne le couvre :
-       · le parcours à l'écran est à REJOUER EN ENTIER — les Tasks 1, 3 et 5 sont décochées, leurs
-         preuves attestant d'un état que HEAD n'est plus ;
-       · il doit inclure le réseau bridé (squelette neuf), un ingrédient à quantité 0 et un
-         ingrédient à unité sans quantité — les deux états que le correctif n°3 change, et que
-         la mutation a montrés sans dent ;
-       · la PR microcopy (`refactor/microcopy-possessifs`) doit fusionner EN PREMIER.
-     La remettre en `review` demande d'avoir fait ça, pas de l'avoir prévu. -->
+<!-- `review` → `in-progress` le 2026-08-02 au terme de la revue adversariale, puis
+     `in-progress` → `review` le 2026-08-03, le parcours à l'écran ayant été REJOUÉ EN ENTIER.
+
+     Le verrou posé le 2026-08-02 était : « la remettre en `review` demande d'avoir fait ça, pas
+     de l'avoir prévu. » Les quatre points sont couverts — les deux thèmes remis après, le réseau
+     bridé sur le squelette neuf, un ingrédient à quantité 0 et un à unité sans quantité, le zoom
+     à 200 % / 390 px / focus dans le DOM.
+     ⚠️ **RAPPORTÉ PAR FLORIAN, pas mesuré par l'agent** (règle §1).
+
+     ⚠️ TROIS CASES RESTENT VIDES, ET ELLES LE RESTERONT :
+       · la phase rouge du TDD — une preuve du passé ne se fabrique pas après coup ;
+       · le SHA-256 de `.env.local` — le parcours s'est fait sur le stack local, mais la
+         comparaison d'empreinte n'a pas été rapportée et je ne l'infère pas d'un parcours réussi ;
+       · les trous « un par un » — le parcours rejoué n'a pas été rapporté comme les couvrant.
+     Elles ne bloquent pas la fusion ; elles disent seulement ce qui n'a pas été établi.
+
+     ⚠️ IL RESTE UNE DÉPENDANCE DE FUSION, ET ELLE N'EST PAS DANS CE FICHIER :
+     la PR #20 (`refactor/microcopy-possessifs`) doit fusionner AVANT la #19. -->
 
 
 <!-- Troisième story de l'Epic 3, et la première qui RENDE du texte écrit par le membre.
@@ -126,8 +133,25 @@ de balisage brut
   - [x] Le lien de retour de l'écran d'édition reste **« ← Tes recettes »** — décision 1,
         rien à changer. Vérifie-le, ne le touche pas
 
-- [ ] **Task 5 — Le parcours à l'écran, dans les deux thèmes** (AC1, AC2, AC3)
-      <!-- DÉCOCHÉE EN ENTIER, et pas seulement pour ses trois sous-tâches vides. Le parcours a
+- [x] **Task 5 — Le parcours à l'écran, dans les deux thèmes** (AC1, AC2, AC3)
+      <!-- RECOCHÉE le 2026-08-03 : le parcours a été REJOUÉ EN ENTIER sur HEAD, après les
+           correctifs de la revue. ⚠️ **RAPPORTÉ PAR FLORIAN**, pas mesuré par l'agent (règle §1).
+
+           Quatre points le rendaient nécessaire, et les quatre sont couverts :
+             · les deux thèmes au réglage système, remis après ;
+             · le RÉSEAU BRIDÉ sur le squelette neuf — c'est ce qui transforme en OBSERVATION ce
+               que la revue n'avait que DÉDUIT : que le repli le plus profond est bien celui qui
+               s'affiche, et non celui du répertoire ;
+             · un ingrédient à QUANTITÉ 0 et un à UNITÉ SANS QUANTITÉ — les deux états que le
+               correctif n°3 change, et dont la mutation a montré qu'AUCUN test ne les couvre
+               (NFR-10) : le parcours est leur seul filet, et il a été tendu ;
+             · 200 % de zoom, 390 px, focus dans le DOM.
+
+           ⚠️ La sous-tâche `.env.local` / SHA-256 reste DÉCOCHÉE : le parcours s'est bien fait sur
+           le stack local, mais la comparaison d'empreinte n'a pas été rapportée, et je ne l'infère
+           pas d'un parcours réussi.
+
+           Historique de la décoche du 2026-08-02 : le parcours d'origine a
            été consigné dans `5beb4fc` ; `cfcc75e` a ENSUITE modifié `app/recettes/[id]/page.tsx`
            et `app/recettes/loading.tsx`, et la revue y a ajouté `app/recettes/[id]/loading.tsx`.
            Les lignes « Recette complète ✅ », « Zoom 200 % ✅ », « Thème sombre ✅ » attestent donc
@@ -146,14 +170,20 @@ de balisage brut
   - [x] Une recette complète, puis une **totalement vide** (titre seul)
   - [x] ⚠️ **Les instructions sur un texte à lignes vides intérieures**, relues à l'écran : c'est
         AC2, et c'est la dette que la story 3.1 a payée d'avance
-  - [ ] Les deux thèmes au réglage système, **remis après**
-        <!-- DÉCOCHÉE par la revue du 2026-08-02 (règle §1, décision de Florian). Le dossier ne
+  - [x] Les deux thèmes au réglage système, **remis après**
+        <!-- RECOCHÉE le 2026-08-03. ⚠️ **RAPPORTÉ PAR FLORIAN**, pas mesuré par l'agent — règle §1 :
+             un fait rapporté par quelqu'un d'autre s'écrit « rapporté par X », jamais « mesuré ».
+             Le parcours a été rejoué en entier après les correctifs de la revue, et Florian
+             confirme les deux thèmes au réglage système avec restauration.
+             Historique de la décoche du 2026-08-02 (règle §1) : le dossier ne
              porte qu'UNE ligne, sur le thème SOMBRE (« ✅ lisible, séparateurs et texte
              secondaire compris »). Rien sur le thème clair, rien sur l'`osascript` que
              `project-context.md:110-112` impose pour basculer ET remettre. Le titre du tableau
              annonce « les deux thèmes » ; son contenu n'en documente qu'un. -->
-  - [ ] 200 % de zoom, largeur 390 px, focus mesuré dans le DOM
-        <!-- DÉCOCHÉE par la revue du 2026-08-02 (règle §1, décision de Florian). Le zoom et la
+  - [x] 200 % de zoom, largeur 390 px, focus mesuré dans le DOM
+        <!-- RECOCHÉE le 2026-08-03. ⚠️ **RAPPORTÉ PAR FLORIAN**, pas mesuré par l'agent (règle §1).
+             Le zoom, la largeur ET le focus dans le DOM sont confirmés au parcours rejoué.
+             Historique de la décoche du 2026-08-02 (règle §1) : le zoom et la
              largeur sont attestés (« ✅ aucun débordement »). Le FOCUS ne l'est pas : aucune
              mesure, ni `document.activeElement`, ni relevé d'anneau, nulle part dans le Dev Agent
              Record — alors que le dossier sait produire ce genre de preuve (le bloc JSON d'AC2 le
@@ -593,8 +623,12 @@ page complet. Exactement ce qu'un squelette existe pour éviter.
 fiche. Vérifié après `rm -rf .next && npm run build` : la route charge désormais les deux modules,
 `/recettes` ne charge que le parent.
 
-⚠️ **DÉDUIT, PAS MESURÉ** : que ce soit bien le repli le plus profond qui s'affiche. C'est la
-sémantique d'imbrication de Next, pas une observation — **le parcours réseau bridé reste à jouer**.
+⚠️ ~~**DÉDUIT, PAS MESURÉ** : que ce soit bien le repli le plus profond qui s'affiche.~~
+**FERMÉ le 2026-08-03 — RAPPORTÉ PAR FLORIAN** (règle §1 : rapporté, pas mesuré par l'agent). Le
+parcours **réseau bridé** a été joué sur HEAD : c'est bien le squelette de la FICHE qui s'affiche,
+pas celui du répertoire. Ce qui n'était que la sémantique d'imbrication de Next est désormais une
+observation — la seule chose qui pouvait fermer ce point, aucune porte automatique ne voyant le
+rendu (règle §7).
 
 ---
 
@@ -772,7 +806,7 @@ parallèle **sans contexte de conversation préalable**. Les sévérités des so
 
 #### Décisions attendues
 
-- [x] [Review][Decision] **RÉSOLU — option (a), décision de Florian du 2026-08-02 : `app/recettes/[id]/loading.tsx` posé.** Un squelette à la forme de la FICHE (lien retour, titre, repères, une ligne de description, « Ce qu'il faut » et ses quatre lignes, « Comment on la fait », le bouton). **Mesuré après `rm -rf .next && npm run build`** — `.next/server/app/recettes/[id]/page.js` charge désormais `app_recettes_[id]_loading_tsx_090cap9._.js` en plus du parent, `/recettes` ne charge que le parent. Typage, lint et build verts. ⚠️ **DÉDUIT, PAS MESURÉ** : que ce soit bien le repli le plus profond qui s'affiche — c'est la sémantique d'imbrication de Next, pas une observation. **Le parcours réseau bridé reste à jouer** (règle §7 : le rendu est ce qu'aucune porte ne voit). ⚠️ **Effet de bord mesuré** : `/recettes/[id]/modifier` hérite lui aussi de ce squelette — mieux que celui du répertoire qu'il affichait, mais ce n'est pas sa forme, l'écran d'édition étant un formulaire. Reporté dans `deferred-work.md`. ⚠️ **Les trois affirmations fausses restent à corriger** (`:510`, `:627`, `deferred-work.md:462`) — voir le correctif dédié. Constat d'origine ci-dessous :
+- [x] [Review][Decision] **RÉSOLU — option (a), décision de Florian du 2026-08-02 : `app/recettes/[id]/loading.tsx` posé.** Un squelette à la forme de la FICHE (lien retour, titre, repères, une ligne de description, « Ce qu'il faut » et ses quatre lignes, « Comment on la fait », le bouton). **Mesuré après `rm -rf .next && npm run build`** — `.next/server/app/recettes/[id]/page.js` charge désormais `app_recettes_[id]_loading_tsx_090cap9._.js` en plus du parent, `/recettes` ne charge que le parent. Typage, lint et build verts. ✅ **FERMÉ le 2026-08-03** — ce qui n'était que la sémantique d'imbrication de Next est désormais une observation : le parcours **réseau bridé** a été joué sur HEAD et c'est bien le squelette de la FICHE qui s'affiche. ⚠️ **RAPPORTÉ PAR FLORIAN**, pas mesuré par l'agent (règle §1). ⚠️ **Effet de bord mesuré** : `/recettes/[id]/modifier` hérite lui aussi de ce squelette — mieux que celui du répertoire qu'il affichait, mais ce n'est pas sa forme, l'écran d'édition étant un formulaire. Reporté dans `deferred-work.md`. ⚠️ **Les trois affirmations fausses restent à corriger** (`:510`, `:627`, `deferred-work.md:462`) — voir le correctif dédié. Constat d'origine ci-dessous :
 - [x] [Review][Decision] ~~**`app/recettes/loading.tsx` COUVRE `/recettes/[id]` — la décision 4 repose sur une prémisse fausse**~~ — Trouvé par DEUX couches indépendantes, puis **mesuré** : `.next/server/app/recettes/[id]/page.js:14` charge `app_recettes_loading_tsx_10777hp._.js`. Il n'y a aucun `layout.tsx` sous `app/recettes/`, donc le `loading.tsx` du segment enveloppe **tous ses enfants**, `[id]` et `[id]/modifier` compris. La story affirme le contraire en trois endroits (`:510`, `:627`, `deferred-work.md:462`) et la décision « aucun `loading.tsx`, absence décidée » en découle entièrement. Conséquence à l'écran, réseau lent : avant sa recette, le membre voit le squelette **du répertoire** — lien retour, titre, bloc « Mon répertoire », trois lignes de liste et le champ « Ajouter une recette » (`loading.tsx:40-69`) — puis tout est remplacé par une fiche. Le squelette promet une liste qui n'arrivera jamais : exactement le saut de mise en page que son propre en-tête dit vouloir éviter. Vaut aussi pour `/recettes/[id]/modifier` depuis la 3.1. Sévérité **medium**. Affirmé sans commande (règle §1)
 - [x] [Review][Defer] **REPORTÉ — décision de Florian du 2026-08-02 : « pas de limite pour l'instant ».** Aucune contrainte de longueur n'est posée sur `description` et `instructions`. ⚠️ **Ce que le report laisse passer, et qui n'est pas une limite de taille** : `prep_time_min` et `cook_time_min` restent sans contrainte de signe, donc `-30` est stockable et l'écran imprimera « -30 min de préparation ». Signalé à Florian au moment de la décision, gardé dans le même report faute d'arbitrage distinct. Détail et modèle de menace dans `deferred-work.md`. Constat d'origine ci-dessous :
 - [x] [Review][Defer] **Rien ne borne en base le texte libre que cet écran est le premier à rendre** — AD-1/AD-2 : la règle métier vit en Postgres, jamais dans la vigilance d'une surface. `20260801124553_require_valid_recipe_fields.sql:80-87` ne pose que `recipes_titre_non_vide` et `recipes_servings_positif`. **Rien sur `description`, rien sur `instructions`, aucune borne de longueur, et aucune contrainte sur `prep_time_min`/`cook_time_min`** — alors que `lib/recettes/saisie.ts:17-21` énonce lui-même le modèle de menace (« un champ libre partagé par tout le foyer, qu'aucun autre membre ne peut corriger »). `MAX_TITRE`, `MAX_DESCRIPTION`, `MAX_INSTRUCTIONS` et `min={0}` vivent tous dans le navigateur ; l'écriture est client-direct et l'Epic 7 ouvre une seconde surface sur la même base. Conséquences vérifiables : `-30 min de préparation` est stockable et sera imprimé par `formaterTemps` ; 2 Mo d'instructions casseraient l'écran de l'autre membre, qui ne les a pas écrites. Sévérité **medium**. Poser la contrainte coûterait une migration — or cette story n'en a aucune, c'est ta décision
@@ -806,9 +840,16 @@ de migration.** Deux mutations ont été jouées pour savoir lesquels sont réel
 ⚠️ **Le correctif le plus important de la liste n'est couvert par aucun test, et il faut l'écrire
 plutôt que de le laisser croire.** NFR-10 interdit le harnais de composants ; ce JSX n'est tenu par
 rien. Une régression y serait silencieuse — c'est précisément la famille de défaut que la règle §7
-décrit (« ce qu'aucune porte automatique ne voit »). **Le seul filet est le parcours à l'écran**, et
-il est de toute façon à rejouer en entier : il faut y inclure **un ingrédient à quantité `0`** et
-**un ingrédient à unité sans quantité**, qui sont les deux états que ce correctif change.
+décrit (« ce qu'aucune porte automatique ne voit »). **Le seul filet est le parcours à l'écran.**
+
+✅ **Ce filet a été tendu le 2026-08-03 — RAPPORTÉ PAR FLORIAN** (règle §1 : rapporté, pas mesuré
+par l'agent). Le parcours rejoué inclut **un ingrédient à quantité `0`** et **un ingrédient à unité
+sans quantité**, les deux états que ce correctif change. C'est la seule vérification possible de ce
+correctif, et elle a eu lieu.
+
+⚠️ **Ce que ça ne change pas :** le JSX reste sans dent. Une régression future y serait toujours
+silencieuse, et la prochaine story qui touche cette ligne devra rejouer ces deux états à la main —
+un parcours réussi ne protège que le commit qu'il a regardé.
 
 #### Reportés
 
