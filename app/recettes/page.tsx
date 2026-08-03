@@ -48,7 +48,14 @@ export default async function RecettesPage() {
         </Link>
 
         <h1 className="titre-ecran mt-2">Mes recettes</h1>
-        <p className="hint mt-1">Ce que vous savez faire à manger.</p>
+        {/*
+          ⚠️ Cette ligne VOUVOYAIT — seule occurrence de tout l'applicatif, trouvée
+          par la revue adversariale du 2026-08-02. Elle surplombait « Mes recettes »
+          et se trouvait trois lignes au-dessus de « Tu n'as encore aucune recette. » :
+          le même écran vouvoyait puis tutoyait. UX-DR12 impose le tutoiement à ce que
+          l'application DIT ; la première personne ne vaut que pour ce qui NOMME.
+        */}
+        <p className="hint mt-1">Ce que tu sais faire à manger.</p>
 
         <div className="mt-12">
           <ListeRecettes
