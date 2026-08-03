@@ -4,7 +4,20 @@ baseline_commit: 8f91f521d863c7f45dc1b1603d01efed03625832
 
 # Story 3.3: Consulter une recette en lecture
 
-Status: review
+Status: in-progress
+
+<!-- `review` → `in-progress` le 2026-08-02, au terme de la revue adversariale. Ce n'est PAS un
+     échec de la story : AC1, AC2 et AC3 sont tenus par le code, les huit pièges sont évités, et
+     les sept correctifs sont appliqués. C'est qu'il reste du travail EXÉCUTABLE avant fusion, et
+     qu'aucune porte automatique ne le couvre :
+       · le parcours à l'écran est à REJOUER EN ENTIER — les Tasks 1, 3 et 5 sont décochées, leurs
+         preuves attestant d'un état que HEAD n'est plus ;
+       · il doit inclure le réseau bridé (squelette neuf), un ingrédient à quantité 0 et un
+         ingrédient à unité sans quantité — les deux états que le correctif n°3 change, et que
+         la mutation a montrés sans dent ;
+       · la PR microcopy (`refactor/microcopy-possessifs`) doit fusionner EN PREMIER.
+     La remettre en `review` demande d'avoir fait ça, pas de l'avoir prévu. -->
+
 
 <!-- Troisième story de l'Epic 3, et la première qui RENDE du texte écrit par le membre.
      C'est elle qui encaisse la dette posée par la 3.1 (`normaliserMultiligne` existe pour
@@ -800,7 +813,7 @@ il est de toute façon à rejouer en entier : il faut y inclure **un ingrédient
 #### Reportés
 
 - [x] [Review][Defer] `break-all` sur le `<h1>` coupe les mots français en plein milieu [app/recettes/[id]/page.tsx:86] — reporté, motif préexistant
-- [x] [Review][Defer] « ← Retour » subsiste sur trois écrans, que la table Microcopy de cette story range en « N'écris jamais » [app/foyer/page.tsx:56, app/rayons/page.tsx:36, app/recettes/page.tsx:47] — reporté, hors périmètre
+- [x] [Review][Dismiss] ~~« ← Retour » subsiste sur trois écrans~~ — **FAUX POSITIF, retiré le 2026-08-02.** `app/recettes/page.tsx:43-45` porte la justification, à six lignes du constat : « Retour » sans destination nommée est acceptable sur un écran qui n'a **qu'un parent**, et l'interdiction ne vise que les sous-écrans, qui en ont deux. Les trois écrans sont de premier niveau et pointent vers `/`. ⚠️ Un défaut de la passe de revue elle-même (règle §6) : une règle appliquée sans lire la justification voisine. Détail dans `deferred-work.md`
 - [x] [Review][Defer] Le piège du « voisinage » n'est pas refermé sur l'accueil : « Chez toi » à dix-huit lignes du bouton « Mon foyer » [app/page.tsx:24] — reporté, hors périmètre
 - [x] [Review][Defer] Course entre les deux lectures : une recette supprimée entre-temps s'affiche comme une recette sans ingrédients [app/recettes/[id]/page.tsx:72-76] — reporté, préexistant
 - [x] [Review][Defer] Des instructions faites de marques combinantes (`\p{Mn}`, absentes d'`INVISIBLES`) rendent la section à titre orphelin qu'AC3 interdit [lib/texte.ts:109-110] — reporté, préexistant

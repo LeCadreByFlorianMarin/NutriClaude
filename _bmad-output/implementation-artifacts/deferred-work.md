@@ -533,12 +533,23 @@ revue sur du code qu'elle n'a pas mandat de juger.
   `FormulaireRecette.tsx:330` : le changer ici seul créerait l'incohérence qu'on reproche.*
   À traiter comme une décision de `titre-ecran`, sur les trois écrans à la fois.
 
-- **« ← Retour » subsiste sur trois écrans.** `app/foyer/page.tsx:56`,
-  `app/rayons/page.tsx:36`, `app/recettes/page.tsx:47`. La table Microcopy de la story 3.3 le
-  range explicitement en colonne « N'écris jamais » — motif : *deux parents possibles*, donc le
-  lien ne dit pas où il mène. La passe `cfcc75e` a traversé ces trois fichiers sans y toucher.
-  *Reporté parce que hors périmètre* — mais cela montre que la passe microcopy est
-  **incomplète**, ce qui affaiblit l'argument qui justifiait de l'embarquer dans cette story.
+- ~~**« ← Retour » subsiste sur trois écrans.**~~ **RETIRÉ le 2026-08-02 : ce constat était FAUX,
+  et le code portait déjà la réponse.** La revue avait lu la colonne « n'écris jamais » de la table
+  Microcopy (« ← Retour », motif : *deux parents possibles*) et conclu à une violation sur
+  `app/foyer/page.tsx:56`, `app/rayons/page.tsx:36` et `app/recettes/page.tsx:47`. Or
+  `app/recettes/page.tsx:43-45` porte le commentaire qui tranche : *« "Retour" sans destination
+  nommée est acceptable ICI, et seulement ici : cet écran n'a qu'un parent possible. Les
+  sous-écrans en ont deux — l'accueil et ce répertoire — et nomment donc le leur. »* Les trois
+  écrans sont de premier niveau et pointent tous vers `/`. **L'interdiction ne vise que les
+  sous-écrans**, et elle est respectée.
+  ⚠️ **Conservé barré plutôt que supprimé, et c'est le point.** C'est un faux positif d'une passe
+  de revue — la famille de défaut que la règle §6 nomme (« la passe de correction doit être revue
+  à son tour ») et que l'Epic 1 a payée trois fois. La revue a énoncé une règle sans lire la
+  justification que le code portait à six lignes du constat.
+  ⚠️ **Le message du commit `c6ab0b2` répète cette erreur** (« la passe est INCOMPLÈTE : ← Retour
+  subsiste sur trois écrans »). Non réécrit — un message de commit est un document historique, au
+  même titre que les tables de microcopy des stories livrées. **C'est cette entrée-ci qui fait
+  foi.**
 
 - **Le piège du « voisinage » n'est pas refermé sur l'accueil.** `app/page.tsx:24` rend
   `{nom ?? "Chez toi"}` — le repli **nomme le foyer du membre à la deuxième personne**, dix-huit
