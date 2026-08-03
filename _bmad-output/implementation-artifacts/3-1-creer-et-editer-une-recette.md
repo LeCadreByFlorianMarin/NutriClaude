@@ -4,7 +4,21 @@ baseline_commit: 2ad08c48dfe587bb83445b0cea198c3f50fb8d25
 
 # Story 3.1: Créer et éditer une recette
 
-Status: review
+Status: done
+
+<!-- `review` → `done` le 2026-08-03, en réalignement : `sprint-status.yaml` la donnait
+     `done` depuis sa fusion du 2026-08-02 (PR #17, squash `d270c47`), ce fichier disait
+     encore `review`.
+
+     ⚠️ FERMÉE AVEC SES CONDITIONS OUVERTES :
+       · **fusionnée SANS revue adversariale**, la deuxième des trois d'affilée ;
+       · la garde des saisies non enregistrées n'est vérifiée que sur 1 de ses 4 chemins
+         (seul le clic sur le lien de retour a été joué ; `beforeunload` est posé et typé
+         mais non observé ; le bouton Retour du navigateur n'est couvert par RIEN,
+         délibérément) ;
+       · le `<textarea>` sur un texte long — éprouvé sur 4 lignes, pas 30.
+     ⚠️ Cette story reste la SEULE de l'Epic 3 à n'avoir reçu aucune revue adversariale.
+     La 3.2 a eu la sienne le 2026-08-03, la 3.3 le 2026-08-02. -->
 
 <!-- Première story de l'Epic 3. Elle ouvre le premier chemin d'écriture vers `recipes` et le
      premier champ de texte MULTILIGNE du produit. Les deux ont leur piège (n°1 et n°2).

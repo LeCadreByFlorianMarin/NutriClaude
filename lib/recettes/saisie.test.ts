@@ -4,6 +4,7 @@ import {
   MAX_DESCRIPTION,
   MAX_INSTRUCTIONS,
   MAX_TITRE,
+  analyserQuantite,
   estUuid,
   normaliserDescription,
   normaliserEntier,
@@ -196,4 +197,52 @@ test("tout ce qui n'est pas un nombre décimal rend null", () => {
   assert.equal(normaliserQuantite(","), null);
   assert.equal(normaliserQuantite("Infinity"), null);
   assert.equal(normaliserQuantite("٤"), null);
+});
+
+/* ── analyserQuantite ─────────────────────────────────────────────────────── */
+
+test("une quantité illisible et une quantité hors bornes ne se confondent pas", () => {
+  /*
+   * ⚠️ **Le défaut que cette fonction répare, et il était en production.**
+   * `normaliserQuantite` rend `null` aussi bien pour « deux » que pour
+   * « 1000000 » — l'écran répondait donc « Une quantité s'écrit en chiffres. » à
+   * quelqu'un qui venait précisément d'en écrire une. Un conseil qui ne peut pas
+   * fonctionner enferme l'utilisateur dans une boucle, ce que `project-context.md`
+   * interdit nommément. Revue adversariale du 2026-08-03.
+   */
+  assert.deepEqual(analyserQuantite("deux"), { faute: "illisible" });
+  assert.deepEqual(analyserQuantite("12g"), { faute: "illisible" });
+  assert.deepEqual(analyserQuantite(""), { faute: "illisible" });
+  assert.deepEqual(analyserQuantite("1000000"), { faute: "hors-bornes" });
+  assert.deepEqual(analyserQuantite("999999,995"), { faute: "hors-bornes" });
+});
+
+test("une quantité que la colonne arrondirait à zéro est REFUSÉE, pas avalée", () => {
+  /*
+   * ⚠️ `numeric(8,2)` arrondit `0,001` à `0.00` : au rechargement, l'ingrédient
+   * affichait « 0 g ». Une réduction reste une réduction ; une réduction À ZÉRO est
+   * une perte, et l'Epic 4 lirait ce zéro comme délibéré (`coalesce(quantity, 0)`).
+   * Mesuré par la couche des cas limites de la revue du 2026-08-03.
+   */
+  assert.deepEqual(analyserQuantite("0,001"), { faute: "trop-petite" });
+  assert.deepEqual(analyserQuantite("0,004"), { faute: "trop-petite" });
+  assert.deepEqual(analyserQuantite("0,009"), { faute: "trop-petite" });
+
+  // ⚠️ Zéro reste LÉGITIME — « 0 » veut dire « aucune », et la base l'autorise.
+  assert.deepEqual(analyserQuantite("0"), { valeur: 0 });
+  assert.deepEqual(analyserQuantite("0,00"), { valeur: 0 });
+  // Et la borne elle-même passe.
+  assert.deepEqual(analyserQuantite("0,01"), { valeur: 0.01 });
+});
+
+test("le négatif est nommé pour lui-même, pas rangé avec l'illisible", () => {
+  assert.deepEqual(analyserQuantite("-1"), { faute: "negative" });
+  assert.deepEqual(analyserQuantite("-0,5"), { faute: "negative" });
+});
+
+test("une quantité bonne traverse, virgule française comprise", () => {
+  assert.deepEqual(analyserQuantite("0,5"), { valeur: 0.5 });
+  assert.deepEqual(analyserQuantite("400"), { valeur: 400 });
+  assert.deepEqual(analyserQuantite(" 1,25 "), { valeur: 1.25 });
+  assert.deepEqual(analyserQuantite("999999,99"), { valeur: 999999.99 });
 });
