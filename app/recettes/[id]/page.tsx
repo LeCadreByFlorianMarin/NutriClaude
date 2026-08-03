@@ -23,6 +23,14 @@ import {
  * mais notre client Supabase n'est pas instrumenté pour ça : cette fonction et le
  * composant liront deux fois. Sans portée sur un écran de configuration — et n'en
  * déduis pas qu'il faut un cache.
+ *
+ * ⚠️ **Le `catch` JOURNALISE, et ce n'est pas décoratif.** Sans cette ligne, « la
+ * recette n'existe pas » et « la lecture a échoué » produisent le MÊME titre neutre,
+ * sans une trace. Un membre obtiendrait alors une fiche parfaitement rendue — le
+ * composant, lui, a réussi sa lecture — surmontée d'un onglet qui dit « Une
+ * recette », et rien nulle part ne dirait pourquoi. C'est aussi ce qui rend une
+ * observation « titre d'onglet neutre » INCAPABLE de prouver que la fonction n'a
+ * pas levé : les deux chemins y mènent.
  */
 export async function generateMetadata({
   params,
@@ -34,9 +42,11 @@ export async function generateMetadata({
     const supabase = await createServerComponentClient();
     const recette = await recetteParId(supabase, id);
     if (recette) return { title: `${recette.titre} · NutriClaude` };
-  } catch {
+  } catch (erreur) {
     // Une lecture qui échoue ne doit pas empêcher la page de rendre son
-    // `notFound()` ou son erreur : on retombe sur le titre neutre.
+    // `notFound()` ou son erreur : on retombe sur le titre neutre. Mais on le dit,
+    // sinon l'échec est indistinguable de la recette absente.
+    console.error("Titre d'onglet : lecture de la recette impossible", erreur);
   }
   return { title: "Une recette · NutriClaude" };
 }
@@ -55,10 +65,19 @@ export async function generateMetadata({
  * foyer. Les distinguer serait au mieux inutile, au pire une fuite : sous RLS, la
  * base ne fait elle-même aucune différence.
  *
- * ⚠️ **Deux lectures en séquence, et c'est délibéré.** Un `Promise.all`
- * économiserait un aller-retour mais lancerait la lecture des ingrédients avant
- * de savoir si la recette existe. Le séquentiel permet de sortir en `notFound()`
- * d'abord ; à cette échelle, c'est le bon compromis.
+ * ⚠️ **Les deux lectures de ce composant sont en séquence, et c'est délibéré.** Un
+ * `Promise.all` économiserait un aller-retour mais lancerait la lecture des
+ * ingrédients avant de savoir si la recette existe. Le séquentiel permet de sortir
+ * en `notFound()` d'abord ; à cette échelle, c'est le bon compromis.
+ *
+ * ⚠️ **Mais l'écran en fait QUATRE, pas deux, et trois clients.** Avant le premier
+ * octet de HTML : `generateMetadata` construit un client et lit la recette,
+ * `requireProfile()` en construit un deuxième via `appartenance()` et lit
+ * l'appartenance, la ligne suivante en construit un troisième, puis viennent la
+ * recette et les ingrédients. Écrit ici parce que le compte est ce qu'une prochaine
+ * revue vérifiera, et qu'un commentaire qui n'en annonce que deux l'enverrait
+ * conclure à tort. Sans portée mesurée sur cet écran ; à rouvrir si un écran chaud
+ * reprend le motif.
  */
 export default async function RecettePage({
   params,
@@ -146,12 +165,26 @@ export default async function RecettePage({
                       ⚠️ `quantite` est `null` — pas `""` — quand il n'y en a pas :
                       « du sel » n'a ni quantité ni unité, et ce `<span>` ne doit
                       alors pas exister du tout.
+
+                      ⚠️ **`!== null`, jamais un test de véracité.** C'est la même
+                      règle que `formaterTemps`, et pour la même raison : `0` est une
+                      quantité STOCKABLE — la contrainte vaut `quantity >= 0`, malgré
+                      son nom `…_quantite_positive` qui laisse croire à `> 0`. Un
+                      `if (quantite)` afficherait « 0 g » sans son zéro, en silence.
+                      L'ancienne rédaction ne marchait que par accident :
+                      `formaterQuantite` rend la CHAÎNE « 0 », qui est vraie.
+
+                      ⚠️ **L'unité ne s'affiche jamais seule.** Une unité qualifie un
+                      nombre ; sans lui elle n'a rien à dire, et « Farine … g » se lit
+                      comme une donnée perdue. Le couple (`quantity` nul, `unit`
+                      posée) est atteignable depuis l'éditeur de la story 3.2 et
+                      qu'aucune contrainte n'interdit — c'est donc un état à rendre,
+                      pas un état impossible.
                     */}
-                    {quantite || i.unite ? (
+                    {quantite !== null ? (
                       <span className="hint shrink-0 tabular-nums">
-                        {quantite ?? ""}
-                        {quantite && i.unite ? " " : ""}
-                        {i.unite ?? ""}
+                        {quantite}
+                        {i.unite ? ` ${i.unite}` : ""}
                       </span>
                     ) : null}
                   </li>

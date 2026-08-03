@@ -27,11 +27,29 @@ const nextConfig: NextConfig = {
    *
    * ⚠️ **Échéance révisée le 2026-08-01 (décision de Florian) : Epic 6, avec la
    * story PWA.** L'ancienne disait « l'epic qui introduit du contenu libre saisi
-   * par le membre (recettes, articles) ». Cet epic est arrivé — la story 3.1
-   * ouvre les recettes — et il n'a **pas** ouvert de surface XSS : React échappe
-   * tout ce qu'il rend, il n'y a ni `dangerouslySetInnerHTML`, ni parseur
-   * Markdown, ni rendu HTML brut, et NFR-10 interdit d'ajouter la dépendance qui
-   * en apporterait un.
+   * par le membre (recettes, articles) ».
+   *
+   * **Contrôle refait le 2026-08-02, sur l'arbre complet, et c'est le contrôle qui
+   * compte** : la story 3.1 ouvrait l'ÉCRITURE des recettes, la story 3.3 en ouvre
+   * la LECTURE — c'est elle qui rend du texte écrit par un membre, et donc elle qui
+   * pouvait ouvrir la surface. Elle ne l'a pas ouverte : aucune occurrence de
+   * `dangerouslySetInnerHTML`, `innerHTML` ni `__html` dans `app/` et `lib/` (la
+   * seule est un commentaire qui les interdit), aucun parseur Markdown ni sanitizer
+   * parmi les dépendances, tout champ de membre rendu par une expression React donc
+   * échappé, et la mise en forme des instructions tenue par `white-space: pre-wrap`
+   * — du CSS, pas du balisage. NFR-10 interdit d'ajouter la dépendance qui en
+   * apporterait un.
+   *
+   * ⚠️ **Ce que ce contrôle NE dit PAS, et qu'il faut rouvrir en Epic 6 :** il porte
+   * sur l'injection de balisage, pas sur le fait que le texte rendu soit BORNÉ.
+   * `recipes.description` et `recipes.instructions` n'ont aucune contrainte en base
+   * — ni contenu, ni longueur ; les gardes vivent dans le navigateur alors que
+   * l'écriture est client-direct. Reporté par Florian le 2026-08-02 (« pas de limite
+   * pour l'instant »), détail dans `deferred-work.md`. Un `grep` vert ne referme que
+   * la moitié de la question.
+   *
+   * **La prochaine story qui rend du texte de membre refait ce contrôle**, elle ne
+   * le suppose pas fait.
    *
    * La nouvelle échéance n'est pas un report de plus : la CSP a besoin d'un
    * nonce **dans le proxy**, et `deferred-work.md` note déjà que le matcher du

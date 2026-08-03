@@ -562,13 +562,26 @@ renseigné ». Les masquer toutes les deux confondrait « je n'ai pas répondu �
 ⚠️ **Teste les deux cas**, et ne les traite pas par le même `if` — `if (!temps)` attrape `0` **et**
 `null`, ce qui est précisément l'erreur que cette décision interdit. Le test est `!== null`.
 
-**4. Pas de `loading.tsx` sur cet écran.** Aucun AC ne le demande : l'AC4 de la story 3.1 portait
-sur le **répertoire**, et `app/recettes/loading.tsx` ne couvre pas cette route. En poser un est un
-travail réel — forme, deux thèmes, vérification réseau bridé — pour un écran qui se charge en deux
-lectures.
+**4. ~~Pas de `loading.tsx` sur cet écran.~~ → RENVERSÉE le 2026-08-02 par la revue.**
 
-⚠️ **Écris-le dans les notes de complétion**, pour qu'une revue n'y voie pas un oubli. C'est une
-absence décidée, pas une absence subie.
+La décision d'origine disait : *« Aucun AC ne le demande : l'AC4 de la story 3.1 portait sur le
+répertoire, et `app/recettes/loading.tsx` ne couvre pas cette route. »*
+
+⚠️ **La seconde moitié de cette phrase est FAUSSE, et c'est mesuré.** Il n'y a aucun `layout.tsx`
+sous `app/recettes/`, donc le `loading.tsx` du segment enveloppe **tous ses enfants** — c'est la
+sémantique de Next, et le build le confirme : `.next/server/app/recettes/[id]/page.js` charge le
+module de `app/recettes/loading.tsx`. La décision reposait donc sur une prémisse jamais vérifiée.
+
+Conséquence réelle, réseau lent : avant sa recette, le membre voyait le squelette **du
+répertoire** — trois lignes de liste, un champ « Ajouter une recette » — puis un saut de mise en
+page complet. Exactement ce qu'un squelette existe pour éviter.
+
+**Florian a tranché l'option (a) : `app/recettes/[id]/loading.tsx` est posé**, à la forme de la
+fiche. Vérifié après `rm -rf .next && npm run build` : la route charge désormais les deux modules,
+`/recettes` ne charge que le parent.
+
+⚠️ **DÉDUIT, PAS MESURÉ** : que ce soit bien le repli le plus profond qui s'affiche. C'est la
+sémantique d'imbrication de Next, pas une observation — **le parcours réseau bridé reste à jouer**.
 
 ---
 
@@ -673,14 +686,22 @@ retirer des saisies. `useGrouping: false` l'évite, et un test l'épingle en vé
 espace, fût-elle insécable**, ne subsiste. Sans ce test, un futur « nettoyage » du formatage le
 réintroduirait sans que rien ne le signale.
 
-**Les quatre décisions ont toutes été appliquées :** lien de retour de l'édition inchangé (vérifié,
-non touché) · `generateMetadata` posée, **et qui ne lève pas** — mesuré sur `/recettes/pizza`, où le
-titre reste neutre pendant que le composant rend `notFound()` · un temps à `0` s'affiche · **aucun
-`loading.tsx`** sur cette route.
+**Les quatre décisions ont été appliquées, et la quatrième a été RENVERSÉE par la revue du
+2026-08-02 :** lien de retour de l'édition inchangé — l'affirmation était devenue fausse avec
+`cfcc75e`, l'extraction de ce commit l'a rendue vraie de nouveau · `generateMetadata` posée, **et
+qui ne lève pas** · un temps à `0` s'affiche · ~~aucun `loading.tsx` sur cette route~~ →
+`app/recettes/[id]/loading.tsx` **est posé**.
 
-⚠️ **L'absence de `loading.tsx` est décidée, pas subie**, et c'est écrit dans `deferred-work.md` :
-aucun AC ne le demande, l'AC4 de la story 3.1 portait sur le répertoire, et
-`app/recettes/loading.tsx` ne couvre pas cette route.
+⚠️ **Correction d'une preuve, pas seulement d'une décision.** L'observation consignée pour
+`generateMetadata` — « le titre reste neutre pendant que le composant rend `notFound()` » — **ne
+prouve pas ce qu'elle affirmait** : le titre neutre est produit aussi bien par « recette absente »
+que par « lecture échouée et avalée ». Les deux chemins y menaient sans distinction, et sans
+journal. Le `catch` journalise désormais ; l'observation reste vraie, sa portée était surestimée.
+
+⚠️ ~~L'absence de `loading.tsx` est décidée, pas subie~~ — **la prémisse était fausse.**
+`app/recettes/loading.tsx` COUVRE bien `/recettes/[id]` : aucun `layout.tsx` sous `app/recettes/`,
+donc le `loading.tsx` du segment enveloppe tous ses enfants. Mesuré dans l'arbre de chargement
+après rebuild. Voir § Décisions n°4 et § Review Findings.
 
 ⚠️ **Aucun test d'isolation ajouté, et c'est délibéré.** Cette story ne fait que lire, par
 `recetteParId` et `ingredientsDeRecette` — deux fonctions dont l'isolation est déjà prouvée par 14
@@ -749,15 +770,32 @@ parallèle **sans contexte de conversation préalable**. Les sévérités des so
 
 #### Correctifs
 
-- [ ] [Review][Patch] La prémisse CSP n'a été rouverte que dans **un** de ses deux domiciles — `deferred-work.md` porte le verdict, mais le commentaire dit toujours « la story **3.1** ouvre les recettes … il n'a pas ouvert de surface XSS », ce qui date la prémisse de la story qui ÉCRIT et ignore celle qui LIT. Règles §5 et §2 [next.config.ts:28-34]
-- [ ] [Review][Patch] Du **vouvoiement**, seule occurrence de tout l'applicatif, entre deux lignes que `cfcc75e` vient de réécrire — « Ce que **vous** savez faire à manger. » sous le `<h1>Mes recettes</h1>` et au-dessus de « Tu n'as encore aucune recette. ». UX-DR12/NFR-8 [app/recettes/page.tsx:51]
-- [ ] [Review][Patch] Le test de véracité que la story interdit sur trois pages, employé sur la valeur voisine — `{quantite || i.unite ? …}` ne fonctionne que par accident : `formaterQuantite` rend la **chaîne** `"0"`, qui est vraie. Or `0` est stockable (`recipe_ingredients_quantite_positive` vaut en réalité `quantity >= 0`, son nom ment). Le jour où la fonction rend un nombre ou `""`, la ligne « 0 g » perd sa quantité **en silence** — la confusion exacte que la décision 3 interdit, au même écran [app/recettes/[id]/page.tsx:150]
-- [ ] [Review][Patch] Une **unité orpheline** quand `quantity` est `null` et `unit` vaut `'g'` — la ligne affiche `Farine … g`, un suffixe sans nombre. Atteignable par l'éditeur de la 3.2 (`IngredientsRecette.tsx:102-111` laisse `quantity: null` et pose `unit` depuis le `<select>`), et aucune contrainte ne l'interdit. Le commentaire au-dessus (`:145-149`) ne raisonne que sur « ni quantité ni unité » [app/recettes/[id]/page.tsx:150-156]
-- [ ] [Review][Patch] `catch {}` nu : « recette introuvable » et « la lecture a échoué » deviennent indistinguables, sans une ligne de journal — le membre obtient une fiche parfaitement rendue dont l'onglet dit « Une recette · NutriClaude ». Pire, la preuve consignée (« titre d'onglet neutre — `generateMetadata` n'a pas levé ») **ne distingue pas les deux cas**, le titre neutre étant produit par les deux. `app/_lib/garde.ts:32` porte la règle du projet sur ce motif [app/recettes/[id]/page.tsx:33-41]
-- [ ] [Review][Patch] Le commentaire revendique **deux lectures**, l'écran en fait **quatre** avec trois constructions de client — `generateMetadata` construit un client et lit (`:34-35`), `requireProfile()` en construit un deuxième via `appartenance()`, `:71` en construit un troisième, `:72` relit la recette, `:76` lit les ingrédients. Le commentaire qui justifie le séquentiel « pour qu'une revue n'y voie pas une négligence » décrit un écran qui n'est pas celui-là. Règle §2 [app/recettes/[id]/page.tsx:58-61]
-- [ ] [Review][Patch] Le dossier affirme « lien de retour de l'édition **inchangé (vérifié, non touché)** », et c'est faux à HEAD — `cfcc75e` l'a passé à « ← Mes recettes ». La spec le cite verbatim et l'interdit (`:91` « Vérifie-le, ne le touche pas »), la table Microcopy (`:328`) et la décision 1 (`:488`) disent « ← Tes recettes ». La destination est conservée, le libellé non. C'est le défaut de « texte d'annonce périmé » que le **piège n°8 de cette story** énumère [3-3-…md:91, :328, :488, :620]
-- [ ] [Review][Patch] `formaterQuantite` réintroduit un **second arrondisseur** que `normaliserQuantite` avait explicitement retiré — `saisie.ts:129-140` pose que « la parade est de n'avoir qu'un seul arrondisseur : la colonne ». `maximumFractionDigits: 2` en pose un autre, avec la règle d'arrondi d'`Intl` (mesuré : `formaterQuantite(1.005)` → « 1,01 »). Sans portée tant que la colonne reste `numeric(8,2)` — mais c'est un invariant entre deux fichiers **affirmé** par un commentaire et par aucun test. Règle §4 [lib/recettes/lecture.ts:42-50]
-- [ ] [Review][Patch] Un test dont le nom annonce deux cas et n'en éprouve aucun des deux — « les portions ne peuvent pas être nulles ou négatives, et on ne fait pas semblant » ne contient qu'une assertion, `formaterPortions(0)`. Ni `null` (impossible par typage, donc le nom ment) ni le négatif. `formaterPortions(-1)` rend « Pour -1 personne » au singulier, et rien ne l'épingle [lib/recettes/lecture.test.ts:92]
+- [x] [Review][Patch] La prémisse CSP n'a été rouverte que dans **un** de ses deux domiciles — `deferred-work.md` porte le verdict, mais le commentaire dit toujours « la story **3.1** ouvre les recettes … il n'a pas ouvert de surface XSS », ce qui date la prémisse de la story qui ÉCRIT et ignore celle qui LIT. Règles §5 et §2 [next.config.ts:28-34]
+- [x] [Review][Patch] **CORRIGÉ SUR LA BRANCHE `refactor/microcopy-possessifs`, pas ici** — la ligne existe sur `main` et n'est pas touchée par cette story ; l'extraction de `cfcc75e` lui a rendu sa vraie destination. Du **vouvoiement**, seule occurrence de tout l'applicatif, entre deux lignes que `cfcc75e` réécrivait — « Ce que **vous** savez faire à manger. » sous le `<h1>Mes recettes</h1>` et au-dessus de « Tu n'as encore aucune recette. ». UX-DR12/NFR-8 [app/recettes/page.tsx:51]
+- [x] [Review][Patch] Le test de véracité que la story interdit sur trois pages, employé sur la valeur voisine — `{quantite || i.unite ? …}` ne fonctionne que par accident : `formaterQuantite` rend la **chaîne** `"0"`, qui est vraie. Or `0` est stockable (`recipe_ingredients_quantite_positive` vaut en réalité `quantity >= 0`, son nom ment). Le jour où la fonction rend un nombre ou `""`, la ligne « 0 g » perd sa quantité **en silence** — la confusion exacte que la décision 3 interdit, au même écran [app/recettes/[id]/page.tsx:150]
+- [x] [Review][Patch] Une **unité orpheline** quand `quantity` est `null` et `unit` vaut `'g'` — la ligne affiche `Farine … g`, un suffixe sans nombre. Atteignable par l'éditeur de la 3.2 (`IngredientsRecette.tsx:102-111` laisse `quantity: null` et pose `unit` depuis le `<select>`), et aucune contrainte ne l'interdit. Le commentaire au-dessus (`:145-149`) ne raisonne que sur « ni quantité ni unité » [app/recettes/[id]/page.tsx:150-156]
+- [x] [Review][Patch] `catch {}` nu : « recette introuvable » et « la lecture a échoué » deviennent indistinguables, sans une ligne de journal — le membre obtient une fiche parfaitement rendue dont l'onglet dit « Une recette · NutriClaude ». Pire, la preuve consignée (« titre d'onglet neutre — `generateMetadata` n'a pas levé ») **ne distingue pas les deux cas**, le titre neutre étant produit par les deux. `app/_lib/garde.ts:32` porte la règle du projet sur ce motif [app/recettes/[id]/page.tsx:33-41]
+- [x] [Review][Patch] Le commentaire revendique **deux lectures**, l'écran en fait **quatre** avec trois constructions de client — `generateMetadata` construit un client et lit (`:34-35`), `requireProfile()` en construit un deuxième via `appartenance()`, `:71` en construit un troisième, `:72` relit la recette, `:76` lit les ingrédients. Le commentaire qui justifie le séquentiel « pour qu'une revue n'y voie pas une négligence » décrit un écran qui n'est pas celui-là. Règle §2 [app/recettes/[id]/page.tsx:58-61]
+- [x] [Review][Patch] Le dossier affirme « lien de retour de l'édition **inchangé (vérifié, non touché)** », et c'est faux à HEAD — `cfcc75e` l'a passé à « ← Mes recettes ». La spec le cite verbatim et l'interdit (`:91` « Vérifie-le, ne le touche pas »), la table Microcopy (`:328`) et la décision 1 (`:488`) disent « ← Tes recettes ». La destination est conservée, le libellé non. C'est le défaut de « texte d'annonce périmé » que le **piège n°8 de cette story** énumère [3-3-…md:91, :328, :488, :620]
+- [x] [Review][Patch] `formaterQuantite` réintroduit un **second arrondisseur** que `normaliserQuantite` avait explicitement retiré — `saisie.ts:129-140` pose que « la parade est de n'avoir qu'un seul arrondisseur : la colonne ». `maximumFractionDigits: 2` en pose un autre, avec la règle d'arrondi d'`Intl` (mesuré : `formaterQuantite(1.005)` → « 1,01 »). Sans portée tant que la colonne reste `numeric(8,2)` — mais c'est un invariant entre deux fichiers **affirmé** par un commentaire et par aucun test. Règle §4 [lib/recettes/lecture.ts:42-50]
+- [x] [Review][Patch] Un test dont le nom annonce deux cas et n'en éprouve aucun des deux — « les portions ne peuvent pas être nulles ou négatives, et on ne fait pas semblant » ne contient qu'une assertion, `formaterPortions(0)`. Ni `null` (impossible par typage, donc le nom ment) ni le négatif. `formaterPortions(-1)` rend « Pour -1 personne » au singulier, et rien ne l'épingle [lib/recettes/lecture.test.ts:92]
+
+#### Ce que les correctifs ont mesuré sur eux-mêmes
+
+Les sept correctifs sont appliqués. **Cinq portes vertes : typage, lint, 153/153, build, en-têtes
+de migration.** Deux mutations ont été jouées pour savoir lesquels sont réellement tenus :
+
+| Mutation | Effet | Lecture |
+|---|---|---|
+| `maximumFractionDigits: 2` → `3` | **153 → 152**, un test tombe | Le nouvel invariant entre `lecture.ts` et `numeric(8,2)` est **mesuré**, pas affirmé (règle §4) |
+| `{quantite !== null ?` → `{quantite ?` dans le JSX | **153 → 153, RIEN ne tombe** | Le correctif n°3 n'a **aucune dent** |
+
+⚠️ **Le correctif le plus important de la liste n'est couvert par aucun test, et il faut l'écrire
+plutôt que de le laisser croire.** NFR-10 interdit le harnais de composants ; ce JSX n'est tenu par
+rien. Une régression y serait silencieuse — c'est précisément la famille de défaut que la règle §7
+décrit (« ce qu'aucune porte automatique ne voit »). **Le seul filet est le parcours à l'écran**, et
+il est de toute façon à rejouer en entier : il faut y inclure **un ingrédient à quantité `0`** et
+**un ingrédient à unité sans quantité**, qui sont les deux états que ce correctif change.
 
 #### Reportés
 

@@ -23,6 +23,36 @@ test("un entier n'a pas de décimale postiche", () => {
   assert.equal(formaterQuantite(0), "0");
 });
 
+test("l'arrondi de l'affichage n'entame pas ce que la colonne sait stocker", () => {
+  /*
+   * ⚠️ **Ce test mesure un invariant ENTRE DEUX FICHIERS**, il ne l'affirme pas —
+   * règle §4 de `project-context.md`, et ce projet a déjà payé trois fois pour
+   * l'avoir seulement affirmé.
+   *
+   * L'invariant : `formaterQuantite` pose `maximumFractionDigits: 2`, et la colonne
+   * est un `numeric(8,2)`. Les deux doivent rester d'accord. `normaliserQuantite`
+   * (`saisie.ts`) a justement SUPPRIMÉ son arrondi client au motif que « la parade
+   * est de n'avoir qu'un seul arrondisseur : la colonne » — celui-ci n'est
+   * acceptable que tant qu'il ne tranche rien que la base puisse rendre.
+   *
+   * Donc : sur les deux décimales que la colonne stocke, l'affichage est FIDÈLE.
+   * Le jour où la migration passerait la colonne à `numeric(8,3)`, ce test tombe —
+   * et c'est tout ce qu'on lui demande.
+   */
+  assert.equal(formaterQuantite(12.34), "12,34");
+  assert.equal(formaterQuantite(99999.99), "99999,99");
+  assert.equal(formaterQuantite(0.01), "0,01");
+
+  /*
+   * ⚠️ En revanche, au-delà de deux décimales, `Intl` ARRONDIT en silence — mesuré,
+   * pas déduit. La base ne peut pas produire ces valeurs aujourd'hui ; l'épingler
+   * documente ce que la fonction fait vraiment, plutôt que de laisser croire qu'elle
+   * tronque ou qu'elle refuse.
+   */
+  assert.equal(formaterQuantite(1.005), "1,01");
+  assert.equal(formaterQuantite(0.005), "0,01");
+});
+
 test("aucune quantité rend null, jamais une chaîne vide", () => {
   /*
    * `null` est distinct de `""` : l'appelant doit décider de ne rien rendre du
@@ -89,12 +119,21 @@ test("l'accord singulier / pluriel", () => {
   assert.equal(formaterPortions(12), "Pour 12 personnes");
 });
 
-test("les portions ne peuvent pas être nulles ou négatives, et on ne fait pas semblant", () => {
+test("si la garde en base sautait, l'accord ne produirait pas d'absurdité", () => {
   /*
-   * `recipes_servings_positif` (story 3.1) le garantit en base : `servings > 0`.
-   * Traiter ces cas ici serait du code mort qui suggère une possibilité qui
-   * n'existe pas. On se contente de ne pas produire d'absurdité si la garde
-   * venait à sauter.
+   * `recipes_servings_positif` (story 3.1) garantit `servings > 0` en base, et
+   * `servings` est `not null`. Ces valeurs sont donc INATTEIGNABLES aujourd'hui :
+   * traiter le cas dans la fonction serait du code mort qui suggère une
+   * possibilité qui n'existe pas. On mesure seulement ce que l'accord rendrait.
+   *
+   * ⚠️ Le nom précédent — « les portions ne peuvent pas être nulles ou négatives »
+   * — annonçait deux cas dont il n'éprouvait aucun : `null` est impossible par
+   * typage, et le négatif n'était pas assert. Trouvé par la revue du 2026-08-02.
+   * Le négatif est ajouté ici, et il montre la limite : « Pour -1 personne » au
+   * singulier, parce que l'accord teste `> 1`. C'est ce que fait la fonction ;
+   * l'épingler vaut mieux que de le découvrir un jour sur un écran.
    */
   assert.equal(formaterPortions(0), "Pour 0 personne");
+  assert.equal(formaterPortions(-1), "Pour -1 personne");
+  assert.equal(formaterPortions(-3), "Pour -3 personne");
 });
