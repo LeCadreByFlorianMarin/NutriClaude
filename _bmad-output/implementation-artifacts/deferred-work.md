@@ -618,3 +618,40 @@ revue sur du code qu'elle n'a pas mandat de juger.
   vérification réseau bridé) sur l'écran d'une AUTRE story, et déborder rendrait sa propre revue
   plus difficile.* Le motif est désormais écrit deux fois dans le dépôt, il n'y a rien à
   inventer.
+
+---
+
+## Deferred from: story 3-5-planifier-le-menu-de-la-semaine-sans-defilement-horizontal (2026-08-04)
+
+**L'AC4 est livré à MOITIÉ, par décision de Florian, et la story 3.6 doit le rouvrir.**
+
+L'AC4 demande que les cases vides soient « lisibles **et directement actionnables** ». « Lisibles » est livré. « Directement actionnables » ne l'est pas : l'action est d'assigner une recette, c'est-à-dire la story 3.6 en entier — et la seconde moitié du même critère (« sans zone ambiguë ») interdit de poser d'ici là une case focalisable qui ne mènerait nulle part. Option (a), tranchée le 2026-08-04 avant démarrage.
+
+⚠️ **C'est une prémisse qui sert à reporter la moitié d'un critère — règle §5.** La story 3.6 doit la **rouvrir en la citant**, pas la supposer close. Ce qui l'attend est déjà en place : la case est dimensionnée, nommée, et n'a besoin que de sa destination. Rien n'est à jeter.
+
+---
+
+**LE TROU : rien n'oblige `meal_plan_entries.recipe_id` à désigner une recette du MÊME foyer.**
+
+⚠️ **Mesuré le 2026-08-04**, sonde exécutée sur le stack local avec deux comptes réels :
+
+| Question | Réponse mesurée |
+|---|---|
+| A peut-elle poser dans SON menu une case pointant une recette de B ? | **OUI** — `error` nul, une ligne rendue |
+| Le titre de B traverse-t-il la jointure `recipes(id, title)` ? | **NON** — PostgREST rend `recipes: null` |
+
+`meal_plan_all` ne contrôle que `household_id` (`initial_schema.sql:316-318`), jamais la provenance de `recipe_id` ; et une contrainte de clé étrangère s'applique **sans égard pour la RLS**. L'écriture étant client-direct (le membre possède sa clé anon et son jeton) et l'Epic 7 ouvrant une seconde surface sur la même base, un `POST` PostgREST direct suffit.
+
+**Ce n'est donc PAS une fuite d'isolation** — NFR-5 tient, la RLS filtre bien la ressource embarquée, et c'est la première fois que ce dépôt le mesure sur cette **forme** de lecture (une jointure, pas une table). C'est un défaut d'**intégrité référentielle** : un foyer peut se fabriquer une case de menu qui ne s'affichera jamais, et que la génération de liste de l'Epic 4 traversera sans rien y trouver.
+
+**Conséquence déjà prise en charge côté lecture** : `casesDeLaSemaine` écarte les lignes dont la jointure rend `null` (`lib/menu/menu.ts`). Cette garde est du **code vivant**, pas une précaution théorique — c'est la sonde qui l'établit.
+
+*Reporté : la story 3.5 ne fait que LIRE. Le trou est à l'écriture, et c'est la story 3.6 qui l'ouvre — c'est elle qui doit le fermer, en même temps qu'elle pose la contrainte `unique(household_id, meal_date, meal_type, recipe_id)` d'AD-6 que son AC2 nomme. Les deux vivent dans la même migration.*
+
+⚠️ **AD-1 / AD-2 : la règle métier vit en Postgres, jamais dans la vigilance d'une surface.** La garde de `casesDeLaSemaine` protège l'affichage, elle ne referme rien. La forme attendue est un `with check` qui exige que la recette appartienne au foyer courant — ou une contrainte équivalente.
+
+**Reporté, avec la raison :**
+
+- **Le squelette de `/menu` n'a pas été regardé au réseau bridé.** Il est écrit sur le motif déjà posé deux fois dans le dépôt et le build charge bien son module, mais la story 3.3 a appris qu'un squelette se juge à l'œil et pas au raisonnement. *Reporté avec le parcours à l'écran, qui n'a pas eu lieu — voir les cases décochées de la Task 5.*
+- **`servings` est lu et n'est pas affiché.** `casesDeLaSemaine` le rend (`personnes`), l'écran l'ignore : le nombre de personnes appartient à la story 3.6, qui le rend modifiable en même temps qu'elle l'affiche. *Reporté volontairement — c'est une frontière de story, pas un oubli.*
+- **La colonne `notes` de `meal_plan_entries` n'est lue par personne.** Elle existe depuis le squelette, aucune story ne la réclame. *À réveiller si un besoin apparaît ; sinon elle est candidate à la suppression au titre de NFR-10.*

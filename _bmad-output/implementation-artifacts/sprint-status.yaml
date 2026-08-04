@@ -41,6 +41,27 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
+last_updated: 2026-08-04  # 2026-08-04 — Story 3.5 contextualisée, tranchée, puis IMPLÉMENTÉE (statut `review`).
+                          # ⛔ Le parcours à l'écran n'a pas eu lieu : l'AC2 n'est pas démontré.
+                          # Détail à l'entrée de la story 3.5, plus bas. Contexte d'origine :
+                          # Story 3.5 contextualisée : `backlog` → `ready-for-dev`,
+                          # puis ses TROIS QUESTIONS TRANCHÉES PAR FLORIAN avant démarrage.
+                          # Les sept tâches sont ouvertes, plus rien ne bloque.
+                          # ⚠️ LA 3.4 EST SAUTÉE À LA DEMANDE DE FLORIAN et reste `backlog` —
+                          # conséquence directe : les étiquettes de la maquette `grille-menu.html`
+                          # n'existent pas et ne sont pas de cette story.
+                          # ⚠️ L'AC4 SERA LIVRÉ À MOITIÉ, ET C'EST UNE DÉCISION, PAS UN OUBLI.
+                          # « Cases lisibles » : oui. « Directement actionnables » : non —
+                          # assigner une recette EST la story 3.6, et poser d'ici là une case
+                          # focalisable qui ne mène nulle part serait la « zone ambiguë » que le
+                          # même critère interdit. Option (a) retenue : la sous-tâche reste
+                          # DÉCOCHÉE avec sa raison, et la 3.6 doit la ROUVRIR en la citant
+                          # (règle §5), pas la supposer close. Règle §1 côté critères : une case
+                          # vide honnête vaut mieux qu'une case cochée à tort.
+                          # Aussi tranché : quatre repas (petit-déj · midi · collation · soir),
+                          # et la semaine en cours par défaut.
+                          # Aucune migration due : `meal_plan_entries`, sa RLS et ses types
+                          # existent depuis le squelette du 2026-05-02.
 last_updated: 2026-08-03  # 2026-08-03 — Parcours à l'écran de la story 3.3 REJOUÉ EN ENTIER après
                           # les correctifs de la revue. Rapporté par Florian, pas mesuré par
                           # l'agent (règle §1). Story `in-progress` → `review`.
@@ -338,8 +359,27 @@ development_status:
   # réussi), les trous « un par un ». Elles ne bloquent pas la fusion.
   # ⚠️ RESTE AVANT FUSION : la PR #20 (microcopy) passe AVANT la #19.
   3-3-consulter-une-recette-en-lecture: review
+  # ⚠️ SAUTÉE À LA DEMANDE DE FLORIAN le 2026-08-04 : la 3.5 a été contextualisée avant elle.
+  # Elle reste due — c'est elle qui apporte les étiquettes que la maquette du menu affiche.
   3-4-etiquettes-filtre-et-recherche-du-repertoire: backlog
-  3-5-planifier-le-menu-de-la-semaine-sans-defilement-horizontal: backlog
+  # 2026-08-04 — Contextualisée, puis ses trois questions tranchées avant démarrage.
+  # Grille jour × repas EN LECTURE (quatre repas : petit-déj · midi · collation · soir),
+  # navigation entre semaines, semaine en cours par défaut, case vide lisible.
+  # Assigner une recette reste la 3.6 en entier.
+  # ⚠️ L'AC4 sera livré à moitié, par décision datée — voir le fichier de story.
+  # 2026-08-04 — Implémentée sur `feat/menu-grille` (branchée sur 795678e). Six portes vertes :
+  # 179/179 unitaires (159 avant), 60/60 isolation (57 avant), dents mesurées par mutation sur
+  # les deux suites. Aucune migration due.
+  # ⛔ NE PAS FUSIONNER EN L'ÉTAT : le parcours à l'écran (Task 5) N'A PAS EU LIEU, et l'AC2
+  # — « aucun défilement horizontal », le critère central de cette story — n'est donc PAS
+  # démontré. Ce qui est établi l'est par mesure STATIQUE (toutes les classes émettent bien
+  # du CSS, les colonnes sont en minmax(0,1fr), les titres portent break-words) : c'est un
+  # raisonnement solide, pas une observation. Règle §7 — le rendu est ce qu'aucune porte ne voit.
+  # ⚠️ Trouvé à l'implémentation : `meal_plan_all` ne contrôle pas la provenance de
+  # `recipe_id` — un foyer peut pointer la recette d'un autre. Ce n'est PAS une fuite (la RLS
+  # filtre la ressource jointe, mesuré) mais un défaut d'intégrité, à fermer par la story 3.6
+  # en même temps que la contrainte d'unicité d'AD-6. Détail dans `deferred-work.md`.
+  3-5-planifier-le-menu-de-la-semaine-sans-defilement-horizontal: review
   3-6-assigner-recettes-et-nombre-de-personnes-aux-cases-du-menu: backlog
   epic-3-retrospective: optional
 

@@ -22,7 +22,8 @@ export const metadata = { title: "Mes recettes · NutriClaude" };
  *
  * Ce que cet écran ne fait pas, et où ça vit : les ingrédients (story 3.2), la
  * lecture d'une recette (story 3.3), les étiquettes, le filtre et la recherche
- * (story 3.4), la grille du menu (stories 3.5 et 3.6).
+ * (story 3.4), l'assignation d'une recette à une case du menu (story 3.6). La
+ * grille du menu, elle, existe depuis la story 3.5 — `/menu`.
  *
  * ⚠️ **Plus large que `/rayons` et `/foyer`, à dessein.** Ces deux-là sont en
  * `max-w-sm` parce qu'ils alignent des lignes courtes. Ici, DESIGN.md et
