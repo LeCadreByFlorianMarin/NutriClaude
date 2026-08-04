@@ -536,11 +536,12 @@ test("A crée, modifie et supprime SA recette de bout en bout", async () => {
 
 test("supprimer une recette vide les cases de menu qui la portaient", async () => {
   /*
-   * `meal_plan_entries.recipe_id` est `on delete cascade`. Aucun écran n'expose
-   * encore le menu (stories 3.5 et 3.6), donc la confirmation de suppression ne
-   * peut RIEN en dire aujourd'hui — et c'est précisément ce qui rend la
-   * suppression bon marché maintenant. Ce test fige la conséquence pour que la
-   * story 3.6 la trouve écrite plutôt que de la découvrir à l'écran.
+   * `meal_plan_entries.recipe_id` est `on delete cascade`. Depuis la story 3.5,
+   * `/menu` AFFICHE la grille : supprimer une recette y vide donc des cases, en
+   * silence et sans confirmation qui le dise — la suppression vit sur l'écran des
+   * recettes, qui n'a aucune raison de savoir ce que le menu en fera. Ce test
+   * fige la conséquence pour que la story 3.6, qui rendra ces cases modifiables,
+   * la trouve écrite plutôt que de la découvrir à l'écran.
    */
   const recette = await recetteDeService(a.foyerId, "Recette au menu");
   const { error: erreurMenu } = await admin.from("meal_plan_entries").insert({
@@ -1037,4 +1038,154 @@ test("les gardes de cardinal et de doublon de reorder_recipe_ingredients", async
     p_ids: [],
   });
   assert.notEqual(vide, null, "un tableau vide doit être refusé");
+});
+
+// ── Menu : la première lecture applicative de `meal_plan_entries` ───────────
+//
+// La story 3.5 ouvre le premier chemin de LECTURE vers `meal_plan_entries` depuis
+// une surface. La table et sa politique `meal_plan_all` existent depuis le
+// squelette (`20260502000000:315-318`) mais aucun écran ne les avait touchées.
+// Une politique jamais exercée est une politique supposée, pas prouvée (AD-17).
+//
+// ⚠️ Et cette story y ajoute une FORME de lecture que le dépôt n'avait jamais
+// employée : la ressource EMBARQUÉE de PostgREST (`recipes(id, title)`). Le
+// projet a déjà payé une fois pour avoir cru qu'une garde couvrait une forme
+// qu'elle ne couvrait pas — le trou de `seed_default_aisles`, invisible aux onze
+// tests d'alors parce qu'ils portaient tous sur des tables. D'où le second test.
+
+test("A ne lit pas les cases de menu de B", async () => {
+  const recetteDeB = await recetteDeService(b.foyerId, "Le gratin de Bruno");
+  const { error: pose } = await admin.from("meal_plan_entries").insert({
+    household_id: b.foyerId,
+    recipe_id: recetteDeB,
+    meal_date: "2026-09-07",
+    meal_type: "dinner",
+  });
+  assert.equal(pose, null, "témoin négatif : la case de B existe bien");
+
+  const { data: vues, error } = await a.client
+    .from("meal_plan_entries")
+    .select("id, household_id")
+    .eq("meal_date", "2026-09-07");
+  assert.equal(error, null, "zéro ligne est un succès PostgREST, pas une erreur");
+  assert.deepEqual(vues, [], "A ne voit aucune case de B");
+});
+
+test("LE TROU POSSIBLE : A pointe une case de SON menu sur une recette de B", async () => {
+  /*
+   * ⚠️ **`meal_plan_all` ne contrôle QUE `household_id`.** Son `with check` ne dit
+   * rien de `recipe_id`, et la contrainte de clé étrangère, elle, s'applique sans
+   * égard pour la RLS. Rien n'empêche donc A d'écrire dans SON foyer une case qui
+   * pointe une recette de B — l'écriture est client-direct, A possède sa clé anon
+   * et son jeton, et l'Epic 7 ouvrira une seconde surface sur la même base.
+   *
+   * La question que ce test tranche n'est pas « peut-on poser la ligne » mais
+   * « la ligne posée FAIT-ELLE FUIR le titre de B » à travers la jointure que
+   * `casesDeLaSemaine` emploie. C'est la seule chose que la RLS de `recipes` peut
+   * encore défendre, et c'est une forme de lecture neuve dans ce dépôt.
+   */
+  const recetteDeB = await recetteDeService(b.foyerId, "SECRET DE BRUNO");
+
+  /*
+   * ⚠️ **MESURÉ le 2026-08-04 : la pose est ACCEPTÉE.** Ce n'est pas une
+   * hypothèse de test, c'est l'état de la base — sonde exécutée sur le stack
+   * local, `error` nul et une ligne rendue. Le test l'assure explicitement pour
+   * que le jour où une migration ferme ce trou, ce soit ICI que ça se voie, et
+   * pas dans une branche `if` qui l'aurait absorbé en silence.
+   */
+  const { data: posee, error: poseInterdite } = await a.client
+    .from("meal_plan_entries")
+    .insert({
+      household_id: a.foyerId,
+      recipe_id: recetteDeB,
+      meal_date: "2026-09-14",
+      meal_type: "lunch",
+    })
+    .select("id");
+
+  assert.equal(
+    poseInterdite,
+    null,
+    "état mesuré au 2026-08-04 : rien n'interdit de pointer la recette d'un autre foyer"
+  );
+  assert.equal(posee?.length, 1);
+
+  /*
+   * ⚠️ **Et voici ce qui tient quand même : la RLS s'applique à la ressource
+   * EMBARQUÉE.** C'était la vraie question — la forme de lecture est neuve dans
+   * ce dépôt, et rien ne garantissait a priori qu'une jointure PostgREST soit
+   * filtrée comme une table. Elle l'est : `recipes` rend `null`, aucun titre de
+   * B ne traverse. AUCUN test ne le disait avant celui-ci.
+   */
+  const { data: vues } = await a.client
+    .from("meal_plan_entries")
+    .select("id, meal_date, meal_type, servings, recipes(id, title)")
+    .eq("meal_date", "2026-09-14");
+
+  assert.equal(vues?.length, 1, "A voit bien SA case — c'est son foyer");
+  assert.equal(
+    vues![0].recipes,
+    null,
+    "la RLS filtre la ressource embarquée : aucun titre de B ne traverse"
+  );
+});
+
+test("A lit SA semaine de menu de bout en bout, jointure comprise", async () => {
+  /*
+   * Le témoin positif : sans lui, les deux tests ci-dessus seraient verts sur une
+   * lecture qui ne rend jamais rien — c'est exactement le piège que l'en-tête de
+   * ce fichier décrit à propos du témoin négatif, pris dans l'autre sens.
+   *
+   * Il fige aussi les DEUX faits dont l'écran dépend et qu'aucun test unitaire ne
+   * peut porter (NFR-10) : la jointure rend bien le titre, et deux recettes
+   * tiennent dans la MÊME case — rien ne l'interdit tant que la contrainte
+   * d'unicité d'AD-6 (story 3.6) n'existe pas.
+   */
+  const gratin = await recetteDeService(a.foyerId, "Gratin de courgettes");
+  const salade = await recetteDeService(a.foyerId, "Salade de lentilles");
+
+  const { error: pose } = await a.client.from("meal_plan_entries").insert([
+    { household_id: a.foyerId, recipe_id: gratin, meal_date: "2026-09-21", meal_type: "dinner" },
+    { household_id: a.foyerId, recipe_id: salade, meal_date: "2026-09-21", meal_type: "dinner" },
+  ]);
+  assert.equal(pose, null, "A pose deux recettes au même repas, et c'est permis");
+
+  const { data: vues, error } = await a.client
+    .from("meal_plan_entries")
+    .select("id, meal_date, meal_type, servings, recipes(id, title)")
+    .gte("meal_date", "2026-09-21")
+    .lte("meal_date", "2026-09-27")
+    .order("meal_date")
+    .order("meal_type")
+    .order("created_at");
+
+  assert.equal(error, null);
+  assert.equal(vues?.length, 2, "les DEUX cases du même repas sont rendues");
+  assert.equal(vues![0].servings, 2, "le défaut de la colonne, pas une valeur écrite");
+
+  /*
+   * ⚠️ **Deux inférences de type se contredisent, et c'est ce test qui tranche.**
+   * Le client de CE fichier n'est pas typé — les comptes sont construits par
+   * `createClient(apiUrl, anonKey)` tout court, sans le générique `Database`.
+   * Faute de schéma, supabase-js infère la ressource embarquée en **tableau** ;
+   * le client typé de `lib/menu/menu.ts`, lui, l'infère en **objet** (mesuré le
+   * 2026-08-04 par une sonde de typage).
+   *
+   * Les deux ne peuvent pas avoir raison, et aucune des deux ne dit ce que
+   * PostgREST envoie vraiment. **L'assertion ci-dessous, elle, le mesure** : c'est
+   * un objet. Sans elle, `lib/menu/menu.ts` reposerait sur une inférence que rien
+   * ne corrobore — et la story 3.2 a déjà appris ici ce que vaut un invariant
+   * affirmé plutôt que mesuré (règle §4).
+   */
+  const embarquee = vues!.map(
+    (v) => v.recipes as unknown as { id: string; title: string } | null
+  );
+  assert.equal(
+    Array.isArray(embarquee[0]),
+    false,
+    "PostgREST rend la ressource embarquée en OBJET, malgré ce que dit le client non typé"
+  );
+
+  const titres = embarquee.map((r) => r?.title).sort();
+  assert.deepEqual(titres, ["Gratin de courgettes", "Salade de lentilles"]);
 });
