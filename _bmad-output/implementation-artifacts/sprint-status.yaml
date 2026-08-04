@@ -41,6 +41,54 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
+last_updated: 2026-08-04  # 2026-08-04 — Story 3.6 IMPLÉMENTÉE (statut `review`). Détail à son entrée, plus bas.
+                          # Contexte d'origine : Story 3.6 contextualisée : `backlog` → `ready-for-dev`.
+                          # DERNIÈRE story de l'Epic 3, et la PREMIÈRE qui ÉCRIT dans
+                          # `meal_plan_entries`. Elle porte UNE migration — la contrainte d'unicité
+                          # d'AD-6 que son AC2 nomme, ET la fermeture du trou de provenance de
+                          # `recipe_id` que la 3.5 a mesuré et daté à son intention. Les deux dans
+                          # le même fichier : `db push` n'est pas atomique sur un lot.
+                          # ⚠️ TROIS PRÉMISSES ROUVERTES EN LES CITANT (règle §5), pas supposées
+                          # closes : la moitié d'AC4 de la 3.5, le trou d'intégrité, et —
+                          # ⛔ L'AC2 DE LA 3.5 EST EN PRODUCTION SANS AVOIR JAMAIS ÉTÉ OBSERVÉ.
+                          # Mesuré : PR #22 fusionnée le 2026-08-04 à 13:34:53 UTC alors que le
+                          # fichier de story disait « NE PAS FUSIONNER EN L'ÉTAT » et que sa Task 5
+                          # était entièrement décochée ; corps de PR = gabarit vierge. Le parcours
+                          # à l'écran de la 3.6 porte donc les DEUX — et cette story ajoute à cette
+                          # grille un `<select>`, c'est-à-dire l'élément qui peut la faire déborder.
+                          # ⚠️ UN TEST D'ISOLATION ASSURE AUJOURD'HUI QUE LE TROU EXISTE
+                          # (`isolation.test.ts:1074`). La migration le fait tomber : son inversion
+                          # est une tâche, pas un rangement — son propre commentaire l'avait prévu.
+                          # ⚠️ Le texte de suppression d'une recette devient FAUX (cascade sur
+                          # `meal_plan_entries`) : réparé dans le même commit, comme l'exige
+                          # `deferred-work.md` qui l'adresse nommément à cette story.
+                          # ✅ LES 4 QUESTIONS TRANCHÉES PAR FLORIAN LE 2026-08-04, AVANT DÉMARRAGE.
+                          # (1) Politique `meal_plan_all` resserrée par un `with check` sur la
+                          #     provenance — la clé étrangère composite est ÉCARTÉE (elle rendrait
+                          #     l'embarquement PostgREST ambigu et casserait la grille livrée), et
+                          #     le piège est DATÉ dans la story plutôt qu'effacé : c'est la forme
+                          #     qu'une revue reproposera comme « plus propre ».
+                          # (2) Route dédiée `/menu/[jour]/[repas]`, slug français porté par REPAS.
+                          #     Ça supprime le risque AC2 À LA SOURCE — aucun `<select>` n'entre
+                          #     dans une piste à 1/7 de largeur — et ça donne à la case vide la
+                          #     « destination » que la 3.5 disait qu'elle attendait.
+                          # (3) `meal_plan_entries_servings_positif` dans la même migration.
+                          # ⚠️ (4) LE NOMBRE DE PERSONNES SE RÈGLE AU FOYER, PUIS S'AJUSTE PAR
+                          #     ASSIGNATION — réponse HORS des options proposées, et elle élargit
+                          #     le périmètre : + `households.default_servings`, + une section sur
+                          #     `/foyer`, et c'est la PREMIÈRE écriture du produit dans `households`.
+                          #     Conséquence à ne pas rater : la forme du schéma change, donc
+                          #     `supabase gen types` est DÛ (trois contraintes seules n'auraient
+                          #     rien changé). Et TROIS nombres de personnes coexistent désormais à
+                          #     l'écran, dont deux s'appellent `servings` en base — c'est leur
+                          #     RAPPORT que l'Epic 4 emploie, et les confondre rend le produit
+                          #     incompréhensible au premier ajustement.
+                          # ⚠️ Frontières posées avec la décision 4 : changer le réglage ne réécrit
+                          #     AUCUNE assignation existante (pas d'`update` en masse) ; ce n'est ni
+                          #     un réglage par membre (AD-16, foyer symétrique) ni par recette.
+                          # ⚠️ Aucun test d'isolation neuf sur `households` : `:214-223` couvre déjà,
+                          #     une politique RLS étant par ligne et pas par colonne.
+                          # Périmètre passé de 9 à 10 tâches. TOUTES OUVERTES, plus rien n'attend.
 last_updated: 2026-08-04  # 2026-08-04 — Story 3.5 contextualisée, tranchée, puis IMPLÉMENTÉE (statut `review`).
                           # ⛔ Le parcours à l'écran n'a pas eu lieu : l'AC2 n'est pas démontré.
                           # Détail à l'entrée de la story 3.5, plus bas. Contexte d'origine :
@@ -380,7 +428,45 @@ development_status:
   # filtre la ressource jointe, mesuré) mais un défaut d'intégrité, à fermer par la story 3.6
   # en même temps que la contrainte d'unicité d'AD-6. Détail dans `deferred-work.md`.
   3-5-planifier-le-menu-de-la-semaine-sans-defilement-horizontal: review
-  3-6-assigner-recettes-et-nombre-de-personnes-aux-cases-du-menu: backlog
+  # 2026-08-04 — Contextualisée sur `a56ba0b`. Dernière story de l'Epic 3, PREMIÈRE écriture
+  # dans `meal_plan_entries`, et la seule de l'epic à porter une migration depuis la 3.2.
+  # Elle REFERME trois choses laissées ouvertes, chacune citée et non résumée :
+  #   1. la moitié d'AC4 de la 3.5 (« directement actionnables ») — la case a été dessinée,
+  #      dimensionnée et nommée pour ça ; il ne lui manque que sa destination ;
+  #   2. le trou de provenance de `recipe_id`, MESURÉ le 2026-08-04 (A peut pointer la recette
+  #      de B ; ce n'est pas une fuite — la RLS filtre la ressource jointe — mais une intégrité
+  #      qui manque). Sa fermeture vit dans la MÊME migration que l'unicité d'AD-6 ;
+  #   3. l'AC2 de la 3.5, fusionné sans jamais avoir été observé.
+  # ✅ 4 QUESTIONS TRANCHÉES LE 2026-08-04, avant démarrage — détail dans le fichier de story.
+  # La 4e est sortie des options proposées et ÉLARGIT LE PÉRIMÈTRE : le nombre de personnes se
+  # règle au FOYER (`households.default_servings`, colonne neuve, section neuve sur `/foyer`,
+  # première écriture du produit dans `households`) puis s'ajuste par assignation.
+  # Conséquence : `supabase gen types` est DÛ — la forme du schéma change, ce qui n'aurait pas
+  # été le cas avec les seules contraintes. 10 tâches, toutes ouvertes.
+  # 2026-08-04 — IMPLÉMENTÉE sur `feat/menu-assignation` (branchée sur `a56ba0b`).
+  # 11 fichiers créés, 13 modifiés. Une migration à QUATRE volets : unicité d'AD-6, provenance
+  # de `recipe_id` (politique resserrée), `servings > 0`, et `households.default_servings`.
+  # 197/197 unitaires (179 avant), 66/66 isolation+contraintes (60 avant). 8 mutations jouées,
+  # chacune faisant tomber le test qu'elle vise ET LUI SEUL. Six portes vertes.
+  # ✅ PARCOURS À L'ÉCRAN JOUÉ EN ENTIER, et il a fermé DEUX dettes d'un coup : les 4 AC de
+  # cette story, la moitié d'AC4 que la 3.5 avait laissée, ET L'AC2 DE LA 3.5 — « aucun
+  # défilement horizontal » — qui était en production sans avoir jamais été observé.
+  # ⚠️ IL A TROUVÉ 2 DÉFAUTS QU'AUCUNE DES SIX PORTES NE VOYAIT (règle §7, deux fois) :
+  #   · `min={1}`/`required` faisaient afficher un message de navigateur EN ANGLAIS, hors
+  #     région aria-live — et empêchaient le gestionnaire d'être appelé, donc rendaient DEUX
+  #     messages français INATTEIGNABLES (des clés de message sans appelant) ;
+  #   · « et des 2repas » — JSX mangeait l'espace après un `<span>`.
+  #   Les deux corrigés et REVÉRIFIÉS à l'écran.
+  # ⚠️ `estCodeRepas` n'a PAS été écrit, et c'est délibéré : la route reçoit un slug, pas un
+  # code, donc le prédicat prescrit n'aurait eu aucun appelant. `repasParSlug` tient le rôle.
+  # ⚠️ Le CLI Supabase de ce poste régénère `types.ts` en PERDANT `__InternalSupabase`, qui
+  # pilote l'inférence de types côté client. Le delta a été appliqué au lieu d'écraser, et
+  # l'écart est MESURÉ par `diff`, pas affirmé.
+  # ⛔ RESTE AVANT FUSION, et ce n'est pas un oubli : la requête de contrôle de la migration
+  # sur la PRODUCTION (c'est le geste de la revue de PR, et la fusion APPLIQUE la migration),
+  # et « le dire dans la PR » que l'AC2 n'y est pas démontrable. Deux cases décochées avec
+  # leur raison ; une troisième porte l'écart de méthode sur la mesure de largeur.
+  3-6-assigner-recettes-et-nombre-de-personnes-aux-cases-du-menu: review
   epic-3-retrospective: optional
 
   # ── Epic 4 : La liste qui ne lâche jamais — hors-ligne, convergence & contrat ──

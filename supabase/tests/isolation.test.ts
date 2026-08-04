@@ -1071,29 +1071,28 @@ test("A ne lit pas les cases de menu de B", async () => {
   assert.deepEqual(vues, [], "A ne voit aucune case de B");
 });
 
-test("LE TROU POSSIBLE : A pointe une case de SON menu sur une recette de B", async () => {
+test("LE TROU REFERMÉ : A ne peut plus pointer une case de SON menu sur une recette de B", async () => {
   /*
-   * ⚠️ **`meal_plan_all` ne contrôle QUE `household_id`.** Son `with check` ne dit
-   * rien de `recipe_id`, et la contrainte de clé étrangère, elle, s'applique sans
-   * égard pour la RLS. Rien n'empêche donc A d'écrire dans SON foyer une case qui
-   * pointe une recette de B — l'écriture est client-direct, A possède sa clé anon
-   * et son jeton, et l'Epic 7 ouvrira une seconde surface sur la même base.
+   * ⚠️ **CE TEST DISAIT L'INVERSE JUSQU'AU 2026-08-04, ET C'ÉTAIT JUSTE.**
+   * `meal_plan_all` ne contrôlait alors que `household_id` : son `with check` ne
+   * disait rien de `recipe_id`, et une contrainte de clé étrangère s'applique sans
+   * égard pour la RLS. A pouvait donc écrire dans SON foyer une case pointant une
+   * recette de B — **mesuré**, `error` nul et une ligne rendue.
    *
-   * La question que ce test tranche n'est pas « peut-on poser la ligne » mais
-   * « la ligne posée FAIT-ELLE FUIR le titre de B » à travers la jointure que
-   * `casesDeLaSemaine` emploie. C'est la seule chose que la RLS de `recipes` peut
-   * encore défendre, et c'est une forme de lecture neuve dans ce dépôt.
+   * La story 3.6 a refermé le trou (`20260804144217`, volet 2) en resserrant le
+   * `with check` de la politique. Ce test a été inversé **dans le même commit** :
+   * sa rédaction précédente avait justement demandé que « le jour où une migration
+   * ferme ce trou, ce soit ICI que ça se voie, et pas dans une branche `if` qui
+   * l'aurait absorbé en silence ». C'est ici que ça s'est vu.
+   *
+   * ⚠️ **Ce n'était PAS une fuite d'isolation**, et ça n'a jamais été présenté
+   * comme tel : la RLS filtrait déjà la ressource embarquée (second volet
+   * ci-dessous). C'était un défaut d'INTÉGRITÉ — un foyer pouvait se fabriquer une
+   * case qui ne s'afficherait jamais.
    */
   const recetteDeB = await recetteDeService(b.foyerId, "SECRET DE BRUNO");
 
-  /*
-   * ⚠️ **MESURÉ le 2026-08-04 : la pose est ACCEPTÉE.** Ce n'est pas une
-   * hypothèse de test, c'est l'état de la base — sonde exécutée sur le stack
-   * local, `error` nul et une ligne rendue. Le test l'assure explicitement pour
-   * que le jour où une migration ferme ce trou, ce soit ICI que ça se voie, et
-   * pas dans une branche `if` qui l'aurait absorbé en silence.
-   */
-  const { data: posee, error: poseInterdite } = await a.client
+  const { error: poseInterdite } = await a.client
     .from("meal_plan_entries")
     .insert({
       household_id: a.foyerId,
@@ -1103,20 +1102,43 @@ test("LE TROU POSSIBLE : A pointe une case de SON menu sur une recette de B", as
     })
     .select("id");
 
-  assert.equal(
+  assert.notEqual(
     poseInterdite,
     null,
-    "état mesuré au 2026-08-04 : rien n'interdit de pointer la recette d'un autre foyer"
+    "la politique doit refuser une case pointant la recette d'un autre foyer"
   );
-  assert.equal(posee?.length, 1);
+  /*
+   * ⚠️ **Le SQLSTATE, pas le texte.** `42501` est le code d'un refus de politique
+   * RLS ; le message français qui l'accompagne est rédigé par Postgres et pourrait
+   * être reformulé par une montée de version. Même règle que `refusOrdre` :
+   * SQLSTATE d'abord, et on ne s'appuie sur un texte que s'il fait partie du
+   * schéma — ce qu'un nom de contrainte est, et qu'un message n'est pas.
+   */
+  assert.equal(poseInterdite!.code, "42501", "un refus de politique RLS");
 
   /*
-   * ⚠️ **Et voici ce qui tient quand même : la RLS s'applique à la ressource
-   * EMBARQUÉE.** C'était la vraie question — la forme de lecture est neuve dans
-   * ce dépôt, et rien ne garantissait a priori qu'une jointure PostgREST soit
-   * filtrée comme une table. Elle l'est : `recipes` rend `null`, aucun titre de
-   * B ne traverse. AUCUN test ne le disait avant celui-ci.
+   * ⚠️ **ET LE FAIT QUE CE TEST PORTAIT DÉJÀ RESTE MESURÉ : la RLS s'applique à la
+   * ressource EMBARQUÉE.** C'est la seule chose qui l'atteste dans ce dépôt, et la
+   * forme de lecture — une jointure PostgREST, pas une table — est la plus récente
+   * du produit. Rien ne garantissait a priori qu'elle soit filtrée comme une table.
+   *
+   * ⚠️ **La pose passe désormais par le client de SERVICE**, faute de pouvoir passer
+   * par A : le témoin négatif du fichier, celui qui traverse la RLS par conception.
+   * Sans ce détour, la fermeture du trou aurait emporté la seule mesure de ce fait —
+   * et personne ne l'aurait vu, puisque le test serait resté vert.
    */
+  const { error: poseDeService } = await admin.from("meal_plan_entries").insert({
+    household_id: a.foyerId,
+    recipe_id: recetteDeB,
+    meal_date: "2026-09-14",
+    meal_type: "lunch",
+  });
+  assert.equal(
+    poseDeService,
+    null,
+    "témoin : le rôle de service traverse la RLS, donc la ligne incohérente existe"
+  );
+
   const { data: vues } = await a.client
     .from("meal_plan_entries")
     .select("id, meal_date, meal_type, servings, recipes(id, title)")
@@ -1128,6 +1150,107 @@ test("LE TROU POSSIBLE : A pointe une case de SON menu sur une recette de B", as
     null,
     "la RLS filtre la ressource embarquée : aucun titre de B ne traverse"
   );
+});
+
+test("l'unicité d'assignation refuse le doublon, et RIEN d'autre", async () => {
+  /*
+   * ⚠️ **Les deux cas NÉGATIFS comptent autant que le positif.** Une contrainte trop
+   * large — sur `(household_id, meal_date, meal_type)` seul — refuserait le doublon
+   * elle aussi, et un test qui ne vérifie que le refus la laisserait passer. Ce
+   * qu'AD-6 autorise et qu'il ne faut PAS casser :
+   *   · deux recettes DIFFÉRENTES au même repas (« Soir : gratin + salade ») ;
+   *   · la même recette dans deux cases différentes (le batch-cooking).
+   */
+  /*
+   * ⚠️ **Des dates À SOI, hors de toute fenêtre lue ailleurs.** Ce fichier ne nettoie
+   * pas entre les tests : les cases s'accumulent dans la même base. Réemployer le
+   * 2026-09-21 faisait compter 5 lignes au témoin positif qui en attend 2 — attrapé
+   * à l'exécution, et c'est le genre de couplage qu'un `.eq("id", …)` masquerait au
+   * lieu de le supprimer.
+   */
+  const gratin = await recetteDeService(a.foyerId, "Gratin à compter");
+  const salade = await recetteDeService(a.foyerId, "Salade à compter");
+
+  const case1 = {
+    household_id: a.foyerId,
+    recipe_id: gratin,
+    meal_date: "2026-10-05",
+    meal_type: "dinner",
+  };
+
+  const { error: premiere } = await a.client.from("meal_plan_entries").insert(case1);
+  assert.equal(premiere, null, "la première assignation passe");
+
+  const { error: doublon } = await a.client.from("meal_plan_entries").insert(case1);
+  assert.notEqual(doublon, null, "AC2 : le doublon d'assignation est refusé");
+  assert.equal(doublon!.code, "23505", "violation d'unicité");
+  assert.match(doublon!.message, /meal_plan_entries_assignation_unique/);
+
+  const { error: autreRecette } = await a.client
+    .from("meal_plan_entries")
+    .insert({ ...case1, recipe_id: salade });
+  assert.equal(
+    autreRecette,
+    null,
+    "deux recettes différentes au même repas restent permises (AD-6)"
+  );
+
+  const { error: autreJour } = await a.client
+    .from("meal_plan_entries")
+    .insert({ ...case1, meal_date: "2026-10-06" });
+  assert.equal(
+    autreJour,
+    null,
+    "la même recette un autre jour reste permise — c'est le batch-cooking"
+  );
+});
+
+test("A ne peut ni poser, ni modifier, ni supprimer une case de menu chez B", async () => {
+  /*
+   * La LECTURE est couverte par « A ne lit pas les cases de menu de B ». L'ÉCRITURE
+   * ne l'était pas — et c'est la story 3.6 qui l'ouvre, donc c'est elle qui la doit
+   * (AD-17 : une politique jamais exercée est une politique supposée).
+   *
+   * ⚠️ Les trois verbes, sur le modèle de « A ne peut ni poser, ni modifier, ni
+   * supprimer un ingrédient chez B » : un `update` et un `delete` refusés par la RLS
+   * rendent **zéro ligne et AUCUNE erreur**, donc c'est l'état de la base qui
+   * tranche, jamais le code de retour.
+   */
+  const recetteDeB = await recetteDeService(b.foyerId, "Le pot-au-feu de Bruno");
+  const { data: caseDeB, error: pose } = await admin
+    .from("meal_plan_entries")
+    .insert({
+      household_id: b.foyerId,
+      recipe_id: recetteDeB,
+      meal_date: "2026-09-28",
+      meal_type: "dinner",
+      servings: 3,
+    })
+    .select("id")
+    .single();
+  assert.equal(pose, null, "témoin négatif : la case de B existe bien");
+
+  const { error: poseChezB } = await a.client.from("meal_plan_entries").insert({
+    household_id: b.foyerId,
+    recipe_id: recetteDeB,
+    meal_date: "2026-09-29",
+    meal_type: "lunch",
+  });
+  assert.notEqual(poseChezB, null, "A ne pose pas une case dans le foyer de B");
+
+  await a.client
+    .from("meal_plan_entries")
+    .update({ servings: 99 })
+    .eq("id", caseDeB!.id);
+  await a.client.from("meal_plan_entries").delete().eq("id", caseDeB!.id);
+
+  const { data: apres } = await admin
+    .from("meal_plan_entries")
+    .select("id, servings")
+    .eq("id", caseDeB!.id)
+    .maybeSingle();
+  assert.notEqual(apres, null, "la case de B n'a pas été supprimée");
+  assert.equal(apres!.servings, 3, "le nombre de personnes de B est intact");
 });
 
 test("A lit SA semaine de menu de bout en bout, jointure comprise", async () => {

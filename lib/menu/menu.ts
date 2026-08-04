@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../supabase/types";
+import { estUuid } from "../recettes/saisie.ts";
 import { joursDeLaSemaine, type JourISO } from "./semaine.ts";
 
 /**
@@ -17,15 +18,56 @@ import { joursDeLaSemaine, type JourISO } from "./semaine.ts";
  *
  * ⚠️ **C'est le seul endroit qui nomme les repas.** Une chaîne « Midi » recopiée
  * dans le JSX serait une seconde source de vérité, et les deux divergeraient.
+ *
+ * ⚠️ **`slug` est ce qui paraît dans l'URL**, et il est français : la story 3.6
+ * ouvre `/menu/2026-08-04/midi`, jamais `/menu/2026-08-04/lunch`. Le jeton anglais
+ * est un détail de schéma ; l'adresse, elle, se lit, se copie et se partage.
+ * Le poser ICI plutôt que dans une table de correspondance ailleurs est ce qui
+ * garde à cette constante son statut de seul décideur.
+ *
+ * ⚠️ **Aucun slug n'a besoin d'être encodé dans une URL**, et c'est mesuré par
+ * `menu.test.ts` plutôt que laissé à la vigilance : « petit-déj » accentué
+ * paraîtrait `petit-d%C3%A9j` dans la barre d'adresse, et un lien copié
+ * deviendrait illisible.
  */
 export const REPAS = [
-  { code: "breakfast", libelle: "Petit-déj" },
-  { code: "lunch", libelle: "Midi" },
-  { code: "snack", libelle: "Collation" },
-  { code: "dinner", libelle: "Soir" },
+  { code: "breakfast", slug: "petit-dej", libelle: "Petit-déj" },
+  { code: "lunch", slug: "midi", libelle: "Midi" },
+  { code: "snack", slug: "collation", libelle: "Collation" },
+  { code: "dinner", slug: "soir", libelle: "Soir" },
 ] as const;
 
 export type CodeRepas = (typeof REPAS)[number]["code"];
+export type Repas = (typeof REPAS)[number];
+
+/**
+ * Le repas désigné par un segment d'URL, ou `null`.
+ *
+ * ⚠️ **C'est une GARDE DE SAISIE, pas un utilitaire de confort.** Le segment
+ * arrive de l'URL, donc de n'importe où : `/menu/2026-08-04/déjeuner`,
+ * `/menu/2026-08-04/lunch`, un segment vide ou répété. Aucun ne doit lever ni
+ * désigner un repas. Même rôle qu'`estJourISO` pour la date et qu'`estUuid` pour
+ * un identifiant — éviter un aller-retour réseau et, surtout, une erreur que rien
+ * ne traduirait.
+ *
+ * ⚠️ **Le CODE de la base est refusé à dessein.** `lunch` est parfaitement valide
+ * en base, et pourtant `repasParSlug("lunch")` rend `null` : accepter les deux
+ * formes donnerait deux adresses à la même case, donc deux entrées d'historique,
+ * deux favoris, et un jour une divergence entre elles. L'URL parle français, et
+ * elle ne parle que français.
+ *
+ * ⚠️ **Une comparaison stricte, sans `trim` ni minuscules.** Toute tolérance
+ * fabriquerait une seconde adresse valide, ce que le paragraphe précédent écarte.
+ *
+ * C'est la garde que la story 3.6 prescrivait sous le nom `estCodeRepas` : la
+ * route recevant un **slug** et non un code, un prédicat sur les codes n'aurait
+ * eu aucun appelant — et un prédicat construit puis non branché est la dette que
+ * la revue du 2026-08-03 a relevée sur `estUniteConnue`.
+ */
+export function repasParSlug(slug: string | null | undefined): Repas | null {
+  if (typeof slug !== "string") return null;
+  return REPAS.find((repas) => repas.slug === slug) ?? null;
+}
 
 /** Une recette assignée à une case (jour × repas) de la grille. */
 export type CaseDeMenu = {
@@ -62,13 +104,14 @@ export function cleDeCase(jour: JourISO, repas: string): string {
  * qui protège. L'index `idx_meal_plan_household_date` porte exactement sur
  * `(household_id, meal_date)`, donc le `between` est servi.
  *
- * ⚠️ **Le tri est à TROIS critères, et le troisième n'est pas décoratif.** Rien
- * n'interdit aujourd'hui deux recettes dans la même case — la contrainte
- * `unique(household_id, meal_date, meal_type, recipe_id)` d'AD-6 appartient à la
- * story 3.6 et n'existe pas encore en base. Sans `created_at`, deux lignes ex
- * æquo sortent dans l'ordre que Postgres choisit ce jour-là, et la case « bouge
- * toute seule » d'un rechargement à l'autre. C'est la leçon déjà payée par
- * `rayonsDuFoyer` (`sort_order` ex æquo) et `recettesDuFoyer` (titres homonymes).
+ * ⚠️ **Le tri est à TROIS critères, et le troisième n'est pas décoratif.** Deux
+ * recettes DIFFÉRENTES peuvent tenir dans la même case : la contrainte
+ * `meal_plan_entries_assignation_unique` d'AD-6 (`20260804144217`, story 3.6)
+ * interdit le doublon de la même recette, pas la pluralité. Sans `created_at`,
+ * deux lignes ex æquo sortent dans l'ordre que Postgres choisit ce jour-là, et la
+ * case « bouge toute seule » d'un rechargement à l'autre. C'est la leçon déjà
+ * payée par `rayonsDuFoyer` (`sort_order` ex æquo) et `recettesDuFoyer` (titres
+ * homonymes).
  *
  * ⚠️ **`meal_type` se trie ALPHABÉTIQUEMENT en base**, ce qui ne veut rien dire
  * comme ordre de repas. Ce n'est pas lui qui ordonne l'affichage : c'est `REPAS`,
@@ -100,54 +143,146 @@ export async function casesDeLaSemaine(
   }
 
   /*
-   * ⚠️ **La garde sur `recipes` est un contrôle d'EXÉCUTION sur un champ que le
-   * type dit non-nul, et ce n'est PAS de la prudence : le cas est atteignable, et
-   * il a été mesuré.**
+   * ⚠️ **La garde sur `recipes` (dans `versCaseDeMenu`) est un contrôle
+   * d'EXÉCUTION sur un champ que le type dit non-nul, et elle reste due bien que
+   * le trou qui la motivait soit refermé.**
    *
    * Le type d'abord : supabase-js infère la ressource embarquée en
    * `{ id: string; title: string }` — ni tableau, ni nullable (mesuré le
    * 2026-08-04 par une sonde de typage). Mais **le type décrit le schéma, pas la
    * RLS.**
    *
-   * Et le schéma laisse un trou : `meal_plan_all` ne contrôle que
-   * `household_id`, jamais que `recipe_id` appartienne au même foyer, et une clé
-   * étrangère s'applique sans égard pour la RLS. Un membre peut donc poser dans
-   * SON menu une case pointant la recette d'un AUTRE foyer — **mesuré le
-   * 2026-08-04 sur le stack local : la pose est acceptée.** PostgREST rend alors
-   * `recipes: null`, la RLS filtrant bien la ressource jointe.
+   * L'ÉTAT AU 2026-08-04, APRÈS `20260804144217` : le `with check` de
+   * `meal_plan_all` exige désormais que `recipe_id` désigne une recette du foyer
+   * courant, donc **aucune surface applicative ne peut plus créer une case
+   * incohérente** — mesuré, la pose rend `42501`. Ce qui subsiste :
    *
-   * Cette ligne est donc du **code vivant**, pas une ceinture de sécurité
-   * théorique : sans elle, la case afficherait « une recette, sans nom », ce qui
+   *   · une politique RLS ne lie ni le rôle de service ni un `security definer` ;
+   *     le harnais d'isolation pose encore de telles lignes, délibérément, et
+   *     c'est ce qui permet de MESURER que la RLS filtre la ressource embarquée ;
+   *   · les lignes antérieures à la migration, s'il en existait — le `with check`
+   *     ne s'applique qu'aux écritures, jamais rétroactivement.
+   *
+   * Sans cette garde, une telle case afficherait « une recette, sans nom », ce qui
    * est pire qu'une case vide. Les deux faits sont figés par
-   * `supabase/tests/isolation.test.ts` (« LE TROU POSSIBLE »), et le trou
-   * d'intégrité lui-même est consigné dans `deferred-work.md` — il appartient à
-   * la story 3.6, qui ouvre l'écriture.
+   * `supabase/tests/isolation.test.ts` (« LE TROU REFERMÉ »).
    */
-  return (data ?? []).flatMap((ligne) =>
-    ligne.recipes
-      ? [
-          {
-            id: ligne.id,
-            jour: ligne.meal_date,
-            repas: ligne.meal_type,
-            personnes: ligne.servings,
-            recetteId: ligne.recipes.id,
-            recetteTitre: ligne.recipes.title,
-          },
-        ]
-      : []
-  );
+  return (data ?? []).flatMap(versCaseDeMenu);
+}
+
+/**
+ * Une ligne de `meal_plan_entries` telle que PostgREST la rend, vers une case.
+ *
+ * ⚠️ **Rend un TABLEAU de zéro ou une case**, pour être consommé par `flatMap` :
+ * c'est ce qui écarte les lignes dont la jointure rend `null` sans que l'appelant
+ * ait à s'en souvenir. Extrait quand la story 3.6 a ajouté un second appelant —
+ * deux copies de ce mapping auraient divergé, et la garde ci-dessous est
+ * précisément ce qu'une copie oublie.
+ */
+function versCaseDeMenu(ligne: {
+  id: string;
+  meal_date: string;
+  meal_type: string;
+  servings: number;
+  recipes: { id: string; title: string } | null;
+}): CaseDeMenu[] {
+  return ligne.recipes
+    ? [
+        {
+          id: ligne.id,
+          jour: ligne.meal_date,
+          repas: ligne.meal_type,
+          personnes: ligne.servings,
+          recetteId: ligne.recipes.id,
+          recetteTitre: ligne.recipes.title,
+        },
+      ]
+    : [];
+}
+
+/**
+ * Ce qui est prévu à UNE case précise (un jour, un repas).
+ *
+ * **Pourquoi une lecture à part plutôt qu'un filtre sur `casesDeLaSemaine`.**
+ * L'écran d'assignation n'a besoin que d'une case sur 28 ; lire la semaine
+ * entière pour en jeter 27 ferait payer à chaque ouverture de formulaire le coût
+ * de la grille. Les colonnes, l'ordre et le mapping restent partagés — c'est ce
+ * qui garantit que les deux lectures rendent la même forme.
+ *
+ * ⚠️ **Le tri par `created_at` n'est pas décoratif**, même ici où la contrainte
+ * d'unicité d'AD-6 existe désormais : elle interdit le doublon de la MÊME recette,
+ * pas la pluralité. Deux recettes différentes au même repas restent permises, et
+ * sans troisième critère leur ordre serait celui que Postgres choisit ce jour-là.
+ */
+export async function casesDuRepas(
+  supabase: SupabaseClient<Database>,
+  jour: JourISO,
+  repas: string
+): Promise<CaseDeMenu[]> {
+  const { data, error } = await supabase
+    .from("meal_plan_entries")
+    .select(COLONNES)
+    .eq("meal_date", jour)
+    .eq("meal_type", repas)
+    .order("created_at");
+
+  if (error) {
+    throw new Error(`Lecture de la case impossible : ${error.message}`);
+  }
+
+  return (data ?? []).flatMap(versCaseDeMenu);
 }
 
 /**
  * Les cases rangées par (jour, repas).
  *
- * ⚠️ **La valeur est une LISTE, pas une case.** Rien n'interdit aujourd'hui
- * plusieurs recettes au même repas du même jour (voir `casesDeLaSemaine`), et une
- * `Map<clé, CaseDeMenu>` en perdrait silencieusement — la case en montrerait une,
- * la base en aurait trois, et la génération de liste de l'Epic 4 compterait les
- * trois. « Soir : gratin + salade » est un menu normal.
+ * ⚠️ **La valeur est une LISTE, pas une case.** Plusieurs recettes DIFFÉRENTES
+ * peuvent partager un repas — la contrainte d'AD-6 n'interdit que le doublon de la
+ * même recette — et une `Map<clé, CaseDeMenu>` en perdrait silencieusement : la
+ * case en montrerait une, la base en aurait trois, et la génération de liste de
+ * l'Epic 4 compterait les trois. « Soir : gratin + salade » est un menu normal.
  */
+/**
+ * Les repas où une recette est prévue, du plus proche au plus lointain.
+ *
+ * **Pourquoi cette lecture existe.** Supprimer une recette vide ses cases de menu
+ * **en silence** — `meal_plan_entries.recipe_id` est `on delete cascade`
+ * (`initial_schema.sql:178`). La confirmation de suppression disait « Elle
+ * disparaît de ton répertoire. », ce qui était vrai tant qu'aucun écran ne
+ * permettait de mettre une recette au menu, et devient faux avec la story 3.6.
+ * Cette fonction est ce qui permet à la confirmation de dire la vérité.
+ *
+ * ⚠️ **Elle ne filtre PAS sur la date.** Un repas passé compte autant qu'un repas
+ * à venir : la ligne disparaîtra pareil, et l'annoncer à moitié serait pire que ne
+ * rien annoncer. C'est un compte de ce qu'on détruit, pas un agenda.
+ *
+ * Client **en paramètre**, garde `estUuid`, `[]` sur zéro ligne et `throw` sur
+ * `error` : le motif de tout `lib/`, et pour les mêmes raisons — une recette qui
+ * n'est à aucun menu est l'état **nominal**, pas une panne.
+ */
+export async function casesDeRecette(
+  supabase: SupabaseClient<Database>,
+  recetteId: string
+): Promise<Array<{ jour: JourISO; repas: string }>> {
+  if (!estUuid(recetteId)) return [];
+
+  const { data, error } = await supabase
+    .from("meal_plan_entries")
+    .select("meal_date, meal_type")
+    .eq("recipe_id", recetteId)
+    .order("meal_date")
+    .order("meal_type");
+
+  if (error) {
+    throw new Error(`Lecture du menu de la recette impossible : ${error.message}`);
+  }
+
+  return (data ?? []).map((ligne) => ({
+    jour: ligne.meal_date,
+    repas: ligne.meal_type,
+  }));
+}
+
 export function grouperParCase(cases: CaseDeMenu[]): Map<string, CaseDeMenu[]> {
   const par = new Map<string, CaseDeMenu[]>();
   for (const c of cases) {

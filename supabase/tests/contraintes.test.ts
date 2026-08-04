@@ -7,6 +7,7 @@ import { normaliserNomRayon } from "../../lib/rayons/saisie.ts";
 import { normaliserEntier, normaliserQuantite, normaliserTitre } from "../../lib/recettes/saisie.ts";
 import { UNITES, estUniteConnue } from "../../lib/recettes/unites.ts";
 import { ingredientsDeRecette } from "../../lib/recettes/ingredients.ts";
+import { analyserPersonnes } from "../../lib/personnes.ts";
 
 /**
  * Les contraintes de la base, confrontées à la normalisation applicative.
@@ -501,5 +502,111 @@ test("la base refuse une quantité négative, que le client l'ait vue ou non", a
       .insert({ recipe_id: recette, name: "négatif", quantity: q });
     assert.notEqual(error, null, `quantity=${q} doit être refusée`);
     assert.match(error!.message, /recipe_ingredients_quantite_positive/);
+  }
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Le nombre de personnes : `lib/personnes.ts` face aux deux contraintes posées
+ * par `20260804144217_contraindre_les_assignations_de_menu.sql`.
+ *
+ * ⚠️ **Deux colonnes, deux tables, une seule règle d'écran.** `analyserPersonnes`
+ * sert l'assignation d'un repas (`meal_plan_entries.servings`) ET le réglage du
+ * foyer (`households.default_servings`). Si l'une des deux contraintes divergeait
+ * de l'autre, l'écran serait juste sur une surface et faux sur l'autre — et rien
+ * ne le dirait, les deux formulaires partageant leur message.
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+test("le nombre de personnes d'un REPAS : le client n'est jamais plus laxiste que la base", async () => {
+  const recette = await recetteDeService();
+  const saisies = ["", "0", "-1", "1", "2", "4", "2e3", "2,5", "abc", "2147483648"];
+  const laxistes: string[] = [];
+
+  for (const [rang, saisie] of saisies.entries()) {
+    const analyse = analyserPersonnes(saisie);
+    if ("faute" in analyse) continue; // le client refuse : la base peut être plus permissive
+
+    const { data, error } = await admin
+      .from("meal_plan_entries")
+      .insert({
+        household_id: foyerId,
+        recipe_id: recette,
+        // Une date par saisie : la contrainte d'unicité d'AD-6 refuserait
+        // autrement la deuxième insertion de la même recette au même repas, et
+        // le test se lirait « la base refuse » pour une tout autre raison.
+        meal_date: `2026-11-${String(rang + 1).padStart(2, "0")}`,
+        meal_type: "dinner",
+        servings: analyse.valeur,
+      })
+      .select("id");
+    if (error) {
+      laxistes.push(saisie);
+      continue;
+    }
+    await admin.from("meal_plan_entries").delete().eq("id", data![0].id);
+  }
+
+  assert.deepEqual(
+    laxistes,
+    [],
+    "le client laisse passer un nombre de personnes que la base refuse"
+  );
+});
+
+test("la base refuse 0 et le négatif au menu, que le client les ait vus ou non", async () => {
+  /*
+   * Le contrôle d'écran est contournable par un appel REST direct ; c'est la
+   * contrainte qui tient (AD-1/AD-2). Et l'enjeu n'est pas cosmétique :
+   * `generate_grocery_list_from_menu` met `mpe.servings` au NUMÉRATEUR, donc un
+   * négatif verserait des quantités négatives dans la liste de courses, qui
+   * s'additionneraient aux autres par l'UPSERT-incrémente d'AD-6.
+   */
+  const recette = await recetteDeService();
+  for (const servings of [0, -1, -12]) {
+    const { error } = await admin.from("meal_plan_entries").insert({
+      household_id: foyerId,
+      recipe_id: recette,
+      meal_date: "2026-11-20",
+      meal_type: "lunch",
+      servings,
+    });
+    assert.notEqual(error, null, `servings=${servings} doit être refusé`);
+    assert.match(error!.message, /meal_plan_entries_servings_positif/);
+  }
+});
+
+test("le nombre de personnes du FOYER : le client n'est jamais plus laxiste que la base", async () => {
+  const saisies = ["", "0", "-1", "1", "2", "6", "2e3", "2,5", "abc", "2147483648"];
+  const laxistes: string[] = [];
+
+  for (const saisie of saisies) {
+    const analyse = analyserPersonnes(saisie);
+    if ("faute" in analyse) continue;
+
+    const { error } = await admin
+      .from("households")
+      .update({ default_servings: analyse.valeur })
+      .eq("id", foyerId)
+      .select("id");
+    if (error) laxistes.push(saisie);
+  }
+
+  // Remettre le foyer de contrôle dans l'état où le reste du fichier l'attend.
+  await admin.from("households").update({ default_servings: 2 }).eq("id", foyerId);
+
+  assert.deepEqual(
+    laxistes,
+    [],
+    "le client laisse passer un réglage de foyer que la base refuse"
+  );
+});
+
+test("la base refuse un réglage de foyer à 0 ou négatif", async () => {
+  for (const personnes of [0, -1]) {
+    const { error } = await admin
+      .from("households")
+      .update({ default_servings: personnes })
+      .eq("id", foyerId);
+    assert.notEqual(error, null, `default_servings=${personnes} doit être refusé`);
+    assert.match(error!.message, /households_default_servings_positif/);
   }
 });

@@ -24,66 +24,106 @@ export const metadata = { title: "Mon menu · NutriClaude" };
 /**
  * Une case de la grille : un jour, un repas, et ce qui y est prévu.
  *
- * ⚠️ **`entrees` est une LISTE, et ce n'est pas de la prudence.** Rien n'interdit
- * aujourd'hui deux recettes au même repas du même jour — la contrainte d'unicité
- * d'AD-6 appartient à la story 3.6 et n'existe pas encore en base. « Soir :
- * gratin + salade » est un menu normal, et n'en afficher qu'une le rendrait faux
- * en silence, alors que la génération de liste de l'Epic 4 comptera les deux.
+ * ⚠️ **`entrees` est une LISTE, et la contrainte d'AD-6 ne change PAS ça.**
+ * `meal_plan_entries_assignation_unique` (`20260804144217`) interdit la même
+ * recette deux fois au même repas ; elle laisse « Soir : gratin + salade », qui
+ * est un menu normal. N'en afficher qu'une le rendrait faux en silence, alors que
+ * la génération de liste de l'Epic 4 comptera les deux.
  *
- * ⚠️ **Aucun `nombre de personnes` ici.** `servings` est lu et disponible, mais
- * l'afficher appartient à la story 3.6, qui le rend modifiable en même temps.
+ * ⚠️ **DEUX AFFORDANCES PAR CASE, ET ELLES NE S'IMBRIQUENT PAS.** Le titre mène à
+ * la recette, le pied de case mène à l'assignation. Poser un `<Link>` sur toute la
+ * case avalerait le clic du titre, et un `<Link>` dans un `<button>` serait un DOM
+ * invalide. Les deux portent `min-h-touch` — une cible née sous 44px serait un
+ * défaut d'accessibilité introduit par cette story (UX-DR11).
  */
 function Case({
+  jour,
+  repas,
   libelle,
   entrees,
 }: {
+  jour: JourISO;
+  repas: (typeof REPAS)[number];
   libelle: string;
   entrees: CaseDeMenu[];
 }) {
   /*
-   * `min-h-touch` sur une case qui ne se presse PAS encore : c'est délibéré. La
-   * story 3.6 posera l'affordance ici même, et une cible qui naîtrait alors sous
-   * les 44px serait un défaut d'accessibilité introduit par la story suivante
-   * (UX-DR11). Dimensionner maintenant coûte une classe et évite qu'il y ait quoi
-   * que ce soit à jeter.
+   * La destination que la story 3.5 avait dessinée sans pouvoir la donner. Son
+   * `min-h-touch` avait été posé d'avance pour ce moment : rien n'a été jeté.
+   *
+   * ⚠️ **L'URL parle français** — `/menu/2026-08-04/midi`, jamais `lunch`. Le
+   * jeton anglais est un détail de schéma ; une adresse se lit et se partage.
    */
+  const destination = `/menu/${jour}/${repas.slug}`;
+
   return (
     <div className="min-h-touch rounded-md border border-card-border bg-surface-card p-card">
       <p className="text-eyebrow text-muted uppercase">{libelle}</p>
 
       {entrees.length === 0 ? (
         /*
-          ⚠️ **La case vide se LIT, et elle ne prétend pas agir.** L'AC4 demande
-          deux choses ; « lisibles » est ici, « directement actionnables » est la
-          story 3.6 — assigner une recette, c'est elle en entier. Décision de
-          Florian du 2026-08-04, option (a).
+          ⚠️ **LA MOITIÉ D'AC4 QUE LA STORY 3.5 AVAIT LAISSÉE OUVERTE SE FERME
+          ICI.** Ses cases vides étaient « lisibles » mais pas « directement
+          actionnables », faute de destination — décision datée de Florian du
+          2026-08-04, option (a), consignée dans `deferred-work.md` pour être
+          ROUVERTE et non supposée close (règle §5).
 
-          C'est aussi pourquoi il n'y a NI `<button disabled>`, NI `tabIndex={0}`,
-          NI `title="Bientôt"` : chacun re-cocherait le critère sans livrer
-          l'action, et chacun EST la « zone ambiguë » que la seconde moitié du
-          même AC interdit. Le produit s'interdit déjà les affordances qui ne
-          peuvent pas fonctionner — c'est la règle du « jamais Réessaie sur une
-          condition non transitoire ».
+          L'objection qui avait fait écarter l'affordance à l'époque — « elle
+          mènerait à un 404 en attendant » — tombe : c'est cette story qui
+          construit la destination. Ce n'est donc plus la « zone ambiguë » que la
+          seconde moitié du même critère interdit ; c'est un lien qui mène
+          quelque part.
         */
-        <p className="hint mt-1">Rien de prévu</p>
+        <Link
+          href={destination}
+          className="hint mt-1 flex min-h-touch items-center underline underline-offset-4"
+        >
+          Mettre une recette
+        </Link>
       ) : (
-        <ul className="mt-1">
-          {entrees.map((entree) => (
-            <li key={entree.id}>
-              {/*
-                La destination existe depuis la story 3.3 et n'est pas à
-                inventer. C'est la seule affordance RÉELLE de cet écran : elle
-                mène quelque part, donc elle a le droit d'exister.
-              */}
-              <Link
-                href={`/recettes/${entree.recetteId}`}
-                className="flex min-h-touch items-center text-base break-words underline underline-offset-4"
-              >
-                {entree.recetteTitre}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="mt-1">
+            {entrees.map((entree) => (
+              <li key={entree.id}>
+                {/*
+                  La destination existe depuis la story 3.3 et n'est pas à
+                  inventer.
+                */}
+                <Link
+                  href={`/recettes/${entree.recetteId}`}
+                  className="flex min-h-touch items-center text-base break-words underline underline-offset-4"
+                >
+                  {entree.recetteTitre}
+                </Link>
+                {/*
+                  ⚠️ **AC4 : « chaque case montre la recette assignée ET SON
+                  NOMBRE DE PERSONNES ».** `servings` était lu depuis la story
+                  3.5 et n'était affiché nulle part.
+
+                  ⚠️ **« pers. » et non « portions ».** Trois nombres de personnes
+                  coexistent désormais dans le produit, et deux s'appellent
+                  `servings` en base : ce pour quoi la RECETTE est écrite
+                  (`recipes.servings`, le dénominateur de la mise à l'échelle), ce
+                  qu'on PRÉVOIT ici (le numérateur), et ce que le foyer règle par
+                  défaut. C'est leur rapport que l'Epic 4 calcule — leur donner le
+                  même mot rendrait le produit incompréhensible au premier
+                  ajustement.
+
+                  `tabular-nums` (UX-DR12) : sans lui la grille tremble d'une
+                  colonne à l'autre.
+                */}
+                <p className="hint tabular-nums">{entree.personnes} pers.</p>
+              </li>
+            ))}
+          </ul>
+
+          <Link
+            href={destination}
+            className="hint mt-2 flex min-h-touch items-center underline underline-offset-4"
+          >
+            Modifier
+          </Link>
+        </>
       )}
     </div>
   );
@@ -96,9 +136,16 @@ function Case({
  * dans un état React — et ça règle trois choses gratuitement : le rechargement
  * garde la semaine, le bouton Retour du navigateur fait la navigation entre
  * semaines sans qu'on l'écrive, et l'écran reste un rendu serveur pur (AD-13 :
- * pas de client sans cause). Cet écran n'écrit rien : ni `useSoumission`, ni
- * `Notice`, ni région de statut. S'il en apparaît un, c'est qu'on a glissé dans
- * la story 3.6.
+ * pas de client sans cause).
+ *
+ * ⚠️ **CET ÉCRAN N'ÉCRIT TOUJOURS RIEN, ET C'EST UN CHOIX DE LA STORY 3.6, PAS UN
+ * RESTE DE LA 3.5.** L'assignation vit sur `/menu/[jour]/[repas]` : un `<select>`
+ * de recettes prend l'intrinsèque de sa plus longue option — jusqu'à 80
+ * caractères — et le poser dans une piste à 1/7 de largeur ferait déborder la page
+ * en largeur, ce que l'AC2 de la story 3.5 interdit. Le sortir de la grille
+ * supprime le risque à la source au lieu de le contenir par des classes.
+ * **Si un `useSoumission`, un `Notice` ou une région de statut apparaît ici, c'est
+ * que le formulaire a glissé dans la grille.**
  *
  * ⚠️ **UN SEUL DOM, à toutes les largeurs (AC2/NFR-3/UX-DR10).** La maquette
  * `mockups/grille-menu.html` rend deux structures et en masque une par media
@@ -223,6 +270,8 @@ export default async function MenuPage({
                 {REPAS.map((repas) => (
                   <Case
                     key={repas.code}
+                    jour={jour}
+                    repas={repas}
                     libelle={repas.libelle}
                     entrees={parCase.get(cleDeCase(jour, repas.code)) ?? []}
                   />

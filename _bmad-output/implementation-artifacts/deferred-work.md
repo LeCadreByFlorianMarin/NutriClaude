@@ -655,3 +655,81 @@ L'AC4 demande que les cases vides soient « lisibles **et directement actionnabl
 - **Le squelette de `/menu` n'a pas été regardé au réseau bridé.** Il est écrit sur le motif déjà posé deux fois dans le dépôt et le build charge bien son module, mais la story 3.3 a appris qu'un squelette se juge à l'œil et pas au raisonnement. *Reporté avec le parcours à l'écran, qui n'a pas eu lieu — voir les cases décochées de la Task 5.*
 - **`servings` est lu et n'est pas affiché.** `casesDeLaSemaine` le rend (`personnes`), l'écran l'ignore : le nombre de personnes appartient à la story 3.6, qui le rend modifiable en même temps qu'elle l'affiche. *Reporté volontairement — c'est une frontière de story, pas un oubli.*
 - **La colonne `notes` de `meal_plan_entries` n'est lue par personne.** Elle existe depuis le squelette, aucune story ne la réclame. *À réveiller si un besoin apparaît ; sinon elle est candidate à la suppression au titre de NFR-10.*
+
+---
+
+## Deferred from: story 3-6-assigner-recettes-et-nombre-de-personnes-aux-cases-du-menu (2026-08-04)
+
+### Ce que cette story REFERME — trois entrées, citées et non effacées
+
+**1. La moitié d'AC4 de la story 3.5 — FERMÉE.** L'entrée disait : « la case est dimensionnée,
+nommée, et n'a besoin que de sa destination. Rien n'est à jeter. » C'est exactement ce qui s'est
+passé : la case vide est devenue un `<Link>` vers `/menu/[jour]/[repas]`, et le `min-h-touch`
+posé d'avance a servi tel quel. **Vérifié à l'écran le 2026-08-04**, et la cible mesure bien
+44 px dans le DOM. L'objection qui avait fait écarter cette forme à l'époque — « elle mènerait à
+un 404 en attendant » — est levée par la construction de la destination.
+
+**2. Le trou de provenance de `recipe_id` — FERMÉ**, par le volet 2 de
+`20260804144217_contraindre_les_assignations_de_menu.sql` : le `with check` de `meal_plan_all`
+exige désormais que la recette appartienne au foyer courant. **Mesuré** : la pose rend `42501`,
+et le test `isolation.test.ts` qui assurait le contraire a été inversé dans le même commit.
+
+⚠️ **Ce qui RESTE ouvert, et c'est la limite assumée de la forme retenue** : une politique RLS ne
+lie ni le rôle de service ni une fonction `security definer`. C'est une frontière de RLS, pas une
+contrainte. AD-2 interdisant `SUPABASE_SERVICE_KEY` côté application, le seul porteur est le
+harnais d'isolation — délibérément, et c'est ce qui permet encore de mesurer que la RLS filtre la
+ressource embarquée. **Si une surface future traversait la RLS, cette prémisse se rouvrirait**
+(règle §5). La clé étrangère composite, qui n'aurait pas cette limite, a été écartée le
+2026-08-04 : deux clés étrangères vers `recipes` rendraient l'embarquement PostgREST ambigu
+(`PGRST201`) et casseraient `casesDeLaSemaine`, donc la grille livrée. *Ce dernier point est
+**déduit** de la documentation PostgREST, non mesuré.*
+
+**3. `servings` lu et non affiché — FERMÉ** par l'AC4 : chaque case montre « N pers. ».
+
+**4. Le squelette de `/menu` au réseau bridé — TOUJOURS OUVERT pour la GRILLE.** Celui de la
+route `/menu/[jour]/[repas]`, lui, **a été observé** le 2026-08-04 par une sonde de latence
+temporaire (4 s côté serveur, retirée aussitôt) : 9 blocs, `aria-hidden="true"`, et **aucune
+grille 7 colonnes** — c'est bien son squelette et pas celui du segment parent. Le squelette de la
+grille elle-même n'a pas été rejoué.
+
+---
+
+### Ce que cette story LAISSE
+
+- **Les formulaires du produit partent en GET natif avant hydratation.** Observé le 2026-08-04
+  sur `/menu/[jour]/[repas]` : une soumission déclenchée avant que React ait hydraté recharge la
+  page avec les champs en query string, au lieu d'appeler le gestionnaire. **Ce n'est pas propre
+  à cette story** — c'est la fenêtre pré-hydratation, commune à tous les formulaires client du
+  produit (`ListeRecettes`, `DisplayNameForm`, `ListeRayons`…), et `project-context.md` la
+  mentionne déjà comme symptôme du piège `127.0.0.1`. *Reporté : la traiter demande une décision
+  de conception (Server Action de repli, ou bouton désactivé jusqu'à hydratation) qui porte sur
+  tous les écrans, pas sur celui-ci.*
+
+- **`min` et `required` produisent un message de navigateur EN ANGLAIS** partout où un formulaire
+  ne porte pas `noValidate`. Mesuré le 2026-08-04 : « Value must be greater than or equal to 1. »
+  — hors ton, hors région `aria-live`, et il empêche le gestionnaire d'être appelé, donc rend le
+  message français **inatteignable**. Corrigé sur les trois formulaires de cette story
+  (`noValidate` + validation applicative). ⚠️ **Le même trou existe ailleurs et n'a pas été
+  touché** : `ListeRecettes.tsx` (`required` sur le titre), `IngredientsRecette.tsx` (`required`
+  sur le nom), `FormulaireRecette.tsx`. *Reporté volontairement — déborder sur trois écrans
+  d'autres stories rendrait la revue de celle-ci plus difficile, et c'est la règle que le dépôt
+  applique depuis la 3.2.*
+
+- **Le champ « Combien » d'`IngredientsRecette` n'a toujours pas `disabled={occupe}`**
+  (`:775-783`), alors que le commentaire du composant (`:741-748`) affirme que tous les champs le
+  portent. Mesuré le 2026-08-04 en relisant le motif avant de le reprendre. *Autre écran, autre
+  story — signalé, pas corrigé.*
+
+- **Le filtre et la recherche du sélecteur de recettes appartiennent à la story 3.4**, sautée et
+  toujours due. Le `<select>` liste tout le répertoire, rangé par titre. Sans portée à l'échelle
+  d'un foyer aujourd'hui ; ça deviendra inconfortable bien avant que ce soit un défaut.
+
+- **La colonne `notes` de `meal_plan_entries` n'est toujours lue par personne.** Inchangé.
+
+- **Le réglage du foyer est lu à l'ouverture d'un formulaire, et n'est pas propagé.** Si l'autre
+  membre le change pendant qu'un formulaire est ouvert, la valeur proposée reste l'ancienne. Sans
+  portée (elle est *proposée*, pas décisive), et la propagation temps réel est l'Epic 4 (AD-8).
+
+- **Le compte de repas de la confirmation de suppression peut être périmé** — il est celui du
+  rendu, et l'autre membre peut mettre la recette au menu entre l'affichage et le clic. C'est une
+  information, pas une garde : la suppression reste la même. Le dire vaut mieux que se taire.
