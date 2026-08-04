@@ -24,8 +24,18 @@ export const metadata = { title: "Modifier une recette · NutriClaude" };
  * possède. Sous RLS, la base ne fait elle-même aucune différence : elle rend
  * zéro ligne, sans erreur. Voir `recetteParId`.
  *
- * La story 3.3 ajoutera `/recettes/[id]` en LECTURE ; cet écran-ci restera
- * l'édition.
+ * `/recettes/[id]` est l'écran de **lecture** depuis la story 3.3 ; celui-ci est
+ * l'édition, et on y arrive par le bouton « Modifier » de la recette.
+ *
+ * ⚠️ **Le lien de retour pointe vers le RÉPERTOIRE** et pas vers la recette
+ * (décision de Florian du 2026-08-02). Son libellé exact vit dans
+ * `FormulaireRecette.tsx`, qui fait foi — le citer ici en ferait une copie qui
+ * devient fausse au premier changement, sans que rien ne le signale.
+ * Le répertoire est une destination juste et
+ * toujours atteignable, là où « la recette » serait faux dès qu'on ouvre cette URL
+ * directement — favori, lien partagé. Pour qui arrive depuis la lecture, le bouton
+ * Retour du navigateur ramène à la recette : ce chemin est déjà couvert par le
+ * contrat du navigateur, il n'a pas besoin d'un lien qui ment dans l'autre cas.
  */
 export default async function ModifierRecettePage({
   params,

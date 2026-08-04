@@ -117,13 +117,16 @@ export function ListeRecettes({
                 className="border-b border-card-border last:border-0"
               >
                 {/*
-                  ⚠️ La cible mène à l'ÉDITION, et ce ne sera pas toujours vrai :
-                  la story 3.3 introduira `/recettes/[id]` en lecture, et c'est
-                  elle qui deviendra la destination naturelle d'un titre. Écrit
-                  ici pour que le changement soit prévu plutôt que subi.
+                  La cible mène à la LECTURE depuis la story 3.3 — c'est la
+                  destination naturelle d'un titre. L'édition s'atteint depuis
+                  la recette, par son bouton « Modifier ».
+
+                  (Elle a mené à l'édition jusqu'au 2026-08-02, faute d'écran de
+                  lecture ; le commentaire qui l'annonçait vivait ici et a été
+                  réécrit avec le changement, pas après.)
                 */}
                 <Link
-                  href={`/recettes/${recette.id}/modifier`}
+                  href={`/recettes/${recette.id}`}
                   className="flex min-h-touch items-center gap-3 py-2 text-base"
                 >
                   <span className="min-w-0 flex-1 break-all">
