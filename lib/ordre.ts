@@ -1,14 +1,12 @@
 /**
  * Le pur du réordonnancement : produire une permutation, jamais l'écrire.
  *
- * **Générique par construction, et il l'était déjà.** Ce module ne travaille que
- * sur `ReadonlyArray<{ id: string }>` : il ne connaît ni les rayons, ni les
- * ingrédients, ni ce qui viendra après. Écrit pour le parcours magasin (story
- * 2.2), **extrait de `lib/rayons/` à son deuxième appelant** (story 3.2, les
- * ingrédients d'une recette) — exactement comme `lib/texte.ts` l'avait été de
- * `lib/foyer/saisie.ts` quand les rayons sont devenus le troisième champ libre.
- * Le recopier aurait produit deux géométries du glisser qui auraient divergé,
- * ce que l'extraction de `useSoumission` a déjà eu à réparer.
+ * **Générique par construction.** Ce module ne travaille que sur
+ * `ReadonlyArray<{ id: string }>` : il ne connaît ni les rayons, ni les
+ * ingrédients, ni ce qui viendra après. **Il vit sous `lib/` et non sous
+ * `lib/<domaine>/` pour cette raison seule** — le recopier dans un second domaine
+ * produirait deux géométries du glisser qui divergeraient, ce que l'extraction de
+ * `useSoumission` a déjà eu à réparer.
  *
  * **Un seul primitif, deux appelants.** Les flèches monter/descendre et le
  * glisser produisent le même objet — la liste complète des identifiants dans
@@ -16,9 +14,14 @@
  * diverger. `ordreApresDeplacement` délègue donc à `ordreDeplace`.
  *
  * ⚠️ **Ces fonctions rendent l'ordre COMPLET, jamais un couple à échanger.**
- * Les fonctions Postgres qui les consomment — `reorder_aisles`,
- * `reorder_recipe_ingredients` — renumérotent **tout** l'ensemble et refusent
- * tout tableau qui ne le couvre pas exactement (leur garde de cardinal). Et
+ * Les fonctions Postgres qui les consomment renumérotent tout l'ensemble qu'elles
+ * gouvernent et refusent un tableau qui ne le couvre pas — mais **cet ensemble
+ * n'est pas le même des deux côtés, et ce module ne peut pas le savoir** :
+ * `reorder_aisles` compte les rayons du FOYER, `reorder_recipe_ingredients` les
+ * ingrédients d'UNE recette. La première rédaction de ce commentaire disait « tout
+ * l'ensemble » sans distinguer les deux, ce qui était déjà imprécis à l'écriture —
+ * relevé par la revue adversariale du 2026-08-03. **La vérité opposable est dans
+ * les migrations et dans les tests d'isolation qui les mesurent, pas ici.** Et
  * l'échange de deux valeurs serait cassé de toute façon : `sort_order` n'a
  * aucune contrainte d'unicité, et échanger deux valeurs égales est un no-op
  * silencieux — le cas est même la NORME sur les ingrédients, dont le

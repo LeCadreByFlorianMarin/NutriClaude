@@ -74,6 +74,7 @@ export type RefusIngredient =
   | "nom-vide"
   | "unite-inconnue"
   | "quantite-negative"
+  | "liste-changee"
   | "echec";
 
 const PAR_CONTRAINTE_INGREDIENT: ReadonlyArray<[string, RefusIngredient]> = [
@@ -82,8 +83,36 @@ const PAR_CONTRAINTE_INGREDIENT: ReadonlyArray<[string, RefusIngredient]> = [
   ["recipe_ingredients_quantite_positive", "quantite-negative"],
 ];
 
+/**
+ * Les SQLSTATE qui disent « la recette a disparu sous tes pieds », et qui ne
+ * peuvent donc PAS se traiter par « Réessaie ».
+ *
+ * ⚠️ **Le défaut que ça répare, et il était en production.** Si l'autre membre
+ * supprime la recette pendant que je remplis le formulaire d'ajout, l'`insert`
+ * rend `23503` — la clé étrangère `recipe_ingredients_recipe_id_fkey` n'a plus de
+ * cible — ou `42501` si c'est le `with check` de `recipe_ingredients_all` qui
+ * parle. Aucun des deux n'est un nom de contrainte `check`, donc les deux
+ * tombaient sur « echec », c'est-à-dire **« Ça n'a pas marché. Réessaie dans un
+ * instant. »** — un conseil qui ne peut JAMAIS fonctionner, la famille que
+ * `project-context.md` interdit nommément. Le chemin `update` était traité (par
+ * son `!data`), pas celui de l'ajout. Revue adversariale du 2026-08-03 ; le
+ * `23503` a été mesuré sur le stack local.
+ *
+ * ⚠️ **Ici c'est le SQLSTATE qui discrimine, pas le nom de contrainte**, et c'est
+ * volontaire : ces deux codes portent une CATÉGORIE de situation, pas une règle
+ * métier nommée. S'appuyer sur le nom de la clé étrangère lierait le message au
+ * schéma pour rien. Les deux familles s'excluent — un `23503` ne peut pas porter
+ * un nom de contrainte `check` — donc l'ordre n'a pas de conséquence pratique ; un
+ * test l'épingle pour que le déplacer devienne un choix visible.
+ */
+const SQLSTATE_LISTE_CHANGEE = new Set(["23503", "42501"]);
+
 export function refusIngredient(erreur: ErreurBase | null): RefusIngredient {
   if (!erreur) return "echec";
+
+  if (erreur.code && SQLSTATE_LISTE_CHANGEE.has(erreur.code)) {
+    return "liste-changee";
+  }
 
   const message = erreur.message ?? "";
   for (const [contrainte, refus] of PAR_CONTRAINTE_INGREDIENT) {

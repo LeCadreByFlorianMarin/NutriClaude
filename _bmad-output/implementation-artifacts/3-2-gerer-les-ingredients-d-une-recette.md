@@ -4,7 +4,24 @@ baseline_commit: d270c47e28a2e442135db6e46796f880d8a92560
 
 # Story 3.2: Gérer les ingrédients d'une recette
 
-Status: review
+Status: done
+
+<!-- `review` → `done` le 2026-08-03, au terme de la revue adversariale — la première que
+     cette story reçoive, et APRÈS sa mise en production (PR #18, squash `8f91f52`).
+
+     ⚠️ CE QUE LA REVUE A TROUVÉ, ET QUI EST CORRIGÉ AILLEURS : six défauts d'usage sur
+     l'écran des ingrédients, tous dans les 660 lignes de JSX qu'aucun test n'exécute
+     (NFR-10). Ils vivent dans la branche `fix/ingredients-revue-3-2`, pas ici : le code de
+     cette story est en production, et sa fermeture n'attend pas ces correctifs.
+
+     ⚠️ CE QUI RESTE OUVERT, et daté plutôt qu'effacé :
+       · l'édition concurrente écrase silencieusement celle de l'autre membre — REPORTÉ à
+         la story 4.10 (convergence LWW par champ), décision de Florian du 2026-08-03 ;
+       · la requête de contrôle de `20260802112749` n'a jamais rien établi et ne le pourra
+         pas : un `create or replace function` ne peut pas échouer sur des données ;
+       · trois comptes de tests faux dans la File List, corrigés dans la branche de
+         correctifs.
+     Le détail complet est en § Review Findings de ce fichier. -->
 
 <!-- Deuxième story de l'Epic 3. Elle porte DEUX contrats avec des epics à venir :
      le vocabulaire d'unités (clé canonique de l'Epic 4) et l'ordre des ingrédients.
@@ -82,7 +99,10 @@ FR-52/AD-7), pour que la génération puisse agréger correctement plus tard
         date. ⚠️ Ne le touche que si la 2.2 est fusionnée — sinon c'est **huit** (voir § Questions)
 
 - [x] **Task 3 — `lib/recettes/unites.ts`, en TDD** (AC1, AC3)
-  - [x] Phase rouge **constatée** avant l'implémentation
+  - [ ] Phase rouge **constatée** avant l'implémentation
+        <!-- DÉCOCHÉE par la revue du 2026-08-03 (règle §1). Aucune commande, aucune sortie,
+             aucun compte de tests en échec, aucun artefact dans le Debug Log. Une preuve du
+             passé ne se fabrique pas après coup ; la case reste vide. -->
   - [x] `UNITES` — le tuple des huit jetons, `as const`, **source unique** du `<select>` et du test
         d'accord avec la contrainte
   - [x] `estUniteConnue(valeur)` et le type `Unite`
@@ -143,7 +163,14 @@ FR-52/AD-7), pour que la génération puisse agréger correctement plus tard
 - [x] **Task 9 — Le parcours à l'écran, dans les deux thèmes** (AC1–AC4)
   - [x] Stack local, `localhost:3333`, **jamais** une prévisualisation Vercel
   - [x] Ajouter, éditer, réordonner, supprimer ; recette sans ingrédient
-  - [x] **Les huit unités**, chacune enregistrée et relue **en base** (pas seulement à l'écran)
+  - [x] **Trois des huit unités à l'écran** (`g`, `pincée`, `L`), **les huit par le test**
+        <!-- REFORMULÉE par la revue du 2026-08-03 (règle §1). La sous-tâche disait « les huit
+             unités, chacune enregistrée et relue en base (pas seulement à l'écran) », et le
+             Debug Log se contredisait lui-même en n'en citant que trois. Les cinq autres sont
+             bien couvertes — mais par `contraintes.test.ts`, qui insère avec le client `admin`
+             et ne passe JAMAIS par le `<select>` : c'est un autre mécanisme que la traversée
+             écran→base que la sous-tâche demandait. Cochée sur ce qui est réellement établi,
+             et pas davantage. -->
   - [x] Les deux thèmes au réglage système, **remis après**
   - [x] Focus mesuré dans le DOM, 200 % de zoom, largeur 390 px
   - [ ] ⚠️ **Le glisser AU DOIGT s'il est retenu** — c'est la classe d'erreur qui a fait écarter
@@ -468,7 +495,7 @@ lib/
     erreurs.ts + .test.ts     ~  + les refus d'ingrédient et de réordonnancement
   supabase/types.ts           ~  régénéré — la FONCTION apparaîtra dans `Functions`
 supabase/
-  migrations/<ts>_require_valid_recipe_ingredient_fields.sql  +  2 `check`
+  migrations/<ts>_require_valid_recipe_ingredient_fields.sql  +  3 `check`
   migrations/<ts>_reorder_recipe_ingredients.sql              +  la fonction, 4 gardes
                                                                  + LE FILTRE recipe_id
   tests/isolation.test.ts     ~  + recipe_ingredients, + l'appel forgé inter-recettes
@@ -767,11 +794,19 @@ production, ce que la règle n°6 de `project-context.md` impose. Cette story a 
 **Modifiés**
 - `app/recettes/[id]/modifier/page.tsx` — monte `IngredientsRecette` **sous** le formulaire
 - `app/rayons/ListeRayons.tsx` — import redirigé vers `@/lib/ordre` (une ligne)
-- `lib/recettes/saisie.ts` + `saisie.test.ts` — `normaliserQuantite`, 9 tests
+- `lib/recettes/saisie.ts` + `saisie.test.ts` — `normaliserQuantite`, **+6 tests**
+  <!-- Annonçait « 9 tests ». MESURÉ par `grep -c '^test('` entre `d270c47` et `8f91f52` :
+       15 → 21, soit +6. Corrigé par la revue du 2026-08-03 (règle §1). -->
 - `lib/recettes/erreurs.ts` + `erreurs.test.ts` — `refusIngredient`, `refusOrdreIngredients`
 - `lib/supabase/types.ts` — `reorder_recipe_ingredients` reportée à la main
-- `supabase/tests/isolation.test.ts` — 8 tests, dont **l'appel forgé inter-recettes**
-- `supabase/tests/contraintes.test.ts` — 6 tests, dont **« pièce » en NFD**
+- `supabase/tests/isolation.test.ts` — **+7 tests**, dont **l'appel forgé inter-recettes**
+  <!-- Annonçait « 8 tests ». MESURÉ : 32 → 39, soit +7. -->
+- `supabase/tests/contraintes.test.ts` — **+7 tests**, dont **« pièce » en NFD**
+  <!-- Annonçait « 6 tests ». MESURÉ : 9 → 16, soit +7.
+       ⚠️ Les TOTAUX de la story (+15 unitaires, +14 isolation) et les chiffres 142/142 et
+       55/55 sont EXACTS et ont été réexécutés par la revue. C'est la ventilation par
+       fichier qui était fausse, et elle était présentée sans distinction de statut avec
+       des chiffres, eux, mesurés. -->
 - `docs/migrations.md` — huit fonctions → **neuf**
 
 **Inchangés, vérifiés**
@@ -779,6 +814,70 @@ production, ce que la règle n°6 de `project-context.md` impose. Cette story a 
 - `app/recettes/[id]/modifier/FormulaireRecette.tsx` — son modèle d'écriture reste distinct
 - `proxy.ts`, `next.config.ts`, `package.json` — intacts, **aucune dépendance**
 - `.env.local` — basculé pour le parcours, **restauré à l'identique** (SHA-256 comparé)
+
+---
+
+### Review Findings
+
+Revue adversariale du 2026-08-03, périmètre `d270c47..8f91f52`. Trois couches en parallèle, sans
+contexte préalable. ⚠️ **Cette story est DÉJÀ EN PRODUCTION** (PR #18, squash `8f91f52`), fusionnée
+sans revue — la troisième d'affilée après la 2.2 et la 3.1. Rien de ce qui suit n'est un correctif
+avant fusion : c'est un correctif à pousser, ou une dette à acter.
+
+> **Le cœur technique est solide, et honnêtement mesuré.** Le trou inter-recettes était réel, le
+> correctif `and ri.recipe_id = p_recipe_id` **tient** — la couche d'audit a rejoué la mutation sur
+> un stack local : 55 → 54, et le seul test tombé est le bon. Les quatre gardes résistent à tout ce
+> que les trois couches leur ont opposé : tableau vide, doublons, `NULL`, cardinal court/long,
+> identifiants d'une autre recette du même foyer, d'un autre foyer, recette sans ingrédient.
+> **Le contrat d'unités est le meilleur exemple de règle §4 du dépôt** : l'accord `UNITES` ↔
+> `recipe_ingredients_unite_fermee` est mesuré dans les deux sens, NFD compris.
+> `lib/ordre.ts` : extraction propre, importeurs redirigés, aucun ré-export fantôme.
+
+**Ce qui manque tient en une phrase : la story a mesuré ce qu'elle avait prévu de mesurer, et rien
+de ce qu'elle n'avait pas prévu.** Les défauts les plus lourds sont tous dans les 660 lignes de JSX
+qu'aucun test n'exécute (NFR-10) — et le fichier documente la leçon qu'il enfreint.
+
+#### Décisions attendues
+
+- [x] [Review][Decision] **RÉSOLU — décision de Florian du 2026-08-03 : une PR dédiée.** Branche `fix/ingredients-revue-3-2`, depuis `main` (`8f91f52`). C'est le choix qui préserve ce que la revue de la 3.3 venait de défaire : une story en revue ne doit pas transporter le correctif d'une autre. Les PR #19 et #20 restent indépendantes. Constat d'origine ci-dessous :
+- [x] [Review][Decision] **Où atterrissent les correctifs d'une story déjà en production ?** Quatre défauts de rendu forment **un seul correctif d'une vingtaine de lignes**, mais le code est déployé et deux PR sont ouvertes (#19 story 3.3, #20 microcopy). Trois destinations possibles : une PR dédiée depuis `main` (le plus propre, une PR de plus) · replier dans la #19 (rapide, mais mélange deux stories et c'est exactement ce que la revue de la 3.3 vient de défaire) · reporter en dette. Sévérité **high** — ce sont les quatre chemins normaux de l'écran
+- [x] [Review][Decision] **RÉSOLU — décision de Florian du 2026-08-03 : message dédié, PAS de migration.** `normaliserQuantite` distinguera « illisible » de « hors bornes », et l'écran NOMMERA la borne au lieu de répondre « une quantité s'écrit en chiffres » à quelqu'un qui vient d'en écrire une. ⚠️ **Ce que ce choix laisse ouvert, et il faut l'écrire** : l'arrondi de `0,001` à `0,00` demeure — il devient seulement VISIBLE, la borne basse étant désormais dite à la saisie. Et la frontière reste **applicative** : un appel REST direct pose toujours ce qu'il veut, `quantity >= 0` étant la seule contrainte en base. C'est un écart assumé à AD-1/AD-2, du même ordre que « pas de limite pour l'instant » du 2026-08-02. Constat d'origine ci-dessous :
+- [x] [Review][Decision] **Une quantité entre 0 et 0,005 est stockée à `0,00` sans un mot, et une quantité hors bornes reçoit un conseil impossible** — deux faces d'une même absence de borne, **mesurées** par la couche des cas limites : `normaliserQuantite("0,001")` rend `0.001`, la garde `< 0` laisse passer, `quantity >= 0` accepte, et `numeric(8,2)` arrondit à `0.00` — au rechargement l'ingrédient affiche « 0 g », et l'Epic 4 le lira comme un zéro délibéré. À l'autre bout, `normaliserQuantite("1000000")` rend `null` comme « deux », donc l'écran répond « Une quantité s'écrit en chiffres. » à quelqu'un qui vient d'en écrire une — un conseil qui ne peut pas fonctionner, la famille que `project-context.md` interdit. **Poser une borne est une décision produit** (quelle borne basse ? faut-il un message dédié ?), et une contrainte en base est une migration. Sévérité **medium**
+- [x] [Review][Defer] **REPORTÉ À LA STORY 4.10 — décision de Florian du 2026-08-03.** L'Epic 4 prévoit la convergence LWW **par champ** ; résoudre à moitié ici créerait un second mécanisme à défaire ensuite. ⚠️ **Ce que le report laisse en production** : à deux membres sur le même écran, l'édition de l'un écrase silencieusement celle de l'autre et affiche « C'est noté. ». Fenêtre étroite à deux personnes, mais réelle. Inscrit au périmètre de la 4.10 dans `deferred-work.md`. Constat d'origine ci-dessous :
+- [x] [Review][Defer] **Une édition concurrente est écrasée en silence et annoncée « C'est noté. »** — `versColonnes` réécrit les **cinq** colonnes depuis l'état du panneau, ouvert avant l'écriture de l'autre membre. La seule garde (`!data`) ne détecte qu'une ligne **supprimée**, jamais **modifiée** : `data` est non nul, le message de succès s'affiche, la valeur de l'autre est perdue sans trace. L'Epic 4 prévoit explicitement une convergence LWW **par champ** (story 4.10) : ce défaut est le même problème, deux epics plus tôt, sur un écran partagé. Le traiter maintenant (écriture par champ modifié, ou `.eq()` sur `updated_at`) ou l'inscrire au périmètre de la 4.10 est ton arbitrage. Sévérité **medium**
+- [x] [Review][Decision] **RÉSOLU — décision de Florian du 2026-08-03 : réaligner les trois ET écrire la règle.** Les fichiers des stories 2.2, 3.1 et 3.2 passent à `done`, chacun portant la mention de ce qui restait ouvert au moment de la fusion — la fermeture ne réécrit pas l'histoire, elle la date. Et une règle entre dans `project-context.md` : **le champ `Status` du fichier de story fait foi et se ferme AVEC le suivi de sprint**, sans quoi il n'est utilisable par personne. C'est la troisième occurrence : le motif est établi, corriger l'état sans la règle le laisserait se reproduire. Constat d'origine ci-dessous :
+- [x] [Review][Decision] **`Status: review` dans le fichier de story, `done` dans `sprint-status.yaml` — et c'est une HABITUDE, pas un accident** — le même commit fait passer 2.2 et 3.1 à `done` en laissant leurs fichiers de story sur `review`. Ce n'est pas un désaccord d'étiquette : le fichier de story porte les Completion Notes et la liste « ce qui reste à vérifier **avant la fusion** », dont deux items n'ont jamais été refermés. Fermer ailleurs **clôt la story sans clore ses conditions**, et laisse `review` comme dernier mot dans le seul document qu'un agent rechargera. **Le champ `Status` du fichier de story n'est plus signifiant** — donc inutilisable comme garde. Trois fichiers à réaligner, et une règle à écrire ou à abandonner. Sévérité **low** pour le membre, structurelle pour la méthode
+
+#### Correctifs
+
+- [x] [Review][Patch] **« C'est noté. » ne s'affiche NULLE PART après une édition réussie** — `enregistrer` pose `zone = "edition"` puis appelle `fermer()` **sans repasser en `"liste"`** ; `fermer()` met `enEdition` à `null`, ce qui démonte le `<form>` où `{statutEdition}` est rendu. Le panneau se referme en silence. ⚠️ **`ListeRayons.tsx:357-358` fait `setZone("liste")` AVANT `fermer()`, précisément pour ça** — et le commentaire de `supprimer` (`:288`) nomme cette famille « la cinquième fois », puis le chemin voisin la reproduit [app/recettes/[id]/modifier/IngredientsRecette.tsx:238, :273, :411]
+- [x] [Review][Patch] **Le focus retombe sur `<body>` après un enregistrement réussi** — `fermer(`nom-${enEdition}`)` vise l'`<input>` **du panneau que `fermer()` démonte au même rendu** ; `getElementById` rend `null` et l'optional chaining avale l'échec. La cible juste est `ingredient-${enEdition}`, le bouton de la ligne repliée — c'est d'ailleurs ce qu'emploie « Annuler » à `:423`, et `ListeRayons` à `:358`. Au clavier : il faut re-`Tab` depuis le haut du document [app/recettes/[id]/modifier/IngredientsRecette.tsx:273]
+- [x] [Review][Patch] **Les flèches perdent le focus à chaque pression** — `deplacer()` ne pose **jamais** `retourFocus`, et les boutons flèches n'ont **aucun `id`** à viser. `disabled={occupe}` désactive le bouton focalisé pendant l'attente, le navigateur renvoie le focus sur `<body>`. ⚠️ `ListeRayons.tsx:480` porte exactement ce code, **sous un commentaire qui le nomme « le piège de cette story »**, et bascule sur la flèche opposée en bout de course. Les flèches sont le seul chemin clavier (UX-DR11) [app/recettes/[id]/modifier/IngredientsRecette.tsx:320-345, :495-516]
+- [x] [Review][Patch] **Le seul message écrit pour « l'autre membre a retiré l'ingrédient » est le seul à ne jamais être vu** — sur `!data`, `enregistrer` fait `router.refresh()` sans `setZone("liste")` ni `fermer()` : le rafraîchissement retire la ligne, le `<form>` se démonte, le message s'évapore, le focus est perdu et `enEdition` garde un identifiant fantôme. `ListeRayons` a une fonction dédiée pour ça, `disparu()` (`:407-413`), qui fait les trois gestes [app/recettes/[id]/modifier/IngredientsRecette.tsx:268-271]
+- [x] [Review][Patch] **`{statutOrdre}` est monté DANS la branche non vide, donc il disparaît quand la liste se vide** — le piège n°8 de cette story exige « une région par surface, montée **en permanence** ». Chemin réel : l'autre membre vide la recette, je presse ↑, le RPC refuse `P0001`, `refusOrdreIngredients` rend « liste-changee » — et le `router.refresh()` ramène une liste vide qui démonte la région. Les trois autres régions sont permanentes ; celle-là non [app/recettes/[id]/modifier/IngredientsRecette.tsx:522]
+- [x] [Review][Patch] **« Réessaie dans un instant. » sur une condition définitive, au chemin d'AJOUT** — `refusIngredient` ne reconnaît que les trois noms de contraintes `check` dans le message ; tout le reste tombe sur `"echec"`. Si l'autre membre supprime la recette pendant la saisie, l'`insert` rend `23503` (mesuré par la couche d'audit sur stack local) et l'écran répond « Ça n'a pas marché. Réessaie dans un instant. » **indéfiniment** — mot pour mot le défaut que `project-context.md` cite en exemple. La branche d'erreur n'appelle même pas `router.refresh()`. ⚠️ **Et `erreurs.test.ts:938` FIGE le mauvais comportement** : `assert.equal(refusIngredient({ code: "23503" … }), "echec")` [lib/recettes/erreurs.ts, lib/recettes/erreurs.test.ts:938]
+- [x] [Review][Patch] **`recipe_ingredients_nom_non_vide` n'a AUCUNE dent** — la Task 8 dit « retire une contrainte … écris les chiffres », et les deux autres contraintes de la migration en ont bien une (unité 55→53, quantité 55→54). Celle-ci : **55 → 55, zéro test tombé** (mesuré par la couche d'audit en retirant la contrainte du stack local). ⚠️ **Et ça se prouve aussi par simple lecture** : le seul test qui touche le nom (`contraintes.test.ts:339`) n'insère que ce que le client **accepte**, puis vérifie que la base l'accepte aussi. Retirer la contrainte rend la base *plus permissive* — chaque insertion réussit toujours, `laxistes` reste vide. **Il ne peut structurellement pas tomber.** Il manque le pendant que la story 3.1 avait écrit pour les titres de recette : « la base REFUSE un nom vide » [supabase/tests/contraintes.test.ts:339]
+- [x] [Review][Patch] **AC4 dit « le nouvel ordre est respecté à l'AFFICHAGE », et rien ne le mesure** — le côté écriture est solidement mesuré ; le côté lecture (`.order("sort_order").order("created_at")`) n'est couvert par aucun test, `lib/recettes/ingredients.test.ts` n'existant pas. Or le piège n°5 qualifie ce tri secondaire d'**obligatoire** précisément parce que `sort_order = 0` est l'état nominal de départ. Il est tenu par un commentaire de douze lignes — règle §4. *(La story 3.3 réutilise `ingredientsDeRecette` au lieu de recopier le tri, donc pas encore de divergence.)* [lib/recettes/ingredients.ts:74-76]
+- [x] [Review][Patch] **Une unité sans quantité affiche une unité orpheline** — `{i.quantite === null ? "" : i.quantite}{i.unite ? ` ${i.unite}` : ""}` rend `" g"`, un suffixe sans nombre. Aucune garde croisée entre les deux champs, aucune contrainte ne l'interdit. ⚠️ **Même défaut que la revue de la 3.3 a corrigé sur l'écran de LECTURE** — il reste ici, sur l'écran d'édition qui le produit [app/recettes/[id]/modifier/IngredientsRecette.tsx:483-484]
+- [x] [Review][Patch] **Les champs de saisie ne sont pas désactivés pendant une écriture, et les frappes sont jetées sans un mot** — tous les boutons portent `disabled={occupe}`, aucun `<input>`/`<select>` ne le porte. `versColonnes` fige la saisie avant `soumettre` ; au succès, `setNouveau(SAISIE_VIDE)` efface ce qui a été tapé depuis, et côté édition `fermer()` démonte le formulaire. L'écran annonce « C'est noté. » [app/recettes/[id]/modifier/IngredientsRecette.tsx:456-561]
+- [x] [Review][Patch] **Deux pressions rapides sur une flèche ne produisent qu'un seul déplacement** — `useSoumission` libère `occupe` dans son `finally`, dès la réponse du RPC, mais `router.refresh()` n'est pas attendu. Entre les deux, les flèches sont réactivées alors que `ingredients` est encore l'ancienne liste : la seconde pression recalcule la même permutation sur les mêmes propriétés. ⚠️ Le commentaire de `:490-495` affirme que `disabled={occupe}` « ferme la course de deux pressions rapides » — il ferme la fenêtre du RPC, pas celle du rafraîchissement, **qui est la plus longue des deux**. Règle §2 [app/recettes/[id]/modifier/IngredientsRecette.tsx:324, :490-516]
+- [x] [Review][Patch] **`estUniteConnue` n'a aucun appelant en production** — trouvé par les trois couches. `versColonnes` envoie `saisie.unite` **sans le valider**, en se reposant sur le `<select>` puis sur la contrainte — ce qui est cohérent avec AD-2, mais laisse un prédicat construit puis non branché, dont la moitié de l'API n'existe que pour ses propres tests. Le module s'annonce « source unique du `<select>`, du test d'accord, **et de tout ce qui viendra ensuite** ». Le câbler dans `versColonnes` ou le retirer [lib/recettes/unites.ts]
+- [x] [Review][Patch] **La garde 2 de `reorder_recipe_ingredients` accuse le mauvais coupable sur un `NULL`** — `count(distinct id) from unnest(p_ids)` ignore les `NULL`, donc `[null, id1]` donne cardinal 2 ≠ distinct 1 → « Un ingrédient est cité deux fois », ce qui est faux. ⚠️ **Aucun trou** : vérifié algébriquement, avec *m* `NULL` on a toujours *n ≥ d + m > d*. Mais le développeur qui lit le journal cherchera un doublon inexistant [supabase/migrations/20260802112749_reorder_recipe_ingredients.sql]
+- [x] [Review][Patch] **Cinq tests dépendent d'une variable affectée dans le corps d'un sixième** — `recetteDesContraintes` est renseignée dans le premier test des ingrédients ; les quatre suivants s'en servent comme `recipe_id` sans garde. Lancer `--test-name-pattern` pour isoler un cas, ou voir le premier échouer, fait insérer `recipe_id: undefined` et produit un `TypeError` au lieu d'une assertion. La recette de service n'est jamais nettoyée [supabase/tests/contraintes.test.ts]
+- [x] [Review][Patch] **Trois comptes de tests faux sur cinq dans la File List** (règle §1) — mesuré par `grep -c '^test('` entre les deux commits : `saisie.test.ts` annonce 9, en ajoute **6** ; `isolation.test.ts` annonce 8, en ajoute **7** ; `contraintes.test.ts` annonce 6, en ajoute **7**. Les totaux (+15 unitaires, +14 isolation), 142/142 et 55/55 sont exacts et réexécutés — c'est la ventilation qui est fausse, présentée sans distinction avec des chiffres mesurés [3-2-…md § File List]
+- [x] [Review][Patch] **Deux cases cochées sans preuve** (règle §1) — « Phase rouge **constatée** » (Task 3) n'a ni commande, ni sortie, ni artefact dans le Debug Log. « **Les huit unités**, chacune enregistrée et relue **en base** » (Task 9) : le Debug Log se contredit lui-même en n'en citant que trois (`g`, `pincée`, `L`) ; les cinq autres sont couvertes par `contraintes.test.ts`, qui insère avec le client **`admin`** et ne passe **jamais par le `<select>`** — donc pas la traversée écran→base que la sous-tâche demandait. Formulation honnête : *trois des huit à l'écran, les huit par le test* [3-2-…md:Task 3, Task 9]
+- [x] [Review][Patch] **La prémisse de la requête de contrôle a été RETIRÉE au lieu d'être rouverte** (règle §5) — la story est honnête (« Attendu zéro ligne, et c'est une **DÉDUCTION** … le dépôt n'étant pas lié, je n'ai aucun accès à la production ») et l'inscrit en « reste à vérifier avant la fusion ». C'est la **fusion** qui viole la règle. Puis `sprint-status.yaml` écrit après coup que « le succès du déploiement PROUVE ce que les requêtes devaient établir ». ⚠️ **Vrai pour la migration des trois `check`** — un `add constraint` échoue si une ligne viole. **FAUX pour la seconde** : `create or replace function` **ne peut pas** échouer sur des données, l'en-tête de la migration le dit lui-même, et sa requête d'ex æquo n'a donc **toujours rien établi** [sprint-status.yaml, 20260802112749_…sql]
+- [x] [Review][Patch] **L'en-tête de `lib/ordre.ts` affirme un invariant entre trois fichiers, et il est déjà imprécis** (règles §2 et §4) — « les fonctions Postgres qui les consomment … refusent tout tableau qui ne couvre pas exactement l'ensemble » : pour les ingrédients la garde de cardinal porte sur **la recette**, pas sur l'ensemble. S'y ajoutent « et il l'était déjà » et « extrait de `lib/rayons/` à son deuxième appelant » — de l'historique de dépôt, que `git log` porte déjà [lib/ordre.ts]
+- [x] [Review][Patch] **Deux résidus documentaires** — `ordre.test.ts` neutralise « rayon » → « élément » partout **sauf** `test("le dernier rayon peut aller en premier")` : un test générique qui nomme encore un domaine est ce qui fait recopier un module au lieu de le réutiliser. Et la Task 1 annonce « **2 `check`** » quand la migration en pose **trois** (la File List, elle, en compte bien trois) [lib/ordre.test.ts, 3-2-…md Task 1]
+
+#### Reportés
+
+- [x] [Review][Defer] `aisle_keyword` : champ libre, partagé, consommé par `resolve_aisle_id`, et sans aucune contrainte [supabase/migrations/20260802112511_…sql] — reporté, même famille que la décision « pas de limite pour l'instant » du 2026-08-02
+- [x] [Review][Defer] `prochainOrdreIngredient` calcule `max + 10` depuis les propriétés du dernier rendu : deux ajouts concurrents recréent les ex æquo que la story dit résorber [lib/recettes/ingredients.ts] — reporté, préexistant au motif de conception
+- [x] [Review][Defer] `prochainOrdreIngredient` n'a aucun test, alors que le piège du `Math.max()` sur liste vide (`-Infinity`) est nommément désigné par le piège n°5 [lib/recettes/ingredients.ts] — reporté, aucune case cochée à tort
+- [x] [Review][Defer] `statutListe` est sans `reserve` alors qu'il surplombe la liste **et** le formulaire d'ajout : « C'est retiré. » fait descendre toute la liste sous le doigt [app/recettes/[id]/modifier/IngredientsRecette.tsx:348] — reporté, hérité de `ListeRayons`
+- [x] [Review][Defer] `break-all` coupe « oignons » en « oign/ons » sur écran étroit, là où l'écran de lecture emploie `break-words` [app/recettes/[id]/modifier/IngredientsRecette.tsx:476] — reporté, hérité de `ListeRayons`
+- [x] [Review][Defer] `docs/migrations.md` fige « neuf fonctions » comme contrôle de régénération alors que `lib/supabase/types.ts` a été édité à la main [docs/migrations.md] — reporté ; la couche d'audit a mesuré que le bloc recopié est **identique** au généré, donc le compte est exact aujourd'hui
 
 ---
 

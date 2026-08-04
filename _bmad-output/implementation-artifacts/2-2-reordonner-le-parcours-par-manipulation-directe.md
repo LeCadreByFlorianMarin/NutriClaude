@@ -4,7 +4,19 @@ baseline_commit: f29c1a1
 
 # Story 2.2: Réordonner le parcours par manipulation directe
 
-Status: review
+Status: done
+
+<!-- `review` → `done` le 2026-08-03, en réalignement : `sprint-status.yaml` la donnait
+     `done` depuis sa fusion du 2026-08-02 (PR #15, squash `86fafe7`), ce fichier disait
+     encore `review`. Le désaccord a duré un jour sur trois stories à la fois.
+
+     ⚠️ FERMÉE AVEC SES CONDITIONS OUVERTES, et la fermeture ne les efface pas :
+       · **fusionnée SANS revue adversariale**, la première des trois d'affilée que la
+         règle n°6 de `project-context.md` réclamait ;
+       · le GLISSER AU DOIGT n'a jamais été joué — souris seulement. `touch-action: none`
+         est mesuré, le geste ne l'est pas. C'est la classe d'erreur qui avait fait écarter
+         `draggable` HTML5, et c'est en PRODUCTION.
+     Ce qui restait ouvert reste ouvert : c'est daté, pas résolu. -->
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

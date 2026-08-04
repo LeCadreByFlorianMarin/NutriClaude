@@ -16,14 +16,27 @@ import {
   prochainOrdreIngredient,
   type Ingredient,
 } from "@/lib/recettes/ingredients";
-import { UNITES } from "@/lib/recettes/unites";
-import { MAX_TITRE, normaliserQuantite, normaliserTitre } from "@/lib/recettes/saisie";
+import { UNITES, estUniteConnue } from "@/lib/recettes/unites";
+import {
+  MAX_TITRE,
+  QUANTITE_MAX,
+  QUANTITE_MIN_NON_NULLE,
+  analyserQuantite,
+  normaliserTitre,
+} from "@/lib/recettes/saisie";
 
 /** Messages en français, sans jargon (NFR-8/NFR-9). */
 const MESSAGES = {
   "nom-vide": "Il faut un nom.",
   "quantite-illisible": "Une quantité s'écrit en chiffres.",
   "quantite-negative": "Une quantité ne peut pas être négative.",
+  /*
+   * ⚠️ Ces deux messages NOMMENT la borne. « Une quantité s'écrit en chiffres. »
+   * était rendu pour un nombre parfaitement écrit mais hors bornes : l'utilisateur
+   * lisait un conseil qu'il avait déjà suivi. Revue du 2026-08-03.
+   */
+  "quantite-hors-bornes": `Une quantité s'arrête à ${QUANTITE_MAX.toLocaleString("fr-FR", { useGrouping: false })}.`,
+  "quantite-trop-petite": `La plus petite quantité qu'on sache garder est ${QUANTITE_MIN_NON_NULLE.toLocaleString("fr-FR")}. En dessous, mets 0.`,
   "unite-inconnue": "Cette unité n'est pas dans la liste.",
   ajoute: "C'est noté.",
   modifie: "C'est noté.",
@@ -100,15 +113,47 @@ function versColonnes(saisie: Saisie): Colonnes | Cle {
    * où « Fromages » tapé au mauvais endroit enregistrait « F ».
    */
   const brut = saisie.quantite.trim();
-  const quantite = brut === "" ? null : normaliserQuantite(brut);
-  if (brut !== "" && quantite === null) return "quantite-illisible";
-  if (quantite !== null && quantite < 0) return "quantite-negative";
+  let quantite: number | null = null;
+  if (brut !== "") {
+    /*
+     * ⚠️ **Quatre refus distincts, pas un seul.** La première rédaction rendait
+     * « quantite-illisible » pour tout ce que `normaliserQuantite` refusait — donc
+     * « Une quantité s'écrit en chiffres. » à quelqu'un qui venait d'écrire
+     * « 1000000 ». Un conseil qui ne peut pas fonctionner enferme l'utilisateur
+     * dans une boucle. Revue adversariale du 2026-08-03, décision de Florian.
+     */
+    const analyse = analyserQuantite(brut);
+    if ("faute" in analyse) {
+      switch (analyse.faute) {
+        case "illisible":
+          return "quantite-illisible";
+        case "negative":
+          return "quantite-negative";
+        case "hors-bornes":
+          return "quantite-hors-bornes";
+        case "trop-petite":
+          return "quantite-trop-petite";
+      }
+    }
+    quantite = analyse.valeur;
+  }
+
+  /*
+   * ⚠️ **L'unité est validée, elle n'est plus seulement présumée.** La rédaction
+   * précédente écrivait « le `<select>` n'émet que les huit jetons ou la chaîne
+   * vide » — vrai, mais c'était une AFFIRMATION sur une autre partie du fichier, et
+   * `estUniteConnue` existait sans aucun appelant en production : un prédicat
+   * construit puis non branché, que les trois couches de la revue du 2026-08-03 ont
+   * relevé. La frontière dure reste `recipe_ingredients_unite_fermee` en base
+   * (AD-2) ; celle-ci rend un message au lieu d'un `23514`.
+   */
+  const unite = saisie.unite === "" ? null : saisie.unite;
+  if (unite !== null && !estUniteConnue(unite)) return "unite-inconnue";
 
   return {
     name: nom,
     quantity: quantite,
-    // Le `<select>` n'émet que les huit jetons ou la chaîne vide.
-    unit: saisie.unite === "" ? null : saisie.unite,
+    unit: unite,
     aisle_keyword: normaliserTitre(saisie.motCleRayon),
     optional: saisie.optionnel,
   };
@@ -163,6 +208,35 @@ export function IngredientsRecette({
    * état : la consommer ne doit pas déclencher de rendu.
    */
   const retourFocus = useRef<string | null>(null);
+
+  /**
+   * Vrai entre l'appel de réordonnancement et l'ARRIVÉE des nouvelles propriétés.
+   *
+   * ⚠️ **`occupe` ne suffit pas, et c'est tout le défaut.** `useSoumission` le
+   * libère dès la réponse du RPC ; `router.refresh()` court encore. Pendant cette
+   * fenêtre — la plus longue des deux, celle du rendu serveur — `ingredients` porte
+   * l'ancien ordre, et une seconde pression recalcule la même permutation depuis les
+   * mêmes propriétés. Trouvé par la revue adversariale du 2026-08-03, contre un
+   * commentaire qui affirmait le contraire.
+   */
+  const [ordreEnvoye, setOrdreEnvoye] = useState<string[] | null>(null);
+
+  /*
+   * ⚠️ **Dérivé du CONTENU, ni d'une ref ni d'un effet.** Les deux raccourcis
+   * évidents sont interdits, et à juste titre : `setState` dans un effet
+   * (`react-hooks/set-state-in-effect`) coûterait un rendu de plus pour une
+   * information que les propriétés portent déjà, et lire une `ref` pendant le rendu
+   * (`react-hooks/refs`) donnerait un résultat que React ne s'engage pas à
+   * rafraîchir.
+   *
+   * Comparer les identifiants dit exactement ce qu'on veut savoir : « les
+   * propriétés reflètent-elles encore l'ordre d'AVANT mon appel ? ». C'est aussi
+   * plus robuste qu'une comparaison de références — ça reste juste même si le rendu
+   * serveur réutilisait un tableau.
+   */
+  const attenteOrdre =
+    ordreEnvoye !== null &&
+    ingredients.map((i) => i.id).join(" ") !== ordreEnvoye.join(" ");
 
   /*
    * ⚠️ **Le focus, sinon il retombe sur `<body>`.** Ouvrir un panneau remplace le
@@ -223,7 +297,16 @@ export function IngredientsRecette({
 
       if (error || !data) {
         if (error) console.error("[ingrédients] ajout refusé :", error.message);
-        return refusIngredient(error);
+        const refus = refusIngredient(error);
+        /*
+         * ⚠️ **Le rafraîchissement fait partie du TRAITEMENT du refus**, il n'est
+         * pas décoratif : « la liste vient de changer » sans remettre l'écran
+         * d'accord avec la base laisserait l'utilisateur devant une recette qui
+         * n'existe plus. C'est écrit en tête de `MESSAGES` et le chemin d'ajout ne
+         * le faisait pas — revue adversariale du 2026-08-03.
+         */
+        if (refus === "liste-changee") router.refresh();
+        return refus;
       }
 
       setNouveau(SAISIE_VIDE);
@@ -266,11 +349,39 @@ export function IngredientsRecette({
        * sur une écriture qui n'a rien touché.
        */
       if (!data) {
+        /*
+         * ⚠️ **L'ingrédient a disparu : les TROIS gestes, pas seulement le
+         * rafraîchissement.** Sans `setZone("liste")` et `fermer()`, le
+         * rafraîchissement retire la ligne, le `<form>` se démonte avec la région
+         * qui portait le message — et « La liste des ingrédients vient de
+         * changer. » ne s'affiche NULLE PART. Le seul message écrit pour ce cas
+         * était le seul à ne jamais être vu. `enEdition` restait en prime sur un
+         * identifiant fantôme. `ListeRayons` a une fonction dédiée pour ça,
+         * `disparu()` ; ici les trois gestes tiennent en trois lignes.
+         * Trouvé par la revue adversariale du 2026-08-03.
+         */
+        setZone("liste");
+        fermer("titre-ingredients");
         router.refresh();
         return "liste-changee";
       }
 
-      fermer(`nom-${enEdition}`);
+      /*
+       * ⚠️ **`setZone("liste")` AVANT `fermer()`, et la cible est la ligne
+       * REPLIÉE.** Deux défauts en une ligne, trouvés par la revue du 2026-08-03,
+       * et `supprimer()` les évitait déjà vingt lignes plus bas :
+       *
+       *   · sans le changement de zone, « C'est noté. » se rendait dans
+       *     `statutEdition`, à l'intérieur du `<form>` que `fermer()` démonte au
+       *     même rendu : le panneau se refermait EN SILENCE sur chaque édition
+       *     réussie — le chemin le plus courant de l'écran ;
+       *   · `nom-${enEdition}` désigne l'`<input>` de ce même `<form>` démonté,
+       *     donc `getElementById` rendait `null` et le focus retombait sur
+       *     `<body>`. La cible juste est le bouton de la ligne repliée, celui
+       *     qu'« Annuler » vise déjà.
+       */
+      setZone("liste");
+      fermer(`ingredient-${enEdition}`);
       router.refresh();
       return "modifie";
     });
@@ -325,6 +436,24 @@ export function IngredientsRecette({
     // `null` veut dire « n'appelle pas la base » : bouton en bout de course.
     if (!ordre) return;
 
+    /*
+     * ⚠️ **Le focus, et la flèche OPPOSÉE en bout de course.** `disabled={occupe}`
+     * désactive le bouton pressé pendant l'attente, et un navigateur qui désactive
+     * l'élément focalisé renvoie le focus sur `<body>` : au clavier, monter un
+     * ingrédient trois fois renvoyait trois fois en haut du document. Les flèches
+     * sont le SEUL chemin clavier (UX-DR11), donc c'est ce chemin-là qui cassait.
+     *
+     * En bout de course la flèche pressée disparaît — viser l'opposée est la seule
+     * cible qui existera encore. `ListeRayons.tsx:480` porte exactement ce code,
+     * sous un commentaire qui le nomme « le piège de cette story » ; il n'avait pas
+     * été repris ici. Trouvé par la revue adversariale du 2026-08-03.
+     */
+    const rangArrivee = ordre.indexOf(i.id);
+    const finDeCourse =
+      rangArrivee === 0 || rangArrivee === ordre.length - 1;
+    const opposee = sens === "haut" ? "bas" : "haut";
+    retourFocus.current = `${finDeCourse ? opposee : sens}-${i.id}`;
+
     await soumettre(async () => {
       const supabase = createNavigateurClient();
       const { error } = await supabase.rpc("reorder_recipe_ingredients", {
@@ -334,11 +463,14 @@ export function IngredientsRecette({
 
       if (error) {
         console.error("[ingrédients] réordonnancement refusé :", error.message);
+        retourFocus.current = null;
+        setOrdreEnvoye(null);
         router.refresh();
         return refusOrdreIngredients(error);
       }
 
-      setDeplacement({ nom: i.nom, rang: ordre.indexOf(i.id) + 1 });
+      setDeplacement({ nom: i.nom, rang: rangArrivee + 1 });
+      setOrdreEnvoye(ordre);
       router.refresh();
       return "deplace";
     });
@@ -401,6 +533,7 @@ export function IngredientsRecette({
                   <form onSubmit={enregistrer} className="py-3">
                     <ChampsIngredient
                       idPrefixe={i.id}
+                      occupe={occupe}
                       saisie={saisieEditee}
                       onChange={(s) => {
                         setSaisieEditee(s);
@@ -479,23 +612,52 @@ export function IngredientsRecette({
                           <span className="hint"> — on peut s&apos;en passer</span>
                         ) : null}
                       </span>
-                      <span className="hint shrink-0 tabular-nums">
-                        {i.quantite === null ? "" : i.quantite}
-                        {i.unite ? ` ${i.unite}` : ""}
-                      </span>
+                      {/*
+                        ⚠️ **L'unité ne s'affiche jamais seule.** Une unité qualifie
+                        un nombre ; sans lui elle n'a rien à dire, et « Farine … g »
+                        se lit comme une donnée perdue. Le couple (quantité nulle,
+                        unité posée) est atteignable depuis cet écran même — les deux
+                        champs sont indépendants — et aucune contrainte ne l'interdit.
+                        Revue adversariale du 2026-08-03 ; le même défaut a été
+                        corrigé sur l'écran de LECTURE, qui affiche cette donnée.
+                      */}
+                      {i.quantite !== null ? (
+                        <span className="hint shrink-0 tabular-nums">
+                          {i.quantite}
+                          {i.unite ? ` ${i.unite}` : ""}
+                        </span>
+                      ) : null}
                     </button>
 
                     {/*
-                      Les deux flèches. `disabled={occupe}` n'est pas décoratif :
-                      il ferme la course de deux pressions rapides, qui
-                      calculeraient le même ordre depuis les mêmes propriétés.
-                      Désactivé = un ton plus clair, jamais une opacité
-                      réductrice, qui ferait tomber le glyphe sous le seuil.
+                      Les deux flèches. Désactivé = un ton plus clair, jamais une
+                      opacité réductrice, qui ferait tomber le glyphe sous le seuil.
+
+                      ⚠️ **`disabled={occupe}` ne ferme PAS la course de deux
+                      pressions rapides**, contrairement à ce que disait la première
+                      rédaction de ce commentaire. `useSoumission` libère `occupe`
+                      dans son `finally`, donc dès la réponse du RPC — mais le
+                      rafraîchissement, lui, n'est pas fini. Entre les deux, les
+                      flèches étaient réactivées alors que `ingredients` portait
+                      encore l'ancien ordre : la seconde pression recalculait la MÊME
+                      permutation depuis les MÊMES propriétés, et deux pressions ne
+                      faisaient avancer que d'un cran.
+
+                      ⚠️ **`router.refresh()` rend `void` : on ne peut pas
+                      l'attendre.** D'où `attenteOrdre`, qui compare l'ordre ENVOYÉ à
+                      celui que portent les propriétés — c'est le seul signal que ce
+                      composant reçoive de l'arrivée du rendu serveur. Sa définition
+                      dit pourquoi il est dérivé et non stocké. Revue du 2026-08-03.
+
+                      ⚠️ **Les `id` ne sont pas décoratifs non plus** : ce sont les
+                      cibles de `retourFocus`. Sans eux, le focus retombait sur
+                      `<body>` à chaque pression.
                     */}
                     <button
                       type="button"
+                      id={`haut-${i.id}`}
                       onClick={() => deplacer(i, "haut")}
-                      disabled={occupe || index === 0}
+                      disabled={occupe || attenteOrdre || index === 0}
                       aria-label={`Monter ${i.nom}`}
                       className="flex min-h-touch w-11 shrink-0 cursor-pointer items-center
                                  justify-center text-base text-text
@@ -505,8 +667,9 @@ export function IngredientsRecette({
                     </button>
                     <button
                       type="button"
+                      id={`bas-${i.id}`}
                       onClick={() => deplacer(i, "bas")}
-                      disabled={occupe || index === ingredients.length - 1}
+                      disabled={occupe || attenteOrdre || index === ingredients.length - 1}
                       aria-label={`Descendre ${i.nom}`}
                       className="flex min-h-touch w-11 shrink-0 cursor-pointer items-center
                                  justify-center text-base text-text
@@ -519,15 +682,27 @@ export function IngredientsRecette({
               </li>
             ))}
           </ul>
-          {statutOrdre}
         </>
       )}
+
+      {/*
+        ⚠️ **Montée EN PERMANENCE, hors de la branche non vide.** Le piège n°8 de
+        cette story l'exige — « une région par surface, montée en permanence » — et
+        cette région-ci était la seule à ne pas l'être. Chemin réel : l'autre membre
+        vide la recette, je presse une flèche, le RPC refuse `P0001`, le message
+        « La liste des ingrédients vient de changer » est posé — et le
+        `router.refresh()` ramène une liste vide qui démonte la branche, donc la
+        région, donc le message. Trouvé par la revue adversariale du 2026-08-03,
+        même famille que les trois autres défauts de ce fichier.
+      */}
+      {statutOrdre}
 
       <div className="mt-8">
         <h3 className="titre-section">Ajouter un ingrédient</h3>
         <form onSubmit={ajouter} className="mt-2">
           <ChampsIngredient
             idPrefixe="nouveau"
+            occupe={occupe}
             saisie={nouveau}
             onChange={(s) => {
               setNouveau(s);
@@ -556,11 +731,21 @@ function ChampsIngredient({
   idPrefixe,
   saisie,
   onChange,
+  occupe,
 }: {
   idPrefixe: string;
   saisie: Saisie;
   onChange: (s: Saisie) => void;
+  occupe: boolean;
 }) {
+  /*
+   * ⚠️ **Les CHAMPS se désactivent pendant l'écriture, pas seulement les boutons.**
+   * `versColonnes` fige la saisie avant `soumettre` ; tout ce qui est tapé pendant
+   * l'aller-retour est donc déjà perdu — et au succès, `setNouveau(SAISIE_VIDE)`
+   * l'efface pendant que l'écran annonce « C'est noté. ». L'utilisateur voyait ses
+   * frappes disparaître sans un mot. Tous les boutons portaient `disabled={occupe}`,
+   * aucun champ ne le portait. Revue adversariale du 2026-08-03.
+   */
   const maj = <C extends keyof Saisie>(champ: C, valeur: Saisie[C]) =>
     onChange({ ...saisie, [champ]: valeur });
 
@@ -579,6 +764,7 @@ function ChampsIngredient({
             placeholder="Pois chiches"
             value={saisie.nom}
             onChange={(e) => maj("nom", e.target.value)}
+            disabled={occupe}
             className="input mt-1"
           />
         </span>
@@ -612,6 +798,7 @@ function ChampsIngredient({
             id={`unite-${idPrefixe}`}
             value={saisie.unite}
             onChange={(e) => maj("unite", e.target.value)}
+            disabled={occupe}
             className="input mt-1"
           >
             <option value="">—</option>
@@ -635,6 +822,7 @@ function ChampsIngredient({
           placeholder="conserves"
           value={saisie.motCleRayon}
           onChange={(e) => maj("motCleRayon", e.target.value)}
+          disabled={occupe}
           className="input mt-1"
         />
         <p className="hint mt-1">
@@ -651,6 +839,7 @@ function ChampsIngredient({
           type="checkbox"
           checked={saisie.optionnel}
           onChange={(e) => maj("optionnel", e.target.checked)}
+          disabled={occupe}
           className="size-5 cursor-pointer"
         />
         On peut s&apos;en passer

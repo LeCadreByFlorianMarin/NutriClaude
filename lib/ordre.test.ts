@@ -53,28 +53,28 @@ test("descendre un élément du milieu l'échange avec son successeur", () => {
   memeEnsemble(rendu!, p);
 });
 
-test("monter le premier rayon ne fait rien", () => {
+test("monter le premier élément ne fait rien", () => {
   assert.equal(ordreApresDeplacement(parcours("a", "b", "c"), "a", "haut"), null);
 });
 
-test("descendre le dernier rayon ne fait rien", () => {
+test("descendre le dernier élément ne fait rien", () => {
   assert.equal(ordreApresDeplacement(parcours("a", "b", "c"), "c", "bas"), null);
 });
 
-test("un parcours d'un seul rayon ne bouge dans aucun sens", () => {
+test("une liste d'un seul élément ne bouge dans aucun sens", () => {
   const p = parcours("a");
   assert.equal(ordreApresDeplacement(p, "a", "haut"), null);
   assert.equal(ordreApresDeplacement(p, "a", "bas"), null);
 });
 
-test("un parcours de deux rayons s'inverse dans les deux sens", () => {
+test("une liste de deux éléments s'inverse dans les deux sens", () => {
   const p = parcours("a", "b");
   assert.deepEqual(ordreApresDeplacement(p, "b", "haut"), ["b", "a"]);
   assert.deepEqual(ordreApresDeplacement(p, "a", "bas"), ["b", "a"]);
 });
 
 test("un identifiant inconnu ne fait rien", () => {
-  // Le cas réel : l'autre membre du foyer vient de supprimer ce rayon, et les
+  // Le cas réel : l'autre membre du foyer vient de supprimer cet élément, et les
   // propriétés de l'écran n'ont pas encore été rafraîchies.
   assert.equal(ordreApresDeplacement(parcours("a", "b"), "zzz", "haut"), null);
 });
@@ -85,14 +85,14 @@ test("un parcours vide ne fait rien", () => {
 
 // ── ordreDeplace — le primitif, et le chemin du glisser ──────────────────
 
-test("le premier rayon peut aller en dernier", () => {
+test("le premier élément peut aller en dernier", () => {
   const p = parcours("a", "b", "c", "d");
   const rendu = ordreDeplace(p, "a", 3);
   assert.deepEqual(rendu, ["b", "c", "d", "a"]);
   memeEnsemble(rendu!, p);
 });
 
-test("le dernier rayon peut aller en premier", () => {
+test("le dernier élément peut aller en premier", () => {
   const p = parcours("a", "b", "c", "d");
   const rendu = ordreDeplace(p, "d", 0);
   assert.deepEqual(rendu, ["d", "a", "b", "c"]);
@@ -132,7 +132,7 @@ test("chaque déplacement possible conserve l'ensemble des identifiants", () => 
 test("des ex æquo de `ordre` n'ont aucune influence", () => {
   // `sort_order` n'est pas unique en base et vaut 100 par défaut. Ces fonctions
   // travaillent sur la POSITION dans le tableau reçu, jamais sur `ordre` — sans
-  // quoi deux rayons ex æquo seraient indiscernables.
+  // quoi deux éléments ex æquo seraient indiscernables.
   const p = [
     { id: "a", ordre: 100 },
     { id: "b", ordre: 100 },
