@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { appartenance } from "@/app/_lib/garde";
 import { OnboardingChoice } from "./OnboardingChoice";
 
-export const metadata = { title: "Ton foyer, pour commencer · NutriClaude" };
+export const metadata = { title: "Mon foyer, pour commencer · NutriClaude" };
 
 /**
  * Inscription au foyer. Route **protégée** — elle n'a de sens que connecté, et

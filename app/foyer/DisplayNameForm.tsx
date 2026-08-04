@@ -91,16 +91,16 @@ export function DisplayNameForm({
       {/*
        * Le libellé est visuellement masqué, pas supprimé.
        *
-       * La passe 3 a donné un `<h2>Ton prénom</h2>` à la section (`page.tsx:69`)
+       * La passe 3 a donné un `<h2>Mon prénom</h2>` à la section (`page.tsx:69`)
        * pour que la seule chose modifiable de l'écran figure dans le plan de
        * navigation par titres. Elle n'a pas vu que ce `<label>` portait déjà ces
-       * mots : relu dans les deux thèmes le 2026-07-29, l'écran affichait
-       * « Ton prénom » deux fois de suite. Le `<label>` reste pour nommer le
+       * mots : relu dans les deux thèmes le 2026-07-29, l'écran l'affichait
+       * deux fois de suite. Le `<label>` reste pour nommer le
        * champ à l'API d'accessibilité — le retirer laisserait l'`<input>` sans
        * nom, le `<h2>` ne lui étant pas associé.
        */}
       <label htmlFor="prenom" className="sr-only">
-        Ton prénom
+        Mon prénom
       </label>
       <p className="hint">C&apos;est ce que les autres voient.</p>
 

@@ -673,7 +673,7 @@ export function ListeRayons({
           retomber sur `<body>` renverrait en haut du document.
         */}
         <h2 id="titre-parcours" tabIndex={-1} className="titre-section">
-          Ton parcours
+          Mon parcours
         </h2>
         {statutListe}
 

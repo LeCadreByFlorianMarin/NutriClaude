@@ -139,7 +139,7 @@ export function JoinHouseholdForm({
       />
 
       <label htmlFor="prenom-invite" className="label mt-4">
-        Ton prénom
+        Mon prénom
       </label>
       <input
         id="prenom-invite"

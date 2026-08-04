@@ -100,7 +100,7 @@ export function ListeRecettes({
   return (
     <div>
       <section>
-        <h2 className="titre-section">Ton répertoire</h2>
+        <h2 className="titre-section">Mon répertoire</h2>
 
         {recettes.length === 0 ? (
           <div className="mt-2">

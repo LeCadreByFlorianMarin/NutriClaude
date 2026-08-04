@@ -4,7 +4,7 @@ import { createServerComponentClient } from "@/lib/supabase/server";
 import { recettesDuFoyer } from "@/lib/recettes/recettes";
 import { ListeRecettes } from "./ListeRecettes";
 
-export const metadata = { title: "Tes recettes · NutriClaude" };
+export const metadata = { title: "Mes recettes · NutriClaude" };
 
 /**
  * Le répertoire des recettes du foyer.
@@ -47,8 +47,15 @@ export default async function RecettesPage() {
           ← Retour
         </Link>
 
-        <h1 className="titre-ecran mt-2">Tes recettes</h1>
-        <p className="hint mt-1">Ce que vous savez faire à manger.</p>
+        <h1 className="titre-ecran mt-2">Mes recettes</h1>
+        {/*
+          ⚠️ Cette ligne VOUVOYAIT — seule occurrence de tout l'applicatif, trouvée
+          par la revue adversariale du 2026-08-02. Elle surplombait « Mes recettes »
+          et se trouvait trois lignes au-dessus de « Tu n'as encore aucune recette. » :
+          le même écran vouvoyait puis tutoyait. UX-DR12 impose le tutoiement à ce que
+          l'application DIT ; la première personne ne vaut que pour ce qui NOMME.
+        */}
+        <p className="hint mt-1">Ce que tu sais faire à manger.</p>
 
         <div className="mt-12">
           <ListeRecettes

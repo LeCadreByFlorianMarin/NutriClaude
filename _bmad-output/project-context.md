@@ -217,6 +217,28 @@ pour trois formulaires.*
 Tutoiement, registre familier. **Mots bannis dans toute chaîne rendue :** synchronisation,
 jeton/token, API, MCP, pont, Supabase, RLS, cache.
 
+### Les possessifs : première personne pour les LIBELLÉS, tutoiement pour les PHRASES
+
+Décision de Florian du 2026-08-02, appliquée à 20 chaînes. Deux familles, et elles ne se
+traitent pas pareil :
+
+- **Ce qui NOMME une chose du membre** — titre d'écran, titre d'onglet, titre de section,
+  lien de retour, libellé de champ — est à la **première personne** : « Mon foyer »,
+  « Mes rayons », « Mes recettes », « Mon parcours », « Mon répertoire », « Mon prénom ».
+  C'est l'usage français courant, celui de « Mes commandes » ou « Mon compte ».
+- **Ce que l'application DIT au membre** reste au **tutoiement**, qu'UX-DR12 impose :
+  « Tu n'as encore aucune recette », « Ta session a expiré », « Tes retours à la ligne
+  sont gardés tels quels ».
+
+**Le libellé appartient au membre ; la phrase lui parle.** Écrire « Ma session a expiré »
+ferait parler l'application d'elle-même.
+
+⚠️ **Le piège est le VOISINAGE, pas la règle.** L'accueil disait « Ton foyer est prêt »
+juste au-dessus d'un bouton « Mon foyer » : deux lignes voisines qui se contredisent. Quand
+une phrase surplombe un libellé qui nomme la même chose, **c'est la phrase qu'on rend
+neutre** — « Tout est prêt : le foyer, les rayons, les recettes » — jamais le libellé qu'on
+retourne au tutoiement.
+
 Jamais un message technique brut — `error.tsx` est le dernier filet, pas le premier. Et
 **jamais « Réessaie » sur une condition non transitoire** : un conseil qui ne peut pas
 fonctionner enferme l'utilisateur dans une boucle. *Défaut réel : un rayon supprimé par

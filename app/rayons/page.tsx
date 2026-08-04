@@ -4,7 +4,7 @@ import { createServerComponentClient } from "@/lib/supabase/server";
 import { rayonsDuFoyer } from "@/lib/rayons/rayons";
 import { ListeRayons } from "./ListeRayons";
 
-export const metadata = { title: "Tes rayons · NutriClaude" };
+export const metadata = { title: "Mes rayons · NutriClaude" };
 
 /**
  * Écran des rayons : l'ordre dans lequel Florian traverse son magasin.
@@ -39,7 +39,7 @@ export default async function RayonsPage() {
         {/* Le titre nomme l'ÉCRAN, pas le foyer : `/` affiche déjà le nom du
             foyer en `<h1>`, et deux pages portant le même titre ne disaient
             plus où l'on était. Leçon de `/foyer`. */}
-        <h1 className="titre-ecran mt-2">Tes rayons</h1>
+        <h1 className="titre-ecran mt-2">Mes rayons</h1>
         <p className="hint mt-1">L&apos;ordre où tu traverses ton magasin.</p>
 
         <div className="mt-12">

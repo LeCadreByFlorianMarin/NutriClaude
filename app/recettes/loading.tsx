@@ -45,7 +45,7 @@ export default function ChargementRecettes() {
         <Bloc className="mt-2 h-5 w-72 max-w-full" />
 
         <div className="mt-12">
-          {/* « Ton répertoire » */}
+          {/* « Mon répertoire » */}
           <Bloc className="h-6 w-40" />
 
           <div className="mt-2">
