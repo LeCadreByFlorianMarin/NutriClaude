@@ -232,7 +232,33 @@ development_status:
   # 2.2 — qui est déjà générique et doit être EXTRAIT en `lib/ordre.ts`, pas recopié.
   # 5 questions ouvertes (branche, suppression d'un ingrédient, glisser ou flèches seules,
   # contrainte sur la quantité, sort du module extrait).
-  3-2-gerer-les-ingredients-d-une-recette: review
+  # ⚠️ FUSIONNÉE le 2026-08-02 (PR #18, squash `8f91f52`), déploiement de production RÉUSSI.
+  # ⚠️ **CE QUE CE SUCCÈS PROUVE, ET CE QU'IL NE PROUVE PAS** — la revue du 2026-08-03 a
+  # mesuré que la formule employée pour la 3.1 ne se transpose PAS ici. Elle vaut pour la
+  # migration des trois `check` : un `add constraint` échoue si une ligne viole, donc son
+  # application prouve qu'aucune ligne de `recipe_ingredients` ne les violait. Elle NE vaut
+  # PAS pour `20260802112749` : un `create or replace function` **ne peut pas** échouer sur
+  # des données — l'en-tête de la migration le dit lui-même — donc sa requête d'ex æquo n'a
+  # TOUJOURS rien établi, et ne le pourra pas rétroactivement. Écrit ici plutôt que corrigé
+  # en silence : c'est la règle §5, une prémisse se rouvre au lieu d'être retirée.
+  #
+  # ✅ REVUE ADVERSARIALE MENÉE le 2026-08-03, la première pour cette story et APRÈS sa mise
+  # en production. 4 décisions, 19 correctifs, 6 reports. Le cœur technique est SOLIDE et
+  # honnêtement mesuré — le trou inter-recettes était réel, le correctif tient (mutation
+  # rejouée sur stack local : 55 → 54, et le seul test tombé est le bon), et l'accord
+  # `UNITES` ↔ contrainte est le meilleur exemple de règle §4 du dépôt.
+  # ⚠️ LE MOTIF, en revanche : la story a mesuré ce qu'elle avait PRÉVU de mesurer, et rien
+  # d'autre. Les six défauts d'usage sont TOUS dans les 660 lignes de JSX qu'aucun test
+  # n'exécute (NFR-10) — et le fichier documente la leçon qu'il enfreint : son commentaire
+  # nomme cette famille « la cinquième fois », corrige le chemin de suppression, et la
+  # reproduit sur les quatre chemins voisins.
+  # ⚠️ Et `recipe_ingredients_nom_non_vide` n'avait AUCUNE dent : retirer la contrainte
+  # laissait 55/55. La Task 8 affirmait pourtant les avoir passées au banc des dents.
+  # Correctifs dans la branche `fix/ingredients-revue-3-2` (PR à part : le code est en
+  # production, sa fermeture n'attend pas ces correctifs).
+  # ⚠️ REPORTÉ à la story 4.10, décision de Florian : l'édition concurrente écrase
+  # silencieusement celle de l'autre membre et affiche « C'est noté. ».
+  3-2-gerer-les-ingredients-d-une-recette: done
   3-3-consulter-une-recette-en-lecture: backlog
   3-4-etiquettes-filtre-et-recherche-du-repertoire: backlog
   3-5-planifier-le-menu-de-la-semaine-sans-defilement-horizontal: backlog

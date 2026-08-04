@@ -6,6 +6,7 @@ import { stackLocal } from "./stack-local.ts";
 import { normaliserNomRayon } from "../../lib/rayons/saisie.ts";
 import { normaliserEntier, normaliserQuantite, normaliserTitre } from "../../lib/recettes/saisie.ts";
 import { UNITES, estUniteConnue } from "../../lib/recettes/unites.ts";
+import { ingredientsDeRecette } from "../../lib/recettes/ingredients.ts";
 
 /**
  * Les contraintes de la base, confrontées à la normalisation applicative.
@@ -271,8 +272,128 @@ test("la base refuse 0 et le négatif, que le client les ait vus ou non", async 
 
 // ── Ingrédients : le vocabulaire d'unités, contrat avec l'Epic 4 ─────────────
 
-/** Une recette de service, pour y accrocher des ingrédients. */
-let recetteDesContraintes: string;
+/**
+ * Une recette de service, pour y accrocher des ingrédients.
+ *
+ * ⚠️ **Créée à la DEMANDE, pas dans le corps du premier test.** La rédaction
+ * précédente l'affectait à l'intérieur de « chaque jeton de UNITES … », et les cinq
+ * tests suivants s'en servaient comme `recipe_id` sans garde. Deux conséquences,
+ * relevées par la revue adversariale du 2026-08-03 : lancer un seul cas avec
+ * `--test-name-pattern` faisait insérer `recipe_id: undefined` et produisait un
+ * `TypeError` au lieu d'une assertion ; et l'échec du premier test faisait échouer
+ * les cinq autres sur un message sans rapport. La recette n'était jamais nettoyée.
+ */
+let recetteDesContraintes: string | null = null;
+
+async function recetteDeService(): Promise<string> {
+  if (recetteDesContraintes) return recetteDesContraintes;
+  const { data, error } = await admin
+    .from("recipes")
+    .insert({ household_id: foyerId, title: "Recette des contraintes" })
+    .select("id")
+    .single();
+  assert.equal(error, null, "la recette de service n'a pas pu être créée");
+  recetteDesContraintes = data!.id as string;
+  return recetteDesContraintes;
+}
+
+/*
+ * Pas de nettoyage dédié : l'`after` du foyer emporte la recette par cascade, et
+ * la recette emporte ses ingrédients. Un second `after` serait une redondance qui
+ * se périmerait le jour où la cascade changerait.
+ */
+
+test("AC4 : l'ordre de LECTURE, ex æquo compris", async () => {
+  const recette = await recetteDeService();
+  /*
+   * ⚠️ **Le seul critère de la story 3.2 que rien n'exécutait.** AC4 dit « le
+   * nouvel ordre est … respecté à l'AFFICHAGE ». Le côté ÉCRITURE était solidement
+   * mesuré — positions distinctes, appel forgé, cardinal, doublon, tableau vide —
+   * mais le côté LECTURE, c'est-à-dire `.order("sort_order").order("created_at")`
+   * de `ingredientsDeRecette`, n'était tenu que par un commentaire de douze lignes.
+   * Règle §4 : un invariant se mesure. Revue adversariale du 2026-08-03.
+   *
+   * ⚠️ **Le tri SECONDAIRE est le point.** `sort_order` vaut 0 par défaut pour
+   * TOUS les ingrédients : sur cette table, les ex æquo sont l'état de DÉPART de
+   * toute recette, pas un cas limite. Sans `created_at`, l'ordre affiché serait
+   * celui que Postgres choisit ce jour-là — donc instable, et le défaut ne se
+   * verrait qu'à l'écran, un jour, sans rien pour le signaler.
+   *
+   * Ce test passe par `ingredientsDeRecette` et non par une requête écrite ici :
+   * recopier le tri prouverait que la copie trie, pas que la fonction trie.
+   */
+  const { data: r } = await admin
+    .from("recipes")
+    .insert({ household_id: foyerId, title: "Recette de l'ordre" })
+    .select("id")
+    .single();
+  const recetteOrdre = r!.id as string;
+
+  // Trois ex æquo à 0 insérés en séquence, puis deux rangés explicitement.
+  for (const nom of ["premier arrivé", "deuxième arrivé", "troisième arrivé"]) {
+    const { error } = await admin
+      .from("recipe_ingredients")
+      .insert({ recipe_id: recetteOrdre, name: nom });
+    assert.equal(error, null, `insertion de « ${nom} »`);
+  }
+  await admin
+    .from("recipe_ingredients")
+    .insert([
+      { recipe_id: recetteOrdre, name: "rangé en 20", sort_order: 20 },
+      { recipe_id: recetteOrdre, name: "rangé en 10", sort_order: 10 },
+    ]);
+
+  const lus = await ingredientsDeRecette(admin, recetteOrdre);
+  assert.deepEqual(
+    lus.map((i) => i.nom),
+    [
+      // Les trois ex æquo à 0 d'abord, dans leur ordre d'ARRIVÉE.
+      "premier arrivé",
+      "deuxième arrivé",
+      "troisième arrivé",
+      "rangé en 10",
+      "rangé en 20",
+    ],
+    "l'ordre de lecture ne respecte pas sort_order puis created_at"
+  );
+
+  // Un identifiant qui n'est pas un uuid rend une liste vide, sans lever.
+  assert.deepEqual(await ingredientsDeRecette(admin, "pas-un-uuid"), []);
+
+  await admin.from("recipes").delete().eq("id", recetteOrdre);
+});
+
+test("la base REFUSE un nom d'ingrédient vide ou invisible", async () => {
+  /*
+   * ⚠️ **La dent qui manquait à `recipe_ingredients_nom_non_vide`, et c'est mesuré.**
+   * La revue adversariale du 2026-08-03 a retiré la contrainte du stack local et
+   * relancé la suite : **55/55, zéro test tombé** — alors que les deux autres
+   * contraintes de la même migration en avaient bien une (unité 55→53, quantité
+   * 55→54). La Task 8 affirmait pourtant les avoir toutes passées au banc des dents.
+   *
+   * ⚠️ **Et ça se démontre sans stack, par simple lecture.** Le seul test qui
+   * touchait le nom — « le client n'est jamais plus laxiste que la base » —
+   * n'insère QUE ce que le client accepte, puis vérifie que la base l'accepte
+   * aussi. Retirer la contrainte rend la base *plus permissive* : chaque insertion
+   * réussit toujours, la liste des laxistes reste vide, le test passe. **Il ne peut
+   * structurellement pas tomber sur une contrainte relâchée.**
+   *
+   * Celui-ci prend le sens inverse — « la base REFUSE » — qui est le seul à mordre.
+   * C'est le pendant de ce que la story 3.1 avait écrit pour les titres de recette.
+   */
+  const recette = await recetteDeService();
+  for (const vide of ["", " ", "​", " ‍", "\t\n"]) {
+    const { error } = await admin
+      .from("recipe_ingredients")
+      .insert({ recipe_id: recette, name: vide });
+    assert.notEqual(
+      error,
+      null,
+      `la base a accepté un nom vide : ${JSON.stringify(vide)}`
+    );
+    assert.match(error!.message, /recipe_ingredients_nom_non_vide/);
+  }
+});
 
 test("chaque jeton de UNITES est accepté par la base, et rien d'autre", async () => {
   /*
@@ -282,17 +403,12 @@ test("chaque jeton de UNITES est accepté par la base, et rien d'autre", async (
    * dise — et la conséquence ne se verrait qu'en Epic 4, sous la forme de deux
    * lignes de courses qui refusent de fusionner.
    */
-  const { data: r } = await admin
-    .from("recipes")
-    .insert({ household_id: foyerId, title: "Recette des unités" })
-    .select("id")
-    .single();
-  recetteDesContraintes = r!.id as string;
+  const recette = await recetteDeService();
 
   for (const unite of UNITES) {
     const { data, error } = await admin
       .from("recipe_ingredients")
-      .insert({ recipe_id: recetteDesContraintes, name: `test ${unite}`, unit: unite })
+      .insert({ recipe_id: recette, name: `test ${unite}`, unit: unite })
       .select("id");
     assert.equal(error, null, `la base a refusé le jeton « ${unite} » que le code publie`);
     await admin.from("recipe_ingredients").delete().eq("id", data![0].id);
@@ -300,17 +416,19 @@ test("chaque jeton de UNITES est accepté par la base, et rien d'autre", async (
 });
 
 test("une unité hors vocabulaire est refusée par la base, comme par le code", async () => {
+  const recette = await recetteDeService();
   for (const faux of ["piece", "l", "G", "litre", "oz", "cuillère", " g"]) {
     assert.equal(estUniteConnue(faux), false, `le code accepte « ${faux} »`);
     const { error } = await admin
       .from("recipe_ingredients")
-      .insert({ recipe_id: recetteDesContraintes, name: "hors vocabulaire", unit: faux });
+      .insert({ recipe_id: recette, name: "hors vocabulaire", unit: faux });
     assert.notEqual(error, null, `la base accepte « ${faux} »`);
     assert.match(error!.message, /recipe_ingredients_unite_fermee/);
   }
 });
 
 test("« pièce » DÉCOMPOSÉ est refusé — le cas qui casserait la clé canonique", async () => {
+  const recette = await recetteDeService();
   /*
    * Mesuré : NFC 5 points de code / 6 octets, NFD 6 / 7, et Postgres les juge
    * inégaux. Sans cette contrainte, deux « pièce » visuellement identiques
@@ -320,15 +438,16 @@ test("« pièce » DÉCOMPOSÉ est refusé — le cas qui casserait la clé cano
   assert.notEqual(decomposee, "pièce");
   const { error } = await admin
     .from("recipe_ingredients")
-    .insert({ recipe_id: recetteDesContraintes, name: "pièce NFD", unit: decomposee });
+    .insert({ recipe_id: recette, name: "pièce NFD", unit: decomposee });
   assert.notEqual(error, null, "la base a accepté une forme décomposée");
   assert.match(error!.message, /recipe_ingredients_unite_fermee/);
 });
 
 test("une unité absente reste permise — « du sel » est légitime", async () => {
+  const recette = await recetteDeService();
   const { data, error } = await admin
     .from("recipe_ingredients")
-    .insert({ recipe_id: recetteDesContraintes, name: "sel" })
+    .insert({ recipe_id: recette, name: "sel" })
     .select("id, unit, quantity");
   assert.equal(error, null);
   assert.equal(data![0].unit, null);
@@ -337,13 +456,14 @@ test("une unité absente reste permise — « du sel » est légitime", async ()
 });
 
 test("le client n'est jamais plus laxiste que la base sur un NOM d'ingrédient", async () => {
+  const recette = await recetteDeService();
   const laxistes: string[] = [];
   for (const [nom, saisie] of [...INVISIBLES_REELS, ...NOMS_LEGITIMES]) {
     const normalise = normaliserTitre(saisie);
     if (normalise === null) continue;
     const { data, error } = await admin
       .from("recipe_ingredients")
-      .insert({ recipe_id: recetteDesContraintes, name: normalise })
+      .insert({ recipe_id: recette, name: normalise })
       .select("id");
     if (error) laxistes.push(nom);
     else await admin.from("recipe_ingredients").delete().eq("id", data![0].id);
@@ -352,6 +472,7 @@ test("le client n'est jamais plus laxiste que la base sur un NOM d'ingrédient",
 });
 
 test("la quantité : le client n'est jamais plus laxiste que la base", async () => {
+  const recette = await recetteDeService();
   /*
    * Le client refuse ce qui n'est pas un nombre et ce qui dépasse numeric(8,2) ;
    * la base tient la seule règle métier, `>= 0`. L'invariant reste le même.
@@ -364,7 +485,7 @@ test("la quantité : le client n'est jamais plus laxiste que la base", async () 
 
     const { data, error } = await admin
       .from("recipe_ingredients")
-      .insert({ recipe_id: recetteDesContraintes, name: `q ${saisie}`, quantity: valeur })
+      .insert({ recipe_id: recette, name: `q ${saisie}`, quantity: valeur })
       .select("id");
     if (error) laxistes.push(saisie);
     else await admin.from("recipe_ingredients").delete().eq("id", data![0].id);
@@ -373,10 +494,11 @@ test("la quantité : le client n'est jamais plus laxiste que la base", async () 
 });
 
 test("la base refuse une quantité négative, que le client l'ait vue ou non", async () => {
+  const recette = await recetteDeService();
   for (const q of [-0.01, -1, -999]) {
     const { error } = await admin
       .from("recipe_ingredients")
-      .insert({ recipe_id: recetteDesContraintes, name: "négatif", quantity: q });
+      .insert({ recipe_id: recette, name: "négatif", quantity: q });
     assert.notEqual(error, null, `quantity=${q} doit être refusée`);
     assert.match(error!.message, /recipe_ingredients_quantite_positive/);
   }

@@ -71,6 +71,23 @@ fois et faux deux fois. Il est désormais mesuré par `supabase/tests/contrainte
 
 *« La base est gelée » a couvert le trou NFR-5 de `profiles_update_own` pendant tout l'Epic 1.*
 
+### 6 bis. Le `Status` du fichier de story se ferme AVEC le suivi de sprint
+
+Deux documents portent le statut d'une story : son fichier et `sprint-status.yaml`. **Le
+fichier fait foi** — c'est lui qui porte les notes de complétion et la liste « ce qui reste
+à vérifier avant la fusion », et c'est lui qu'une session d'agent recharge.
+
+Le fermer ailleurs **clôt la story sans clore ses conditions**.
+
+*Mesuré le 2026-08-03 : les stories 2.2, 3.1 et 3.2 étaient `done` dans le suivi et `review`
+dans leurs fichiers — trois d'un coup, par le même commit. Deux d'entre elles avaient des
+conditions de fusion jamais refermées. Ce n'était pas un accident d'étiquette : c'était une
+habitude, et elle rendait le champ `Status` du fichier de story inutilisable comme garde.*
+
+**Fermer avec ses conditions ouvertes est permis ; les effacer ne l'est pas.** Une story se
+ferme en DATANT ce qui reste ouvert, jamais en le retirant — c'est la même règle que §1, du
+côté des statuts.
+
 ### 6. Revue adversariale par story, pas en fin d'epic
 
 **Et la passe de correction doit être revue à son tour.** *Trois des six défauts majeurs de

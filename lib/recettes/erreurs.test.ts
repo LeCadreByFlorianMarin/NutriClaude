@@ -81,9 +81,53 @@ test("les TROIS contraintes d'ingrédient se distinguent, sous le même 23514", 
 
 test("un refus d'ingrédient inconnu reste générique", () => {
   assert.equal(refusIngredient(msg("contrainte_inventee")), "echec");
-  assert.equal(refusIngredient({ code: "23503", message: "foreign key" }), "echec");
   assert.equal(refusIngredient(null), "echec");
   assert.equal(refusIngredient({ code: null, message: null }), "echec");
+});
+
+test("la recette disparue ne dit JAMAIS « Réessaie »", () => {
+  /*
+   * ⚠️ **Ce test remplace une assertion qui FIGEAIT le défaut.** Elle disait
+   * `refusIngredient({ code: "23503" … }) === "echec"` — c'est-à-dire « Ça n'a pas
+   * marché. Réessaie dans un instant. » sur une recette que l'autre membre venait
+   * de supprimer. Retenter ne pouvait JAMAIS marcher : le conseil enfermait
+   * l'utilisateur dans une boucle, la famille de défaut que `project-context.md`
+   * cite nommément en exemple. Le test rendait ce comportement intouchable.
+   * Trouvé par la revue adversariale du 2026-08-03.
+   *
+   * `23503` : la clé étrangère `recipe_ingredients_recipe_id_fkey` n'a plus de
+   * cible — mesuré sur le stack local par la couche d'audit.
+   * `42501` : c'est le `with check` de `recipe_ingredients_all` qui refuse.
+   * Les deux disent la même chose à l'utilisateur, et une seule action la répare.
+   */
+  assert.equal(
+    refusIngredient({ code: "23503", message: "foreign key" }),
+    "liste-changee"
+  );
+  assert.equal(
+    refusIngredient({ code: "42501", message: "permission denied" }),
+    "liste-changee"
+  );
+});
+
+test("le SQLSTATE l'emporte sur le nom de contrainte, et c'est voulu", () => {
+  /*
+   * Un `23503` ne PEUT pas porter un nom de contrainte `check` — les deux familles
+   * s'excluent. L'ordre n'a donc aucune conséquence pratique ; il est épinglé pour
+   * que le déplacer devienne un choix visible et non un accident.
+   */
+  assert.equal(
+    refusIngredient({
+      code: "23503",
+      message: "viole recipe_ingredients_nom_non_vide",
+    }),
+    "liste-changee"
+  );
+  // Et une contrainte `check` reste nommée par son nom, pas par son SQLSTATE.
+  assert.equal(
+    refusIngredient({ code: "23514", message: "recipe_ingredients_nom_non_vide" }),
+    "nom-vide"
+  );
 });
 
 test("les quatre gardes de reorder_recipe_ingredients disent la même chose", () => {

@@ -434,3 +434,53 @@ signalait. Le bouton reste réservé à l'état vide, conformément à la décis
   celle-ci, ce qui peut sembler exiger un pixel de plus qu'attendu. Le trait d'insertion le rend
   visible en continu, donc l'écart s'observe avant de relâcher. Un modèle par bords serait plus
   fidèle mais demande de gérer les recouvrements ; sans portée tant que les hauteurs restent proches.
+
+---
+
+## Deferred from: code review of 3-2-gerer-les-ingredients-d-une-recette (2026-08-03)
+
+Revue adversariale à trois couches sur `d270c47..8f91f52`. ⚠️ **Story déjà EN PRODUCTION**,
+fusionnée sans revue — la troisième d'affilée. Six constats réels mais préexistants, hérités, ou
+sans case cochée à tort.
+
+- **`aisle_keyword` : champ libre, partagé, consommé par un calcul, et sans aucune contrainte.**
+  La migration `20260802112511` argumente sur quinze lignes que `name` doit descendre en base parce
+  qu'« un champ libre partagé par tout le foyer descend en base (AD-1/AD-2), et le contrôle
+  navigateur ne voit pas les appels REST directs ». **Le même argument s'applique mot pour mot à
+  `aisle_keyword`**, qui est le troisième repli de `resolve_aisle_id`
+  (`initial_schema.sql:498-507`) — donc consommé par un calcul, le critère exact invoqué pour
+  justifier `quantity >= 0`. Ni contrainte, ni test, ni mention dans le tableau « Frontières ».
+  *Scénario : un appel REST pose `aisle_keyword = ''` ou une chaîne d'invisibles ; en Epic 4 la
+  résolution de rayon se comporte de travers sans qu'aucune surface ne le montre.*
+  *Reporté : même famille que la décision de Florian du 2026-08-02 (« pas de limite pour
+  l'instant ») sur `description` et `instructions` — voir la PR #19. À rouvrir ensemble.*
+
+- **`prochainOrdreIngredient` recrée les ex æquo qu'il est censé résorber.** `max(ordre) + 10`
+  est calculé sur la liste reçue en propriétés. Deux ajouts concurrents — deux membres, ou deux
+  soumissions avant l'arrivée du `router.refresh()` — calculent le **même** `max + 10`. Le tri
+  secondaire `created_at` sauve l'affichage, mais `ordreApresDeplacement` part alors d'un ordre
+  affiché que `sort_order` seul ne reproduit pas. ⚠️ Le commentaire de la migration affirme le
+  contraire (« renuméroter TOUT plutôt qu'échanger est ce qui rend les positions uniques ») — vrai
+  du réordonnancement, faux de l'ajout. *Reporté : fenêtre étroite, conséquence cosmétique.*
+
+- **`prochainOrdreIngredient` n'a aucun test**, alors que le piège du `Math.max()` sur liste vide
+  (`-Infinity`) est nommément désigné par le piège n°5 de la story et gardé par un simple
+  commentaire. C'est la seule fonction pure de cette story qui échappe au filet TDD.
+  *Reporté : ni Task 3 ni Task 4 ne l'exigeaient, donc aucune case n'est cochée à tort.*
+
+- **`statutListe` est sans `reserve`.** Il surplombe la liste **et** le formulaire d'ajout : quand
+  « C'est retiré. » apparaît, toute la liste descend sous le doigt — le cas exact que
+  `project-context.md` décrit pour justifier `reserve`. *Reporté : hérité de `ListeRayons`, à
+  traiter sur les deux écrans à la fois.*
+
+- **`break-all` coupe les mots français au caractère** (« oign/ons ») là où l'écran de lecture
+  emploie `break-words`. *Reporté : hérité de `ListeRayons`, et déjà consigné pour le `<h1>` de
+  l'écran de lecture (PR #19). Même décision à prendre, sur les trois écrans.*
+
+- **`docs/migrations.md` fige « neuf fonctions » comme contrôle de régénération** alors que les
+  Completion Notes admettent que `lib/supabase/types.ts` a été **édité à la main**. Le contrôle ne
+  prouve donc plus qu'une régénération a eu lieu, seulement qu'une main a écrit neuf lignes.
+  ⚠️ *La couche d'audit a MESURÉ que le bloc recopié est identique au généré
+  (`supabase gen types --local` + `diff`, écart strictement limité à `__InternalSupabase` ↔
+  `graphql_public`) : le compte est donc exact aujourd'hui.* *Reporté : la faiblesse est celle du
+  contrôle, pas de la donnée.*
