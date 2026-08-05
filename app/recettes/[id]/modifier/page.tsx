@@ -3,6 +3,7 @@ import { requireProfile } from "@/app/_lib/garde";
 import { createServerComponentClient } from "@/lib/supabase/server";
 import { recetteParId } from "@/lib/recettes/recettes";
 import { ingredientsDeRecette } from "@/lib/recettes/ingredients";
+import { casesDeRecette } from "@/lib/menu/menu";
 import { FormulaireRecette } from "./FormulaireRecette";
 import { IngredientsRecette } from "./IngredientsRecette";
 
@@ -57,12 +58,27 @@ export default async function ModifierRecettePage({
 
   if (!recette) notFound();
 
-  const ingredients = await ingredientsDeRecette(supabase, recette.id);
+  /*
+   * ⚠️ **`repasAuMenu` n'est pas décoratif : sans lui, la confirmation de
+   * suppression MENT.** `meal_plan_entries.recipe_id` est `on delete cascade`
+   * (`initial_schema.sql:178`), donc supprimer une recette efface aussi les repas
+   * où elle est prévue. La confirmation disait « Elle disparaît de ton
+   * répertoire. » — vrai tant qu'aucun écran ne permettait de mettre une recette
+   * au menu, faux depuis la story 3.6. Arête datée à l'avance dans
+   * `deferred-work.md`, à l'intention de cette story.
+   *
+   * Les deux lectures sont indépendantes : les enchaîner les ferait attendre l'une
+   * après l'autre.
+   */
+  const [ingredients, repasAuMenu] = await Promise.all([
+    ingredientsDeRecette(supabase, recette.id),
+    casesDeRecette(supabase, recette.id),
+  ]);
 
   return (
     <main className="flex-1 p-6">
       <div className="mx-auto w-full max-w-2xl py-6">
-        <FormulaireRecette recette={recette} />
+        <FormulaireRecette recette={recette} repasAuMenu={repasAuMenu.length} />
         {/*
           ⚠️ **Composant à part, monté SOUS le formulaire — pas dedans.** Les deux
           n'ont pas le même modèle d'écriture : le formulaire de la recette

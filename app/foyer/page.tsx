@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { requireProfile } from "@/app/_lib/garde";
 import { createServerComponentClient } from "@/lib/supabase/server";
-import { nomDuFoyer } from "@/lib/foyer/foyer";
+import { foyerCourant } from "@/lib/foyer/foyer";
 import { invitationEnCours } from "@/lib/foyer/invitation";
 import { membresDuFoyer } from "@/lib/foyer/membres";
 import { Notice } from "@/app/_lib/Notice";
 import { seDeconnecter } from "./actions";
 import { DisplayNameForm } from "./DisplayNameForm";
 import { InviteCard } from "./InviteCard";
+import { PersonnesForm } from "./PersonnesForm";
 
 export const metadata = { title: "Mon foyer · NutriClaude" };
 
@@ -35,8 +36,8 @@ export default async function FoyerPage({
   // Les trois lectures sont indépendantes : les enchaîner les faisait attendre
   // l'une après l'autre. En parallèle, l'écran coûte le temps de la plus lente
   // au lieu de leur somme — ce sont toujours trois allers-retours.
-  const [nom, invitation, membres] = await Promise.all([
-    nomDuFoyer(supabase, profile.household_id),
+  const [foyer, invitation, membres] = await Promise.all([
+    foyerCourant(supabase, profile.household_id),
     invitationEnCours(supabase),
     membresDuFoyer(supabase),
   ]);
@@ -62,7 +63,7 @@ export default async function FoyerPage({
           que rien à l'écran ne disait où l'on était.
         */}
         <h1 className="titre-ecran mt-2">Mon foyer</h1>
-        <p className="hint mt-1 break-words">{nom ?? "Sans nom"}</p>
+        <p className="hint mt-1 break-words">{foyer?.nom ?? "Sans nom"}</p>
 
         {/* ── Groupe 1 : toi et ton foyer ── */}
         <section className="mt-12">
@@ -71,6 +72,23 @@ export default async function FoyerPage({
             <DisplayNameForm profilId={profile.id} prenom={profile.display_name} />
           </div>
         </section>
+
+        {/* ⚠️ Le foyer illisible n'est pas censé arriver — `household_id` est
+            `not null` et `households_select` rend la ligne visible à tout membre.
+            Le cas reste distinct de « pas de nom », comme `foyerCourant` le
+            documente : les confondre avait fait afficher « Chez toi » à la place
+            du nom du foyer, donnant à croire qu'il avait été renommé. */}
+        {foyer ? (
+          <section className="mt-6">
+            <h2 className="titre-section">Combien on est</h2>
+            <div className="mt-2">
+              <PersonnesForm
+                foyerId={profile.household_id}
+                personnes={foyer.personnesParDefaut}
+              />
+            </div>
+          </section>
+        ) : null}
 
         <section className="mt-6">
           <h2 className="titre-section">Qui est là</h2>

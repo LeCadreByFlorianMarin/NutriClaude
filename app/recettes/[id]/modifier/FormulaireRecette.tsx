@@ -95,7 +95,26 @@ function identiques(a: Saisie, b: Saisie): boolean {
  * ⚠️ **Le lien de retour vit ICI et non dans la page**, parce que c'est lui
  * qu'il faut pouvoir intercepter quand des saisies ne sont pas enregistrées.
  */
-export function FormulaireRecette({ recette }: { recette: Recette }) {
+export function FormulaireRecette({
+  recette,
+  repasAuMenu,
+}: {
+  recette: Recette;
+  /**
+   * Combien de repas cette recette occupe au menu.
+   *
+   * ⚠️ **Il ne sert qu'à ne pas MENTIR dans la confirmation de suppression.**
+   * `meal_plan_entries.recipe_id` est `on delete cascade` : supprimer la recette
+   * efface aussi ces repas, et la confirmation ne le disait pas.
+   *
+   * ⚠️ **Ce compte est celui du rendu, et il peut être périmé** — l'autre membre
+   * du foyer peut mettre la recette au menu entre l'affichage et le clic. C'est
+   * une information, pas une garde : il n'y a rien à contrôler ici, la suppression
+   * reste la même. Le dire vaut mieux que se taire, et prétendre le contraire
+   * demanderait une propagation temps réel que l'Epic 4 n'a pas encore apportée.
+   */
+  repasAuMenu: number;
+}) {
   const router = useRouter();
   const { occupe, cle, refuser, effacer, soumettre } = useSoumission<Cle>();
 
@@ -489,8 +508,33 @@ export function FormulaireRecette({ recette }: { recette: Recette }) {
           )}
         </div>
 
+        {/*
+          ⚠️ **CE TEXTE ÉTAIT DEVENU FAUX AVEC LA STORY 3.6.** « Elle disparaît de
+          ton répertoire. » était vrai tant qu'aucun écran ne permettait de mettre
+          une recette au menu ; depuis, `on delete cascade` emporte aussi les repas
+          planifiés — **sans un mot**. C'est le défaut de texte d'annonce périmé que
+          les stories 1.6, 1.7, 2.1, 2.2 et 3.5 ont chacune eu à réparer, et il se
+          répare dans le commit qui le rend faux, jamais après.
+
+          `tabular-nums` sur le compte (UX-DR12), et le singulier écrit à part : « 1
+          repas » se lit mal quand on peut écrire « du repas ».
+        */}
         {aConfirmer ? (
-          <p className="hint mt-2">Elle disparaît de ton répertoire.</p>
+          <p className="hint mt-2">
+            Elle disparaît de ton répertoire
+            {repasAuMenu === 0 ? "." : null}
+            {repasAuMenu === 1 ? ", et du repas où tu l'as prévue." : null}
+            {repasAuMenu > 1 ? (
+              <>
+                {/* ⚠️ `{" "}` EXPLICITE après le compte : JSX supprime l'espace qui
+                    précède un saut de ligne, et le rendu disait « des 2repas ».
+                    Trouvé par le parcours à l'écran du 2026-08-04 — les six portes
+                    étaient vertes, et aucune ne lit une phrase. */}
+                , et des <span className="tabular-nums">{repasAuMenu}</span>{" "}
+                repas où tu l&apos;as prévue.
+              </>
+            ) : null}
+          </p>
         ) : null}
 
         {statutSuppression}
