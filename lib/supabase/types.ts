@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
-  }
   public: {
     Tables: {
       aisles: {
@@ -51,43 +46,61 @@ export type Database = {
       }
       grocery_list_items: {
         Row: {
+          actor_id: string | null
+          actor_kind: string | null
           added_by: string | null
           aisle_id: string | null
           created_at: string
+          deleted_at: string | null
           household_id: string
           id: string
+          intent_at: string
           name: string
           product_id: string | null
           quantity: number | null
           recipe_id: string | null
+          source_ref: string | null
           status: string
           unit: string | null
+          updated_at: string
         }
         Insert: {
+          actor_id?: string | null
+          actor_kind?: string | null
           added_by?: string | null
           aisle_id?: string | null
           created_at?: string
+          deleted_at?: string | null
           household_id: string
           id?: string
+          intent_at?: string
           name: string
           product_id?: string | null
           quantity?: number | null
           recipe_id?: string | null
+          source_ref?: string | null
           status?: string
           unit?: string | null
+          updated_at?: string
         }
         Update: {
+          actor_id?: string | null
+          actor_kind?: string | null
           added_by?: string | null
           aisle_id?: string | null
           created_at?: string
+          deleted_at?: string | null
           household_id?: string
           id?: string
+          intent_at?: string
           name?: string
           product_id?: string | null
           quantity?: number | null
           recipe_id?: string | null
+          source_ref?: string | null
           status?: string
           unit?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -518,20 +531,26 @@ export type Database = {
     Views: {
       grocery_list_by_aisle: {
         Row: {
+          actor_id: string | null
+          actor_kind: string | null
           added_by: string | null
           aisle_icon: string | null
           aisle_id: string | null
           aisle_name: string | null
           aisle_sort: number | null
           created_at: string | null
+          deleted_at: string | null
           household_id: string | null
           id: string | null
+          intent_at: string | null
           name: string | null
           product_id: string | null
           quantity: number | null
           recipe_id: string | null
+          source_ref: string | null
           status: string | null
           unit: string | null
+          updated_at: string | null
         }
         Relationships: [
           {
@@ -630,6 +649,7 @@ export type Database = {
         Args: { p_household_id: string }
         Returns: undefined
       }
+      strip_accents: { Args: { p_texte: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
@@ -762,3 +782,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
