@@ -41,7 +41,13 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
-last_updated: 2026-08-04  # 2026-08-04 — Story 3.6 IMPLÉMENTÉE (statut `review`). Détail à son entrée, plus bas.
+last_updated: 2026-08-05  # 2026-08-05 — Story 7.1 contextualisée : `backlog` → `ready-for-dev`, et
+                          # `epic-7` : `backlog` → `in-progress`. ⛔ QUATRE DÉCISIONS OUVERTES, dont
+                          # le mécanisme d'identité lui-même. Ses trois critères citent les stories
+                          # 5.1 et 5.7, qui n'existent pas. Détail à son entrée, plus bas.
+                          # ⚠️ L'Epic 7 est pris HORS ORDRE : 4, 5 et 6 restent entiers en `backlog`.
+                          #
+                          # 2026-08-04 — Story 3.6 IMPLÉMENTÉE (statut `review`). Détail à son entrée, plus bas.
                           # Contexte d'origine : Story 3.6 contextualisée : `backlog` → `ready-for-dev`.
                           # DERNIÈRE story de l'Epic 3, et la PREMIÈRE qui ÉCRIT dans
                           # `meal_plan_entries`. Elle porte UNE migration — la contrainte d'unicité
@@ -530,8 +536,24 @@ development_status:
   epic-6-retrospective: optional
 
   # ── Epic 7 : Le pilotage conversationnel (Claude / MCP) ──
-  epic-7: backlog
-  7-1-acces-conversationnel-scope-foyer-sans-contournement-de-l-isolation: backlog
+  # 2026-08-05 — `backlog` → `in-progress` : première story de l'epic contextualisée.
+  # ⚠️ L'EPIC EST PRIS HORS ORDRE. Les Epics 4, 5 et 6 sont entiers en `backlog`, et la 7.1
+  # est la SEULE des quatre stories de cet epic qui n'a besoin ni de la liste (Epic 4) ni
+  # d'un écran : elle ne pose que l'authentification et son périmètre. Livrer la 7.1 ne
+  # débloque donc PAS l'Epic 7 — les 7.2, 7.3 et 7.4 restent derrière l'Epic 4.
+  epic-7: in-progress
+  # 2026-08-05 — Story 7.1 contextualisée : `backlog` → `ready-for-dev`.
+  # ⛔ `ready-for-dev` dit que le CONTEXTE est complet, PAS que le chemin est tranché.
+  #    QUATRE DÉCISIONS SONT OUVERTES dans le fichier de story, dont une structurante :
+  #    le mécanisme d'identité lui-même (clé de signature importée vs serveur OAuth 2.1 de
+  #    Supabase). Ne pas lancer `dev-story` avant qu'elles soient tranchées. C'est la même
+  #    honnêteté de statut que la règle §6 bis de `project-context.md`, côté ouverture.
+  # ⚠️ SES TROIS CRITÈRES CITENT DES STORIES QUI N'EXISTENT PAS : l'AC1 renvoie à la 5.1
+  #    (identité d'appareil), l'AC3 à la 5.7 (révocation depuis le web) — toutes deux
+  #    `backlog`, aucune table `device_credentials` dans les 15 migrations. Selon la
+  #    Décision 1, la 7.1 ABSORBE la 5.1 (chemin A) ou la REND SANS OBJET pour cette
+  #    surface (chemin B). Dans les deux cas l'entrée `5-1-…` ci-dessus devra être reprise.
+  7-1-acces-conversationnel-scope-foyer-sans-contournement-de-l-isolation: ready-for-dev
   7-2-piloter-la-liste-depuis-claude: backlog
   7-3-consulter-et-faconner-recettes-menu-depuis-claude: backlog
   7-4-consulter-et-modifier-rayons-regles-depuis-claude: backlog
