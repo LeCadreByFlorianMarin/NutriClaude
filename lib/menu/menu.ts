@@ -234,15 +234,6 @@ export async function casesDuRepas(
 }
 
 /**
- * Les cases rangées par (jour, repas).
- *
- * ⚠️ **La valeur est une LISTE, pas une case.** Plusieurs recettes DIFFÉRENTES
- * peuvent partager un repas — la contrainte d'AD-6 n'interdit que le doublon de la
- * même recette — et une `Map<clé, CaseDeMenu>` en perdrait silencieusement : la
- * case en montrerait une, la base en aurait trois, et la génération de liste de
- * l'Epic 4 compterait les trois. « Soir : gratin + salade » est un menu normal.
- */
-/**
  * Les repas où une recette est prévue, du plus proche au plus lointain.
  *
  * **Pourquoi cette lecture existe.** Supprimer une recette vide ses cases de menu
@@ -283,6 +274,15 @@ export async function casesDeRecette(
   }));
 }
 
+/**
+ * Les cases rangées par (jour, repas).
+ *
+ * ⚠️ **La valeur est une LISTE, pas une case.** Plusieurs recettes DIFFÉRENTES
+ * peuvent partager un repas — la contrainte d'AD-6 n'interdit que le doublon de la
+ * même recette — et une `Map<clé, CaseDeMenu>` en perdrait silencieusement : la
+ * case en montrerait une, la base en aurait trois, et la génération de liste de
+ * l'Epic 4 compterait les trois. « Soir : gratin + salade » est un menu normal.
+ */
 export function grouperParCase(cases: CaseDeMenu[]): Map<string, CaseDeMenu[]> {
   const par = new Map<string, CaseDeMenu[]>();
   for (const c of cases) {

@@ -39,14 +39,30 @@ export const metadata = { title: "Mon menu · NutriClaude" };
 function Case({
   jour,
   repas,
-  libelle,
   entrees,
 }: {
   jour: JourISO;
   repas: (typeof REPAS)[number];
-  libelle: string;
   entrees: CaseDeMenu[];
 }) {
+  /*
+   * ⚠️ **Le libellé se dérive de `repas`, il ne se passe plus en second paramètre.**
+   * Depuis que la case reçoit l'objet `REPAS` entier (pour son `slug`), un paramètre
+   * `libelle` était une seconde voie par laquelle un nom de repas pouvait entrer —
+   * dans un composant dont `REPAS` proclame être « le seul endroit qui nomme les
+   * repas ». Câblage mort relevé par la revue du 2026-08-05.
+   */
+  const libelle = repas.libelle;
+
+  /*
+   * ⚠️ **Le nom accessible NOMME sa case, et c'est une correction de revue.** Sans
+   * lui, la grille présente 28 liens intitulés « Mettre une recette » ou « Modifier »,
+   * indiscernables au rotor d'un lecteur d'écran ou en navigation par liens : le jour
+   * vit dans un `<h2>` et le repas dans un `<p>`, tous deux frères du lien et non
+   * associés à lui. Le défaut est né avec cette story — l'état vide était auparavant un
+   * `<p>` non interactif.
+   */
+  const situe = `${formaterJourLong(jour)}, ${libelle.toLowerCase()}`;
   /*
    * La destination que la story 3.5 avait dessinée sans pouvoir la donner. Son
    * `min-h-touch` avait été posé d'avance pour ce moment : rien n'a été jeté.
@@ -76,6 +92,7 @@ function Case({
         */
         <Link
           href={destination}
+          aria-label={`Mettre une recette — ${situe}`}
           className="hint mt-1 flex min-h-touch items-center underline underline-offset-4"
         >
           Mettre une recette
@@ -119,6 +136,7 @@ function Case({
 
           <Link
             href={destination}
+            aria-label={`Modifier — ${situe}`}
             className="hint mt-2 flex min-h-touch items-center underline underline-offset-4"
           >
             Modifier
@@ -272,7 +290,6 @@ export default async function MenuPage({
                     key={repas.code}
                     jour={jour}
                     repas={repas}
-                    libelle={repas.libelle}
                     entrees={parCase.get(cleDeCase(jour, repas.code)) ?? []}
                   />
                 ))}

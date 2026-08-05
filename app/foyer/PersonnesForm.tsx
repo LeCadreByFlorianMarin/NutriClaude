@@ -20,6 +20,12 @@ const MESSAGES = {
    * est mesuré par `supabase/tests/contraintes.test.ts`, pas affirmé ici.
    */
   invalide: "Il faut au moins une personne.",
+  /*
+   * ⚠️ **Un troisième refus, ajouté par la revue du 2026-08-04.** Le hors-bornes
+   * tombait sur « s'écrit en chiffres » — un conseil que quelqu'un qui vient de taper
+   * un nombre a déjà suivi, donc une boucle sans issue visible.
+   */
+  trop: "C'est trop de monde pour un foyer.",
   echec: "Ça n'a pas marché. Réessaie dans un instant.",
   ok: "C'est noté.",
 } as const;
@@ -71,7 +77,14 @@ export function PersonnesForm({
      */
     const analyse = analyserPersonnes(valeur);
     if ("faute" in analyse) {
-      return refuser(analyse.faute === "illisible" ? "illisible" : "invalide");
+      switch (analyse.faute) {
+        case "illisible":
+          return refuser("illisible");
+        case "trop-peu":
+          return refuser("invalide");
+        case "trop-grand":
+          return refuser("trop");
+      }
     }
     const combien = analyse.valeur;
 

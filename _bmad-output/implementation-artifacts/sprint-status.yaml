@@ -466,7 +466,19 @@ development_status:
   # sur la PRODUCTION (c'est le geste de la revue de PR, et la fusion APPLIQUE la migration),
   # et « le dire dans la PR » que l'AC2 n'y est pas démontrable. Deux cases décochées avec
   # leur raison ; une troisième porte l'écart de méthode sur la mesure de largeur.
-  3-6-assigner-recettes-et-nombre-de-personnes-aux-cases-du-menu: review
+  # 2026-08-05 — REVUE ADVERSARIALE menée (3 couches en contexte vierge) + passe de correction.
+  # 21 findings, 7 levés par au moins deux couches. 14 correctifs appliqués, 6 reports datés.
+  # ⚠️ Menée par le modèle QUI A IMPLÉMENTÉ : la règle §6 demande un autre modèle, et les
+  # sous-agents à contexte vierge sont une atténuation, pas un équivalent.
+  # 2 décisions de Florian : décocher le refus `23514` (inatteignable), et REFONDRE
+  # `AssignerRepas` en « une ligne ouverte à la fois » — refonte qui referme 4 findings.
+  # ⚠️ 4 AFFIRMATIONS FAUSSES du Dev Agent Record corrigées, dont `loading.tsx` déclaré
+  # « intact » alors qu'il ne suivait plus la hauteur des cases (saut de mise en page sur 28
+  # cases), et une empreinte SHA-256 de `.env.local` qui ne prouvait rien — le fichier porte un
+  # jeton Vercel de 12 h que la CLI réécrit seule.
+  # ⛔ `in-progress` ET NON `review` : la passe de correction DOIT ÊTRE REVUE À SON TOUR
+  # (règle §6 — 3 des 6 défauts majeurs de l'Epic 1 sont nés d'une passe de revue).
+  3-6-assigner-recettes-et-nombre-de-personnes-aux-cases-du-menu: in-progress
   epic-3-retrospective: optional
 
   # ── Epic 4 : La liste qui ne lâche jamais — hors-ligne, convergence & contrat ──

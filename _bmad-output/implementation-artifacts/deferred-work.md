@@ -733,3 +733,92 @@ grille elle-même n'a pas été rejoué.
 - **Le compte de repas de la confirmation de suppression peut être périmé** — il est celui du
   rendu, et l'autre membre peut mettre la recette au menu entre l'affichage et le clic. C'est une
   information, pas une garde : la suppression reste la même. Le dire vaut mieux que se taire.
+
+---
+
+## Deferred from: code review of story-3.6 (2026-08-04)
+
+Revue adversariale à trois couches en contexte vierge. ⚠️ **Menée par le modèle qui a implémenté
+la story** — la règle §6 en demande un autre ; les sous-agents à contexte vierge sont une
+atténuation, pas un équivalent, et cette limite est datée ici plutôt que tue.
+
+- **Aucun test positif sur `households_update`.** La story affirmait « rien à ajouter, un test de
+  plus serait de la redondance » en citant `isolation.test.ts:214-223` — qui n'éprouve que le
+  **refus** (« A ne peut pas renommer le foyer de B »). Les quatre tests neufs de
+  `contraintes.test.ts` passent par le rôle de service, qui traverse la RLS : ils ne couvrent pas
+  la politique non plus. **La revue a comblé la mesure** (`set_config('request.jwt.claims', …)` +
+  `set local role authenticated`) : le chemin **fonctionne** — `UPDATE 1` sur sa propre ligne,
+  puis refus du `0` par `households_default_servings_positif`. Ce n'est donc pas un bug, mais un
+  invariant qui restait **affirmé et non mesuré** sur le seul chemin d'écriture neuf du foyer,
+  dans un dépôt dont la règle §4 dit l'inverse. *À transformer en test le jour où `households`
+  gagne une seconde écriture.*
+
+- **Aucune borne haute sur le nombre de personnes.** `analyserPersonnes("2147483647")` est
+  accepté, et les deux contraintes ne posent que `> 0`. Un foyer réglé à 2 147 483 647 personnes
+  verrait ce nombre partir au **numérateur** de la mise à l'échelle de
+  `generate_grocery_list_from_menu` — la conséquence exacte que le volet 3 de la migration se
+  donne pour mission d'écarter à l'autre bout de la division. *Préexistant dans sa forme :
+  `recipes_servings_positif` a la même. À traiter avec lui, pas séparément.*
+
+- **`ajouter` : zéro ligne sans erreur retombe sur « Réessaie » sans aucune trace console.** Le
+  `console.error` est sous `if (error)`, donc un `insert` accepté dont le `returning` ne rend
+  rien serait muet côté journal. *Atteignabilité non démontrée : le `using` et le `with check` de
+  `meal_plan_all` couvrent la même condition.*
+
+- **L'écran d'un repas n'affiche jamais l'année.** `formaterJourLong` rend « Jeudi 31 décembre ».
+  C'est le seul écran du produit atteignable **exclusivement par son URL** (favori, lien
+  partagé), et rien n'y distingue deux 31 décembre. *Sans conséquence tant qu'on y arrive par la
+  grille, qui porte la plage de semaine avec son année.*
+
+- **Une soumission avant hydratation part en GET natif et jette la saisie.** Aggravé par
+  `noValidate`, présent dans le HTML rendu côté serveur : il désarme aussi le blocage natif que
+  `required` aurait opposé **avant** hydratation. *Motif préexistant (`DisplayNameForm`,
+  `ListeRecettes`), mais ce diff en ajoute deux instances, dont une sur un `<select>` qui perd un
+  choix et non un texte retapable.*
+
+- **Le repli « aucune recette au répertoire » vit sur l'écran de destination, pas sur la case.**
+  La case invite toujours à « Mettre une recette » même quand le répertoire est vide ; c'est
+  `AssignerRepas` qui dit « Tu n'as encore aucune recette. » et donne le chemin. Défendable — la
+  grille ne lit pas le répertoire — mais ce n'est pas littéralement ce que la sous-tâche décrit.
+
+- ⚠️ **Une empreinte SHA-256 n'est PAS une preuve de restauration valable pour `.env.local`.**
+  Le fichier porte `VERCEL_OIDC_TOKEN`, un jeton de **12 heures** que la CLI Vercel réécrit
+  toute seule : l'empreinte consignée par la story (`8aa793a6…`) ne correspondait déjà plus au
+  fichier quelques minutes plus tard (`c3f894e7…`), **sans que rien n'ait touché aux clés
+  Supabase**. La preuve juste est de comparer les seules lignes qui décident — 
+  `NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_ANON_KEY` — et non le fichier entier.
+  *À corriger dans le gabarit de PR et dans les stories à venir, qui prescrivent toutes le
+  SHA-256 du fichier complet.*
+
+- **Le résidu de l'AC2 de la story 3.5 : le zoom 200 % n'a jamais été joué comme un zoom.**
+  La story 3.6 a mesuré l'absence de débordement à 1440 px, à 528 px (viewport réel minimal
+  atteignable dans Chrome), et avec le conteneur forcé à 390 / 320 / 195 px. **Ce qui n'a PAS été
+  éprouvé** : un viewport réel de 390 ou 320 px, et surtout **un zoom à 200 %, qui double la
+  taille du texte** — l'axe qui compte le plus pour le pire cas (un titre de 80 caractères dans
+  une piste à 1/7 de largeur). L'écart était écrit dans la case de la Task 8, mais le Change Log
+  affirmait « PARCOURS À L'ÉCRAN JOUÉ EN ENTIER » sans réserve et rien n'en gardait trace ici.
+  ⚠️ **La story referme donc la prémisse de la 3.5 en en laissant une moitié** — c'est la règle
+  §5, et le geste juste est de la DATER plutôt que de la taire. *À jouer sur un vrai appareil, ou
+  avec un outillage qui sait forcer le viewport (le pilotage par extension ne le peut pas : la
+  fenêtre Chrome ne descend pas sous ~528 px, et le document d'un iframe est inaccessible depuis
+  le contexte d'extension).*
+
+- **Le refus nommé du `23514` sur `/foyer` n'est pas écrit.** `PersonnesForm` rend `"echec"` pour
+  toute erreur base, donc « Réessaie dans un instant. » sur une violation de
+  `households_default_servings_positif`. **Décision de Florian du 2026-08-05 : décocher la case
+  plutôt qu'écrire le traducteur**, le chemin étant aujourd'hui inatteignable depuis l'écran
+  (`analyserPersonnes` refuse déjà le `<= 0` et le hors-bornes) et l'accord des deux bornes étant
+  mesuré par `contraintes.test.ts`. *À écrire le jour où une seconde surface écrit dans
+  `households` — ce sera alors du code avec un appelant.*
+
+- **Le retour du focus après un `router.refresh()` n'est pas démontré.** Après un enregistrement
+  réussi — le seul geste de l'écran suivi d'un rafraîchissement — `document.activeElement` était
+  `<body>` au lieu du bouton de la ligne repliée. ⚠️ **La mesure n'est pas concluante** :
+  `document.hasFocus()` valait `false`, la fenêtre étant en arrière-plan pendant le pilotage,
+  et c'est l'artefact que `project-context.md` documente. Les trois autres gestes (Annuler,
+  armer la confirmation, Non) ont rendu le focus dans les **mêmes** conditions — l'API marche
+  donc — mais eux ne déclenchent pas de rafraîchissement. L'hypothèse à éprouver : `fermer()`
+  consomme la ref au changement d'`enEdition`, puis l'arrivée des nouvelles propriétés remonte
+  la liste et perd le focus posé, la ref étant déjà désarmée. *À rejouer à la main, fenêtre au
+  premier plan. Le motif copié (`IngredientsRecette`) porte le même enchaînement : si le défaut
+  est réel, il est plus large que cette story.*

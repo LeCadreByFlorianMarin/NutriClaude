@@ -61,14 +61,38 @@ test("ce qui n'est pas un entier est illisible", () => {
   }
 });
 
-test("au-delà de ce qu'un int Postgres retient, on refuse plutôt que de laisser passer", () => {
+test("au-delà de ce qu'un int Postgres retient, la faute est HORS-BORNES, pas « illisible »", () => {
   /*
-   * ⚠️ **Sinon la base rend `22003`**, un code que rien ne traduit — donc
-   * « Réessaie » en boucle sur une saisie que retenter à l'identique ne corrigera
-   * jamais. Même parade que `normaliserQuantite` face à `numeric(8,2)`.
+   * ⚠️ **CE TEST ÉPINGLAIT LE DÉFAUT COMME S'IL ÉTAIT LE CONTRAT.** Il exigeait
+   * `{ faute: "illisible" }` pour `2147483648` — c'est-à-dire la même faute que pour
+   * « abc », donc le message « Un nombre de personnes s'écrit en chiffres. » rendu à
+   * quelqu'un qui vient de taper **uniquement des chiffres**. Un conseil qu'il a déjà
+   * suivi, et dont il ne peut pas sortir sans deviner qu'un plafond existe.
+   *
+   * C'est exactement le défaut que l'en-tête du module se vantait d'avoir évité, et
+   * que la revue adversariale du 2026-08-04 a trouvé — dans le module ET dans son
+   * test. Un test peut figer un défaut aussi solidement qu'il protège une règle.
+   *
+   * Sans borne, la base rendrait `22003`, un code que rien ne traduit. Même partage
+   * que `normaliserQuantite` face à `numeric(8,2)`, qui distingue déjà « illisible »
+   * de « hors-bornes ».
    */
-  assert.deepEqual(analyserPersonnes("2147483648"), { faute: "illisible" });
-  assert.deepEqual(analyserPersonnes("99999999999999999999"), { faute: "illisible" });
+  assert.deepEqual(analyserPersonnes("2147483648"), { faute: "trop-grand" });
+  assert.deepEqual(analyserPersonnes("99999999999999999999"), { faute: "trop-grand" });
   // La borne exacte, elle, passe.
   assert.deepEqual(analyserPersonnes("2147483647"), { valeur: 2147483647 });
+});
+
+test("les trois fautes sont distinctes — c'est tout l'intérêt de les nommer", () => {
+  /*
+   * Le contrat que les écrans traduisent en messages : « ce n'est pas un nombre »,
+   * « c'est trop peu » et « c'est trop » appellent trois conseils différents. Les
+   * confondre enferme l'utilisateur dans une boucle.
+   */
+  const fautes = ["abc", "0", "2147483648"].map((s) => {
+    const a = analyserPersonnes(s);
+    return "faute" in a ? a.faute : "aucune";
+  });
+  assert.deepEqual(fautes, ["illisible", "trop-peu", "trop-grand"]);
+  assert.equal(new Set(fautes).size, 3, "les trois fautes ne doivent pas se confondre");
 });

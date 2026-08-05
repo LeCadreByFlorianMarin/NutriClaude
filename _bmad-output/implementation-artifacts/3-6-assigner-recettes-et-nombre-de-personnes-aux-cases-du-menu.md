@@ -4,7 +4,7 @@ baseline_commit: a56ba0b0458d741f7c8f86f7624923a99b198559
 
 # Story 3.6: Assigner recettes et nombre de personnes aux cases du menu
 
-Status: review
+Status: in-progress
 
 <!-- Sixième et dernière story de l'Epic 3, et la PREMIÈRE qui ÉCRIT dans
      `meal_plan_entries`. Trois choses la distinguent de toutes les stories précédentes de
@@ -285,7 +285,12 @@ mesurer une fois, c'est fermer les deux.
         tests en échec. ⚠️ La 3.3 a laissé cette case vide faute d'avoir consigné quoi que ce
         soit, et la 3.5 l'a cochée en produisant sa preuve. **Si tu la coches, produis-la ;
         sinon laisse-la vide avec sa raison** (règle §1)
-  - [x] `estCodeRepas(v: string | null | undefined): v is CodeRepas` dans `lib/menu/menu.ts`
+  - [ ] `estCodeRepas(v: string | null | undefined): v is CodeRepas` dans `lib/menu/menu.ts`
+        <!-- ⚠️ DÉCOCHÉE PAR LA REVUE DU 2026-08-05 : la fonction N'EXISTE PAS, et c'est
+             délibéré (voir Completion Notes) — la route reçoit un slug et non un code, donc
+             le prédicat n'aurait eu aucun appelant. `repasParSlug` tient le rôle de garde
+             de saisie. La case était restée cochée pour un travail non fait : c'est
+             exactement ce que la règle §1 interdit, et la story le prescrit trois fois. -->
         — ⚠️ **dérivé de `REPAS`, jamais d'une seconde liste recopiée.** `REPAS` est déjà « le
         seul endroit qui nomme les repas » (`lib/menu/menu.ts:18-19`), et une énumération
         parallèle divergerait (règle §3). Modèle : `estUniteConnue` de `lib/recettes/unites.ts`
@@ -426,9 +431,19 @@ mesurer une fois, c'est fermer les deux.
         rôle). Le changer change ce que voit l'autre membre à sa prochaine assignation. **Dis-le
         à l'écran** — un réglage qu'on croit personnel et qui ne l'est pas est une surprise, pas
         une fonctionnalité
-  - [x] `normaliserEntier` pour la saisie (`lib/recettes/saisie.ts:102`) et un refus nommé pour
+  - [ ] `normaliserEntier` pour la saisie (`lib/recettes/saisie.ts:102`) et un refus nommé pour
         le `23514` — la contrainte a un nom, donc `refus…` discrimine par **nom de contrainte**,
         pas par le seul SQLSTATE
+        <!-- ⚠️ DÉCOCHÉE — la saisie passe bien par `analyserPersonnes`, mais le REFUS NOMMÉ
+             n'a pas été écrit : `PersonnesForm` rend `"echec"` pour toute erreur base, donc
+             « Réessaie dans un instant. » sur un `23514`.
+             **Décision de Florian du 2026-08-05, en revue : décocher plutôt qu'écrire.** Le
+             chemin est aujourd'hui INATTEIGNABLE depuis l'écran — `analyserPersonnes` refuse
+             déjà `<= 0` et le hors-bornes — et l'accord des deux bornes est mesuré par
+             `contraintes.test.ts`. Écrire un traducteur pour un refus que rien ne peut
+             produire serait du code sans appelant, la dette relevée sur `estUniteConnue`.
+             Reporté dans `deferred-work.md` : à écrire le jour où une autre surface écrit
+             dans `households`. -->
 
 - [x] **Task 7 — Le texte de suppression d'une recette, devenu faux** (hors AC, dû dans le
       MÊME commit)
@@ -1345,8 +1360,14 @@ Claude Opus 5 (`claude-opus-5`), 2026-08-04.
 
 #### Les dents, par mutation
 
-Six mutations jouées, chacune restaurée immédiatement, et **chacune fait tomber le test
+**Huit** mutations jouées, chacune restaurée immédiatement, et **chacune fait tomber le test
 qu'elle vise et lui seul**.
+
+⚠️ **Ce paragraphe disait « Six » au-dessus d'un tableau qui en compte huit** — corrigé par la
+revue du 2026-08-05, qui a aussi relevé que les quatre dernières lignes partent de **192** tests
+là où la story en mesure 197 : elles ont été jouées **avant** l'extraction de `lib/personnes.ts`
+et de ses 5 tests. La table n'était donc pas rejouable telle qu'écrite ; les totaux de départ
+sont désormais datés ligne par ligne.
 
 | Mutation | Résultat |
 |---|---|
@@ -1354,10 +1375,10 @@ qu'elle vise et lui seul**.
 | `meal_plan_all` rendu à son ANCIEN `with check` (sans la provenance) | 66 → **65 pass, 1 fail** — « LE TROU REFERMÉ » |
 | `drop constraint meal_plan_entries_servings_positif` | 66 → **65 pass, 1 fail** — « la base refuse 0 et le négatif au menu » |
 | `drop constraint households_default_servings_positif` | 66 → **65 pass, 1 fail** — « la base refuse un réglage de foyer à 0 » |
-| Slug accentué `petit-déj` | 192 → **189 pass, 3 fail** |
-| `repasParSlug` acceptant AUSSI le code de la base | 192 → **191 pass, 1 fail** |
-| `refusAssignation` privé du cas `23505` | 192 → **191 pass, 1 fail** |
-| Nom de contrainte comparé de façon relâchée (`servings_positif`) | 192 → **191 pass, 1 fail** |
+| Slug accentué `petit-déj` *(sur 192, avant `lib/personnes.ts`)* | 192 → **189 pass, 3 fail** |
+| `repasParSlug` acceptant AUSSI le code de la base *(sur 192)* | 192 → **191 pass, 1 fail** |
+| `refusAssignation` privé du cas `23505` *(sur 192)* | 192 → **191 pass, 1 fail** |
+| Nom de contrainte comparé de façon relâchée (`servings_positif`) *(sur 192)* | 192 → **191 pass, 1 fail** |
 | *(tout restauré, `pg_constraint` recontrôlé identique au dépôt)* | **197 / 197** et **66 / 66** |
 
 ⚠️ **La mutation qui compte pour la politique n'est PAS `drop policy`** — c'est la leçon de la
@@ -1531,17 +1552,103 @@ demande un geste que cette story n'a pas eu à faire.*
 
 **Intacts, et vérifiés comme tels** : `package.json` (aucune dépendance — NFR-10),
 `app/globals.css`, `lib/supabase/proxy.ts` (les routes neuves sont protégées par défaut),
-`app/menu/loading.tsx` (la forme de la grille n'a pas bougé), `.env.local` (basculé pour le
-parcours puis **restauré, SHA-256 identique** :
-`8aa793a63fb651aba4e2d457ccbd4b58adcd3897efc01f8f6ebb4116b1fcaf2d`), réglage système de thème
-(remis à `false`).
+`.env.local` (basculé pour le parcours puis restauré — voir la réserve ci-dessous), réglage
+système de thème (remis à `false`, vérifié).
+
+⚠️ **DEUX AFFIRMATIONS DE CETTE LISTE ÉTAIENT FAUSSES, et la revue du 2026-08-05 les a
+mesurées :**
+
+1. **`app/menu/loading.tsx` n'était PAS intact au sens qui compte.** Le fichier n'était pas
+   modifié, mais son en-tête exige qu'il SUIVE `page.tsx` — or la case a gagné une affordance
+   en `min-h-touch` (44 px). Le squelette rendait ~40 px contre ~64 px réels, sur 28 cases :
+   le saut de mise en page qu'un squelette existe pour éviter. **Corrigé** dans la passe de
+   revue, et `h-touch` a été vérifié comme émettant bien `height:var(--spacing-touch)` — un
+   utilitaire inconnu aurait échoué en silence.
+
+2. **L'empreinte SHA-256 de `.env.local` ne prouvait rien.** Le fichier porte
+   `VERCEL_OIDC_TOKEN`, un jeton de **12 heures que la CLI Vercel réécrit toute seule** :
+   l'empreinte consignée ne correspondait déjà plus quelques minutes après, **sans qu'aucune
+   clé Supabase ait bougé**. Ce qui est vrai et vérifiable : `NEXT_PUBLIC_SUPABASE_URL` pointe
+   bien sur la production. Le contrôle prescrit par la story et par le gabarit de PR est donc
+   **mal conçu** — comparer le fichier entier, c'est comparer un jeton volatil. Consigné dans
+   `deferred-work.md`.
 
 ### Review Findings
+
+**PASSE DE CORRECTION DU 2026-08-05 — vérifiée à l'écran.** Les 14 correctifs sont appliqués et
+les 2 décisions tranchées par Florian. ⚠️ **Cette passe doit être revue à son tour** (règle §6 :
+trois des six défauts majeurs de l'Epic 1 ont été introduits par une passe de revue).
+
+**Ce qui a été REJOUÉ à l'écran après correction** (stack local, `.env.local` basculé puis
+restauré) :
+
+| Contrôle | Résultat mesuré |
+|---|---|
+| Nom accessible du bouton de ligne | `Modifier : Gratin de courgettes, 2 personnes` — plus de cible anonyme |
+| Hauteur de la cible | **44 px** (UX-DR11) |
+| Ouverture d'une ligne | focus sur le champ, **une seule ligne ouverte**, 3 régions de statut |
+| Refus depuis la ligne | s'affiche **DANS le `<form>` de la ligne** (`form.contains(region) === true`), plus en tête de section |
+| Hors-bornes `2147483648` | « **C'est trop de monde pour un repas.** » — plus « ça s'écrit en chiffres » |
+| Zéro | « Il faut au moins une personne. » |
+| « Annuler » | focus → `case-<id>` (bouton replié) |
+| Armer la confirmation | focus → `confirmer-<id>` |
+| « Non » | focus → `retirer-<id>` |
+| Enregistrement | « C'est noté. », ligne repliée, libellé à jour (`5 personnes`) |
+| `h-touch` du squelette | émet bien `height:var(--spacing-touch)` — un utilitaire inconnu aurait échoué en silence |
+
+⚠️ **UN POINT N'EST PAS CONCLUANT, ET JE NE L'AFFIRME PAS :** après un enregistrement réussi —
+le seul geste suivi d'un `router.refresh()` — `document.activeElement` était `<body>`. Mais
+`document.hasFocus()` valait **false** : la fenêtre était en arrière-plan, l'artefact de pilotage
+que `project-context.md` documente. Les trois autres gestes ont rendu le focus dans les **mêmes**
+conditions, donc l'API fonctionne ; ce qui distingue ce cas est l'arrivée de nouvelles propriétés
+après la pose du focus. **À rejouer à la main, fenêtre au premier plan.** Consigné dans
+`deferred-work.md` plutôt que coché.
+
+---
+
+**Revue adversariale du 2026-08-04**, trois couches lancées en parallèle en contexte vierge
+(Blind Hunter, Edge Case Hunter, Acceptance Auditor). ⚠️ **Menée par le modèle qui a
+implémenté la story** — la règle §6 en demande un autre ; les sous-agents à contexte vierge
+sont une atténuation, pas un équivalent. **7 findings sur 21 ont été levés par au moins deux
+couches indépendantes.**
+
+#### Décisions requises
+
+- [x] [Review][Decision] **Le refus nommé du `23514` sur `/foyer` est coché et n'existe pas** — la Task 6 exige « un refus nommé pour le `23514` […] discrimine par nom de contrainte ». `PersonnesForm.tsx` traite toute erreur base par `return "echec"`, donc par « Ça n'a pas marché. Réessaie dans un instant. » — le conseil impossible que `project-context.md` interdit. Le chemin est **aujourd'hui inatteignable** (`analyserPersonnes` refuse déjà `<= 0`) et l'accord des deux bornes est mesuré. Écrire le refus, ou décocher la case avec cette raison ?
+- [x] [Review][Decision] **Un seul `occupe` pour N formulaires de ligne** — chaque case rend en permanence son `<form>`, donc enregistrer la ligne 1 affiche « Un instant… » sur toutes les lignes et les désactive toutes. Le motif du dépôt (`IngredientsRecette`, `ListeRayons`) n'ouvre le formulaire que pour la ligne en édition. Adopter le motif « une ligne ouverte à la fois » (refonte réelle), ou garder les N formulaires ouverts et ne traiter que l'indication visuelle ?
+
+#### Correctifs
+
+- [x] [Review][Patch] **`personnesEditees` n'est jamais purgé : la copie locale gagne indéfiniment sur la base** `[app/menu/[jour]/[repas]/AssignerRepas.tsx:111,214,334]` — dès la première frappe, la valeur serveur ne revient plus jamais dans le champ : ni après un enregistrement réussi, ni après le `router.refresh()` déclenché par l'écriture de l'autre membre. La grille peut afficher « 4 pers. » et le champ « 6 », sans rien qui l'explique. ⚠️ **Contredit l'en-tête du composant** (`:70-74`, « Aucune copie locale des cases »). *Levé par 2 couches.*
+- [x] [Review][Patch] **`app/menu/loading.tsx` n'a pas suivi le changement de hauteur des cases** `[app/menu/loading.tsx:63-70]` — la case vide gagne un `min-h-touch` (44 px) et la case pleine deux éléments ; le squelette rend toujours ~40 px de contenu contre ~64 px minimum, × 28 cases. C'est le saut de mise en page qu'un squelette existe pour éviter, réintroduit sur la surface même que la story dit refermer. ⚠️ **La sous-tâche Task 4 « loading.tsx suit » est cochée et la File List le déclare « Intact, et vérifié comme tel ».** *Levé par 2 couches.*
+- [x] [Review][Patch] **Une seule région de statut pour `2 × N` surfaces de soumission, et sans `reserve`** `[AssignerRepas.tsx:281,299]` — `statutPrevu` est monté une fois en tête de section, au-dessus de N formulaires « Enregistrer » et 2N boutons de retrait. Un refus déclenché depuis la 4ᵉ case s'affiche hors écran, et l'apparition du message pousse la cible sous le doigt. C'est **le récidiviste du dépôt** (cinq occurrences, deux fois de suite sur `/rayons`), et le motif `IngredientsRecette` fait explicitement l'inverse. *Levé par 3 couches.*
+- [x] [Review][Patch] **`statutAjout` est rendu à l'intérieur de deux branches conditionnelles** `[AssignerRepas.tsx:398,491]` — alors que le commentaire du type `Zone` (`:56-59`) jure que les deux régions sont « montées en permanence, hors des branches qui se démontent ». Chemin atteignable : le foyer n'a qu'une recette, B la supprime, A soumet → `menu-change` + `router.refresh()` → `recettes` devient `[]`, le `<form>` se démonte **avec sa région**, et le message n'est jamais vu.
+- [x] [Review][Patch] **`deja-au-menu` ne rafraîchit pas, alors que le refus prouve que l'écran ment** `[AssignerRepas.tsx:193]` — un `23505` établit que la base contient une ligne que la liste au-dessus n'affiche pas. Le membre lit « Cette recette est déjà à ce repas. » au-dessus d'une liste qui la dément. Le raisonnement est écrit cinq lignes plus haut pour `menu-change` et n'est pas appliqué ici.
+- [x] [Review][Patch] **Deux chemins sur trois annoncent « Voilà ce qui reste » sans rafraîchir** `[AssignerRepas.tsx:228,267]` — les branches `if (error)` de `changerPersonnes` et `retirer` rendent `menu-change` sans `router.refresh()`, alors que la branche `!data` de la même fonction le fait. La seconde phrase du message est une promesse que le code ne tient pas. *Levé par 2 couches.*
+- [x] [Review][Patch] **Un nombre hors bornes reçoit « Un nombre de personnes s'écrit en chiffres. »** `[lib/personnes.ts:41-53]` — MESURÉ : `analyserPersonnes("2147483648")` rend `{faute:"illisible"}`, la même faute que `"abc"`. L'utilisateur lit un conseil qu'il vient de suivre, sans moyen de deviner qu'il existe un plafond. ⚠️ **C'est exactement le défaut que l'en-tête du module se vante d'avoir évité** (`:17-22`), et `lib/personnes.test.ts:64` **épingle le comportement fautif comme s'il était le contrat**. *Levé par 2 couches.*
+- [x] [Review][Patch] **Bloc de documentation orphelin : `casesDeRecette` hérite du JSDoc de `grouperParCase`** `[lib/menu/menu.ts:236-244,286]` — deux `/** */` consécutifs précèdent `casesDeRecette` ; TypeScript attache le dernier, et la seule mise en garde qui interdit de réduire une case à une recette (« La valeur est une LISTE ») surplombe désormais une fonction qui ne rend pas de `Map`. `grouperParCase` se retrouve sans aucune documentation. Règle §2. *Levé par 2 couches.*
+- [x] [Review][Patch] **Le focus n'est pas rendu à l'ouverture ni à la fermeture de la confirmation de retrait** `[AssignerRepas.tsx:126,351-384]` — `aConfirmer` n'est pas dans les dépendances de l'effet, et ni `setAConfirmer(c.id)` ni `setAConfirmer(null)` ne renseignent `retourFocus`. Le ternaire démonte le bouton focalisé dans les deux sens ⇒ retour sur `<body>`. ⚠️ **Deux cases le déclarent vérifié** (Task 5 « ouvrir, refermer » et Task 8 « après chaque geste »).
+- [x] [Review][Patch] **`retourFocus` reste armé sur le chemin d'exception → vol de focus différé** `[AssignerRepas.tsx:253,266]` — `retirer()` arme la ref avant l'`await` et ne la désarme que dans la branche `if (error)`. `useSoumission` attrape aussi les **exceptions** (c'est sa raison d'être) ; sur ce chemin la ref reste armée et tirera le focus vers `#titre-prevu` au prochain rendu serveur, sans cause visible.
+- [x] [Review][Patch] **28 liens au nom accessible identique sur la grille** `[app/menu/page.tsx:78-83,118-125]` — « Mettre une recette » / « Modifier » × 7 jours × 4 repas, indiscernables au rotor ou en navigation par liens. Le jour (`<h2>`) et le repas (`<p>`) sont des frères, pas des `aria-labelledby`. **Introduit par ce diff** : l'état vide était un `<p>` non interactif.
+- [x] [Review][Patch] **Quatre affirmations fausses ou périmées dans le Dev Agent Record** — (a) « **Six mutations jouées** » au-dessus d'un tableau qui en compte **huit**, et dont les quatre dernières lignes partent de 192 tests là où la story en mesure 197 ; (b) la sous-tâche `estCodeRepas` est **cochée** alors que la fonction n'existe pas — le Completion Notes l'assume, la case non ; (c) l'empreinte SHA-256 de `.env.local` donnée comme preuve **ne correspond plus au fichier** ; (d) `app/menu/loading.tsx` déclaré « Intact, et vérifié comme tel ». Règle §1.
+- [x] [Review][Patch] **Le résidu de l'AC2 de la story 3.5 n'est consigné dans aucun document durable** — la story referme cette prémisse alors que le zoom 200 % n'a **pas** été joué comme un zoom (l'écart est écrit dans la case Task 8, mais le Change Log dit « PARCOURS À L'ÉCRAN JOUÉ EN ENTIER » sans réserve, et `deferred-work.md` n'en garde aucune trace). Règle §5 : une prémisse se ferme en **datant** ce qu'elle laisse.
+- [x] [Review][Patch] **`Case` reçoit `repas` et `libelle`, le second étant dérivable du premier** `[app/menu/page.tsx:39-49,270-277]` — câblage mort depuis que l'objet `REPAS` entier est passé, et seconde voie par laquelle un libellé pourrait entrer dans un composant dont `REPAS` proclame être « le seul endroit qui nomme les repas ».
+
+#### Reportés
+
+- [x] [Review][Defer] **Aucun test positif sur `households_update`** — la story affirme « rien à ajouter, un test de plus serait de la redondance », mais le test cité n'éprouve que le **refus**, et les quatre tests de contraintes passent par le rôle de service qui traverse la RLS. ⚠️ **Une couche a comblé la mesure elle-même** (`set_config` + `set local role authenticated`) : le chemin **fonctionne** (`UPDATE 1`, puis refus du `0`). Ce n'est donc pas un bug — c'est un invariant non mesuré sur le seul chemin d'écriture neuf, dans un dépôt dont la règle §4 est « un invariant se mesure ». *Reporté : la mesure existe désormais dans ce document.*
+- [x] [Review][Defer] **Aucune borne haute sur le nombre de personnes** — `2147483647` est accepté des deux côtés, et irait au numérateur de la mise à l'échelle de l'Epic 4. Même forme que `recipes_servings_positif` : *préexistant, à traiter avec lui.*
+- [x] [Review][Defer] **`ajouter` : zéro ligne sans erreur retombe sur « Réessaie » sans trace console** `[AssignerRepas.tsx:115-117]` — le `console.error` est sous `if (error)`. *Atteignabilité non démontrée : `using` et `with check` couvrent la même condition.*
+- [x] [Review][Defer] **L'écran d'un repas n'affiche jamais l'année** — `formaterJourLong` rend « Jeudi 31 décembre ». C'est le seul écran atteignable exclusivement par son URL. *Sans conséquence tant qu'on y arrive par la grille.*
+- [x] [Review][Defer] **Soumission avant hydratation → GET natif qui jette la saisie** — aggravé par `noValidate`, qui désarme aussi le blocage natif avant hydratation. *Motif préexistant du dépôt, déjà consigné par la story ; le traiter demande une décision qui porte sur tous les écrans.*
+- [x] [Review][Defer] **Le repli « aucune recette » est sur l'écran de destination, pas sur la case** — défendable (la grille ne lit pas le répertoire), mais ce n'est pas ce que la sous-tâche décrit, et rien ne le dit.
+
 
 ## Change Log
 
 | Date | Quoi |
 |---|---|
 | 2026-08-04 | Story créée sur `a56ba0b`. Statut `backlog` → `ready-for-dev`. **Quatre questions posées, dont deux structurantes** (forme de la contrainte de provenance, place de l'assignation). Trois prémisses rouvertes et citées (règle §5), dont **l'AC2 de la 3.5, fusionné sans avoir été observé** — sa démonstration passe dans la Task 8 de cette story |
+| 2026-08-05 | **Revue adversariale à trois couches** (contexte vierge), puis passe de correction. ⚠️ **Menée par le modèle qui a implémenté** — règle §6 non satisfaite à la lettre. **21 findings, dont 7 levés par au moins deux couches indépendantes.** 2 décisions tranchées par Florian : décocher la case du refus `23514` (chemin inatteignable), et **refondre `AssignerRepas` en « une ligne ouverte à la fois »** — cette refonte referme à elle seule quatre findings (copie locale `personnesEditees`, région de statut unique, `occupe` global, focus de la confirmation). 14 correctifs appliqués, 6 reports datés. **Quatre affirmations fausses du Dev Agent Record corrigées** : « six mutations » pour huit, `estCodeRepas` coché sans exister, `loading.tsx` déclaré intact alors qu'il ne suivait plus les cases, et une empreinte SHA-256 de `.env.local` qui ne prouvait rien (jeton Vercel de 12 h réécrit tout seul). Correctifs **rejoués à l'écran**. ⛔ Statut `review` → `in-progress` : la passe de correction doit être revue à son tour |
 | 2026-08-04 | **Implémentée sur `feat/menu-assignation`** (branchée sur `a56ba0b`). 11 fichiers créés, 13 modifiés. Une migration à **quatre volets**. 18 tests unitaires neufs (179 → 197), 6 tests d'isolation/contraintes neufs (60 → 66), **8 mutations** jouées, chacune faisant tomber le test qu'elle vise et lui seul. Six portes vertes. ✅ **PARCOURS À L'ÉCRAN JOUÉ EN ENTIER** — les quatre AC de cette story, la moitié d'AC4 de la 3.5, **et l'AC2 de la 3.5 qui n'avait jamais été observé**. Il a trouvé **2 défauts qu'aucune porte ne voyait** : un message de navigateur en anglais qui rendait deux messages français inatteignables, et « et des 2repas » — les deux corrigés et revérifiés. ⛔ **Reste avant fusion** : la requête de contrôle de la migration sur la PRODUCTION (geste de revue), et le dire dans la PR |
 | 2026-08-04 | **Les quatre questions tranchées par Florian, avant démarrage.** (1) Politique `meal_plan_all` resserrée — la clé étrangère composite est écartée et le piège n°3 est DATÉ plutôt qu'effacé. (2) Route dédiée `/menu/[jour]/[repas]`, slug français porté par `REPAS` — les pièges n°8 et n°10 deviennent actifs. (3) `meal_plan_entries_servings_positif` dans la même migration. (4) **Le nombre de personnes se règle au FOYER puis s'ajuste par assignation** — réponse hors des options proposées, qui ajoute `households.default_servings`, une section sur `/foyer`, la **première écriture du produit dans `households`**, un `supabase gen types` désormais **dû**, et le piège n°14 (trois nombres de personnes, deux du même nom en base). Périmètre passé de 9 à **10 tâches** ; toutes ouvertes, plus rien n'attend |

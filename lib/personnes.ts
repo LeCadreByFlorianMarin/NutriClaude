@@ -28,18 +28,36 @@ import { normaliserEntier } from "./recettes/saisie.ts";
  */
 export type PersonnesAnalysees =
   | { valeur: number }
-  | { faute: "illisible" | "trop-peu" };
+  | { faute: "illisible" | "trop-peu" | "trop-grand" };
+
+/**
+ * La plus grande valeur qu'un `int` Postgres retient. Au-delà, la base rend `22003`,
+ * un code que rien ne traduit — donc « Réessaie » en boucle sur une saisie que
+ * retenter à l'identique ne corrigera jamais.
+ */
+const PERSONNES_MAX = 2147483647;
 
 export function analyserPersonnes(saisie: string): PersonnesAnalysees {
   /*
-   * `normaliserEntier` porte déjà les trois pièges du champ numérique, et son
-   * en-tête les explique : `Number("")` vaut 0, `parseInt("")` rend `NaN` que
-   * `JSON.stringify` transforme en `null` **en silence** sur une colonne
-   * `not null`, et `type="number"` accepte « 2e3 ». Il borne aussi à l'`int`
-   * Postgres, ce qui évite un `22003` que rien ne traduirait.
+   * ⚠️ **`normaliserEntier` confond « pas un entier » et « hors bornes » — il rend
+   * `null` pour les deux**, et c'est ce qui a produit le défaut trouvé par la revue du
+   * 2026-08-04 : `2147483648` recevait « Un nombre de personnes s'écrit en chiffres. »
+   * On teste donc la forme et la borne SÉPARÉMENT, au lieu de déléguer les deux.
+   *
+   * Le reste de son contrat sert tel quel, et son en-tête l'explique : `Number("")`
+   * vaut 0, `parseInt("")` rend `NaN` que `JSON.stringify` transforme en `null` **en
+   * silence** sur une colonne `not null`, et `type="number"` accepte « 2e3 ».
    */
-  const valeur = normaliserEntier(saisie);
-  if (valeur === null) return { faute: "illisible" };
+  const net = saisie.trim();
+  if (!/^-?\d+$/.test(net)) return { faute: "illisible" };
+
+  const valeur = normaliserEntier(net);
+  /*
+   * La forme est bonne et `normaliserEntier` refuse quand même : il ne reste que le
+   * dépassement de l'`int` Postgres — c'est un « trop », pas un « illisible ».
+   */
+  if (valeur === null) return { faute: "trop-grand" };
+  if (valeur > PERSONNES_MAX) return { faute: "trop-grand" };
 
   /*
    * ⚠️ **Le zéro et le négatif sont RENDUS par `normaliserEntier`, et refusés

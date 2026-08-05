@@ -59,14 +59,28 @@ export default function ChargementMenu() {
               {/* L'en-tête du jour */}
               <Bloc className="h-4 w-28" />
 
-              {/* Les quatre repas */}
+              {/*
+                Les quatre repas.
+
+                ⚠️ **CE GABARIT A ÉTÉ RATTRAPÉ LE 2026-08-05, et il l'a été par une
+                revue.** La story 3.6 a rendu chaque case actionnable — un lien en
+                `min-h-touch` (44px) sous l'étiquette du repas — et n'a pas touché ce
+                fichier, alors que son en-tête l'exige. Le squelette rendait ~40px de
+                contenu contre ~64px minimum, sur 28 cases : c'est très exactement le
+                saut de mise en page qu'un squelette existe pour éviter, réintroduit sur
+                l'écran que la story disait refermer.
+
+                La hauteur suit donc `page.tsx` : l'étiquette du repas, puis un bloc à
+                `min-h-touch` pour l'affordance qui s'y trouve toujours — case vide
+                (« Mettre une recette ») comme case pleine (« Modifier »).
+              */}
               {[0, 1, 2, 3].map((repas) => (
                 <div
                   key={repas}
-                  className="rounded-md border border-card-border p-card"
+                  className="min-h-touch rounded-md border border-card-border p-card"
                 >
                   <Bloc className="h-3 w-16" />
-                  <Bloc className="mt-2 h-5 w-full" />
+                  <Bloc className="mt-1 h-touch w-28" />
                 </div>
               ))}
             </div>
