@@ -41,7 +41,23 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
-last_updated: 2026-08-05  # 2026-08-05 — Story 7.1 contextualisée : `backlog` → `ready-for-dev`, et
+last_updated: 2026-08-05  # 2026-08-05 — Story 4.1 REVUE puis fermée (`done`), avec deux conditions
+                          # ouvertes DATÉES : la requête de contrôle en production, et la fonction
+                          # de génération toujours cassée (4.7). La revue a trouvé DEUX défauts
+                          # bloquants — l'AC4 défait par une RPC, et l'AC2 faux pour 241 points de
+                          # code invisibles. Détail à son entrée.
+                          #
+                          # 2026-08-05 — Story 4.1 IMPLÉMENTÉE (statut `review`). Détail à son entrée.
+                          # Contexte d'origine : Story 4.1 contextualisée : `backlog` → `ready-for-dev`, et
+                          # `epic-4` : `backlog` → `in-progress`. PREMIÈRE story de l'Epic 4, et la
+                          # plus structurante du produit : elle pose la clé canonique sur laquelle
+                          # 4.3, 4.4, 4.5, 4.6, 4.7, 4.10 et 4.12 s'arbitrent toutes. Aucune surface,
+                          # aucune ligne de JSX — donc rien qui excuse un test manquant.
+                          # ✅ Les 4 décisions TRANCHÉES avant démarrage, la première contre la
+                          # recommandation : la clé canonique plie aussi les accents. Détail à
+                          # son entrée, plus bas.
+                          #
+                          # 2026-08-05 — Story 7.1 contextualisée : `backlog` → `ready-for-dev`, et
                           # `epic-7` : `backlog` → `in-progress`. ⛔ QUATRE DÉCISIONS OUVERTES, dont
                           # le mécanisme d'identité lui-même. Ses trois critères citent les stories
                           # 5.1 et 5.7, qui n'existent pas. Détail à son entrée, plus bas.
@@ -492,8 +508,97 @@ development_status:
   epic-3-retrospective: optional
 
   # ── Epic 4 : La liste qui ne lâche jamais — hors-ligne, convergence & contrat ──
-  epic-4: backlog
-  4-1-modele-canonique-de-la-ligne-d-article-isolation-rls: backlog
+  epic-4: in-progress
+  # Contextualisée le 2026-08-05. HUIT SONDES EXÉCUTÉES sur le stack local (PostgreSQL 17.6)
+  # avant d'écrire une ligne de prescription — la story ne postule rien de ce qu'elle peut
+  # mesurer. Les quatre qui changent la migration :
+  #   · un `unique (…, unit)` ORDINAIRE laisse passer DEUX lignes dès que `unit` est nul,
+  #     c'est-à-dire sur le cas le plus courant du produit. L'AC2 serait faux en silence.
+  #     `nulls not distinct` (PG15+) le ferme, et il EXIGE un `create unique index` ;
+  #   · sans `normalize(name, NFC)` dans la clé, « crème » en NFC et en NFD font DEUX lignes —
+  #     le défaut exact que `lib/texte.ts` documente pour `unique(household_id, name)` ;
+  #   · l'INSERT nu de `generate_grocery_list_from_menu` échoue en `23505` sur DEUX chemins une
+  #     fois l'index posé (l'acheté qui survit au DELETE, et son `group by` sur `product_id`) ;
+  #   · la vue `grocery_list_by_aisle` MONTRE un article tombstoné, et son corps `g.*` ne se
+  #     rejoue pas : `create or replace` échoue (« cannot change name of view column »). Les
+  #     colonnes neuves s'appendent en fin, mesuré.
+  #
+  # ✅ LES 4 DÉCISIONS TRANCHÉES par Florian le 2026-08-05, AVANT démarrage. La première
+  # CONTRE la recommandation : la clé canonique PLIE AUSSI LES ACCENTS. Ce que ça change —
+  #   · la migration installe `unaccent` (`with schema extensions`, sinon elle atterrit dans
+  #     `public` — mesuré) et une enveloppe `strip_accents` déclarée `immutable` ;
+  #   · ⚠️ le contournement que tout le monde connaît — « employer la forme à deux arguments,
+  #     elle est IMMUTABLE » — est FAUX sur PG 17.6 : MESURÉ, les DEUX formes sont `STABLE`.
+  #     Sans enveloppe, l'index est refusé ;
+  #   · ⚠️ `immutable` y est une PROMESSE, pas un constat : le dictionnaire est un fichier sur
+  #     disque. S'il bouge, l'index garde des clés périmées et une recherche peut manquer une
+  #     ligne SANS erreur ni log. Contre-mesure écrite : `reindex` après toute montée majeure ;
+  #   · mesuré sur cinq familles à unité égale — casse, accents, NFC/NFD, invisible, unité
+  #     nulle deux fois : `23505` aux cinq. Et deux unités différentes font bien deux lignes.
+  # D2, D3, D4 conformes aux prescriptions : fonction de génération DATÉE pour la 4.7 (non
+  # touchée), index TOTAL (le tombstone garde sa clé, AD-3), vue amendée ici.
+  #
+  # ✅ Décision de Florian : la story se démontre INTÉGRALEMENT EN LOCAL. `SUPABASE_DB_URL`
+  # n'est plus requis, et la requête de contrôle s'exécute sur le stack local — consignée
+  # comme telle, pas comme une mesure de production (règle §1).
+  #
+  # ⚠️ ZÉRO test touche `grocery_list_items` aujourd'hui, et AUCUN code applicatif ne la lit
+  # (mesuré). La story doit donc les DEUX familles d'AD-17 sur cette table.
+  # ✅ IMPLÉMENTÉE le 2026-08-05 (statut `review`). Migration `20260805092611`, sept volets ;
+  # 21 tests neufs (87/87 en isolation, contre 66 avant) ; `npm test` inchangé à 198/198, ce
+  # qui est le résultat ATTENDU — cette story n'écrit aucun code applicatif.
+  # ⚠️ ONZE PASSAGES AU BANC DES DENTS, et ils ont trouvé DEUX affirmations fausses de la
+  # contextualisation, corrigées dans le code ET dans les commentaires :
+  #   1. le test NFC n'avait AUCUNE dent — `unaccent` retire les diacritiques combinants tout
+  #      seul, donc retirer `normalize(NFC)` de la clé laissait le test vert. Un test neuf
+  #      (jamo Hangul vs syllabe précomposée) tient désormais la première opération de la clé ;
+  #   2. le `with check` de `grocery_update` n'est PAS ce qui refuse un déplacement
+  #      inter-foyers — c'est la politique SELECT. Le `with check` est gardé comme ceinture,
+  #      et le fait qu'aucun test ne le fasse tomber est ÉCRIT plutôt que laissé croire.
+  # ⛔ CE QUI RESTE OUVERT, DATÉ : `generate_grocery_list_from_menu` échoue en `23505` sur deux
+  # chemins mesurés et fait toujours un DELETE dur → story 4.7 (décision de Florian). L'AC4 est
+  # donc tenu POUR LES SURFACES, pas pour cette fonction `security definer`.
+  # ✅ REVUE ADVERSARIALE FAITE le 2026-08-05 — trois couches parallèles (Blind Hunter, Edge Case
+  # Hunter, Acceptance Auditor). 6 décisions tranchées par Florian, 16 correctifs appliqués,
+  # 4 reports datés, 4 écartés. DEUX CONSTATS BLOQUANTS, tous deux mesurés :
+  #   ⛔ L'AC4 ÉTAIT DÉFAIT. `generate_grocery_list_from_menu` est `security definer` avec
+  #      `execute` accordé à PUBLIC : un membre ordinaire effaçait sa liste EN DUR, tombstones
+  #      compris, par un simple `POST /rest/v1/rpc/` (mesuré : 2 lignes → 0). La prémisse qui
+  #      couvrait le report — « aucun point d'appel » — était mesurée sur le source TypeScript et
+  #      ne disait rien de la surface REST. Fermé par un HUITIÈME VOLET (`revoke execute`), sans
+  #      toucher au corps de la fonction : D2 tient, la réparation reste la 4.7.
+  #   ⛔ L'AC2 ÉTAIT FAUX pour 241 points de code invisibles. Trois « Creme fraiche »
+  #      indiscernables à l'œil coexistaient dans le même foyer et la même unité (mesuré). Deux
+  #      plages manquaient, établies PAR SONDE : U+180F — voisin immédiat de la plage déjà
+  #      énumérée, ajouté par Unicode 14 — et U+E0100–U+E01EF. Regex étendue : 0 survivant.
+  # ✅ TROIS CONTRAINTES NEUVES, posées pendant que la table est encore vide (décision de
+  # Florian ; la fenêtre se referme à la 4.4) : `nom_borne` (sans elle la clé rendait `54000`,
+  # une erreur btree intraduisible, et le défaut était INTERMITTENT selon l'entropie du nom),
+  # `acteur_couple` (AD-9 : la provenance EST le couple) et `intention_bornee` (`intent_at` à
+  # `'infinity'` gagnait définitivement tout arbitrage LWW futur).
+  # ✅ Aussi corrigés : le trigger `updated_at` ne couvrait pas l'INSERT ; `nom_non_vide` et la
+  # clé n'employaient PAS le même prédicat malgré deux commentaires l'affirmant ; la requête de
+  # contrôle portait une regex simplifiée qui SOUS-DÉTECTAIT ; et `create extension if not
+  # exists … with schema` est un no-op qui aurait tué la migration EN PLEIN DÉPLOIEMENT si
+  # `unaccent` préexistait dans `public` (mesuré de bout en bout).
+  # ⚠️ HUIT PASSAGES AU BANC DES DENTS, tous propres — et le banc a trouvé UNE AFFIRMATION FAUSSE
+  # DANS LA CORRECTION ELLE-MÊME : `revoke … from anon, authenticated` ne retirait RIEN, l'entrée
+  # `PUBLIC` de l'ACL survivant. Sans le contrôle, le correctif aurait été consigné « appliqué »
+  # en ne fermant rien (règle §6 : la passe de correction doit être revue à son tour).
+  # ✅ Portes après correction : check:migrations 16/14/2/0 · lint · typecheck · npm test 198/198
+  # (inchangé, c'est l'attendu) · test:isolation 95/95, contre 87 avant la revue.
+  # ⛔ FERMÉE AVEC DEUX CONDITIONS OUVERTES, DATÉES (règle §6 bis, « le fichier fait foi ») :
+  #   1. la requête de contrôle n'a JAMAIS été exécutée sur la PRODUCTION — local uniquement ;
+  #      sur le distant, que la table soit vide reste une DÉDUCTION ;
+  #   2. `generate_grocery_list_from_menu` reste cassée (`23505` sur deux chemins) et fait
+  #      toujours un DELETE dur → story 4.7. Plus aucune surface ne l'atteint, mais elle n'est
+  #      pas réparée.
+  # ⛔ Quatre reports de revue dans `deferred-work.md` : `actor_id` non attaché à l'appelant
+  # (4.6), `deleted_at` sans borne (4.5/4.10), `unit` non normalisé (Epic 6), `strip_accents`
+  # exposée en RPC anonyme (4.12). Plus deux dettes transversales : `recipe_ingredients_nom_non_vide`
+  # garde le trou que la 4.1 vient de fermer, et la régénération des types n'est PAS reproductible
+  # (deux CLI Supabase sur le poste, aucune version épinglée).
+  4-1-modele-canonique-de-la-ligne-d-article-isolation-rls: done
   4-2-lecture-client-direct-de-la-liste-groupee-par-rayon: backlog
   4-3-cocher-et-decocher-idempotent-et-reversible: backlog
   4-4-ajouter-un-article-avec-agregation-et-unites-fermees: backlog

@@ -822,3 +822,248 @@ atténuation, pas un équivalent, et cette limite est datée ici plutôt que tue
   la liste et perd le focus posé, la ref étant déjà désarmée. *À rejouer à la main, fenêtre au
   premier plan. Le motif copié (`IngredientsRecette`) porte le même enchaînement : si le défaut
   est réel, il est plus large que cette story.*
+
+---
+
+## Deferred from: story 4-1-modele-canonique-de-la-ligne-d-article-isolation-rls (2026-08-05)
+
+*Première story de l'Epic 4. Elle pose la clé canonique, le tombstone, la provenance
+polymorphe et retire le DELETE dur aux surfaces. Ce qu'elle laisse est **daté et adressé**,
+jamais effacé (règle §6 bis).*
+
+### ⛔ `generate_grocery_list_from_menu` est CASSÉE — pour la story 4.7
+
+**Mesuré le 2026-08-05**, index canonique en place, sur le stack local. La fonction
+(`20260502000000:527-580`) échoue en `23505` sur **deux chemins distincts** :
+
+1. **L'acheté survivant.** Son `delete … where status = 'pending'` ne retire pas les articles
+   `bought`. Un acheté de même clé canonique survit, et l'INSERT nu qui suit heurte l'index.
+2. **Le `group by` trop fin.** Elle groupe par `ri.name, ri.unit, ri.product_id,
+   ri.aisle_keyword` : deux ingrédients de même nom et même unité mais de `product_id`
+   différents sortent en **deux lignes de même clé canonique**.
+
+Et elle fait un **DELETE dur**, que le critère AC4 de la 4.1 proscrit.
+
+*Reporté sur décision de Florian du 2026-08-05.* La casse est **dormante** : la fonction n'a
+**aucun point d'appel** — mesuré, `grep -rn "generate_grocery_list" --include=*.ts` ne rend
+que des commentaires. Et la réparer correctement — UPSERT-incrémente sur la clé canonique,
+tombstone au lieu du DELETE, génération non destructive, compte des articles ajoutés (FR-17,
+AD-6) — **est la story 4.7 en entier**. Une demi-réparation dans la 4.1 aurait été jetée.
+
+⚠️ **La 4.7 hérite donc de trois choses, pas d'une** : les deux `23505`, et le fait que le
+critère « jamais de DELETE dur » n'est aujourd'hui tenu **que pour les surfaces**. Une
+politique RLS ne lie ni le rôle de service ni une fonction `security definer` détenue par
+`postgres` — c'est écrit au volet 6 de `20260805092611`, pas déduit.
+
+### L'index d'idempotence de `source_ref` — pour l'Epic 6
+
+`grocery_list_items.source_ref` **existe** depuis la 4.1. Son unicité, non :
+
+```sql
+create unique index … on grocery_list_items (household_id, source_ref)
+  where source_ref is not null;
+```
+
+*Reporté délibérément.* AD-12 fait de cette colonne l'idempotence du pont Google (« un rejeu
+ne réinsère pas »), et l'index appartient à la story qui écrit le pont — poser une contrainte
+d'unicité sur une colonne que personne ne remplit encore la rendrait invérifiable. ⚠️ **Ce
+n'est pas un oubli : c'est le point n°4 du § « Ce qui est dû » de la story 4.1, écrit pour
+qu'il ne soit pas posé en silence.**
+
+### `added_by` est SUPPLANTÉE — pour la story 4.6
+
+La 4.1 pose `actor_kind` / `actor_id` (provenance polymorphe, AD-9), qui remplacent
+`added_by` (FK vers `auth.users`). **La colonne n'est PAS supprimée** : `drop column` est
+interdit sans décision explicite et sauvegarde vérifiée (`docs/migrations.md`).
+
+La story 4.6 possède le chemin de lecture de la provenance et tranchera son sort — trois temps
+(nouvelle forme, migration des données, retrait) ou conservation.
+
+⚠️ **Rappel de l'entrée du 2026-08-01, toujours valable** : `grocery_list_items.recipe_id` est
+`on delete set null`, donc un `recipe_id` nul peut vouloir dire « recette supprimée » et pas
+seulement « ajout manuel ». La 4.6 doit distinguer les deux, et `actor_kind` ne le lui dira pas.
+
+### `quantity >= 0` et le miroir applicatif de la clé — pour la story 4.4
+
+Deux choses que la 4.1 a délibérément laissées :
+
+- **La contrainte de positivité sur `quantity`.** Le critère du projet est « la valeur est-elle
+  consommée par un CALCUL ? » — elle l'est, mais l'agrégation qui la consomme est la 4.4. La
+  poser dans la 4.1 aurait contraint un champ que personne n'écrit encore. *C'est le même
+  raisonnement que `recipe_ingredients_quantite_positive` (`20260802112511`), à un epic de
+  distance.* ⚠️ **`>= 0` et non `> 0`** : une quantité nulle n'a pas de sens mais n'est pas
+  dangereuse.
+- **Le `normaliserNomArticle` côté client.** La 4.1 mesure l'accord entre `normaliserTexte`
+  (nu) et `grocery_list_items_nom_non_vide` ; l'enveloppe de domaine appartient au premier
+  écran qui ajoute un article. ⚠️ **Elle n'a PAS à recalculer la clé canonique** — celle-ci vit
+  dans l'expression de l'index, côté serveur, et un miroir applicatif serait une seconde source
+  de vérité (AD-1/AD-6).
+
+### Ce que la story 4.1 a MESURÉ et qui vaut pour toutes les suivantes
+
+- **`with check` sur `grocery_update` n'est pas ce qui refuse un déplacement inter-foyers.**
+  Mesuré : c'est la politique **SELECT** — Postgres exige que le nouvel état d'une ligne mise à
+  jour reste visible à celui qui la modifie. Le `with check` est gardé comme ceinture, et aucun
+  test ne le fait tomber à lui seul. ⚠️ **À rouvrir si `grocery_select` s'assouplit un jour**
+  (dashboard Epic 5, pont Epic 6) : ce jour-là, c'est lui qui restera debout.
+- **`unaccent` est `STABLE`, ses DEUX formes.** Le contournement répandu (« employer
+  `unaccent(regdictionary, text)`, elle est IMMUTABLE ») est **faux sur PG 17.6**. D'où
+  `public.strip_accents`, et la promesse d'immutabilité documentée au volet 1 de la migration.
+  ⚠️ **`reindex index grocery_list_items_cle_canonique;` après toute montée de version MAJEURE
+  de Postgres** — c'est la contre-mesure, et rien ne la déclenchera tout seul.
+- **`g.*` dans une vue est un piège dormant.** Postgres fige l'expansion à la création : les
+  colonnes ajoutées ensuite n'y apparaissent jamais, et rejouer le corps d'origine échoue
+  (`cannot change name of view column`). `grocery_list_by_aisle` porte désormais une liste
+  explicite. ⚠️ **Aucune autre vue du schéma n'a été auditée sur ce point** —
+  `household_invites_valides` (`20260728133837`) reste à vérifier.
+
+---
+
+## Deferred from: code review of story-4.1 (2026-08-05)
+
+*Revue adversariale à trois couches sur `20260805092611`. Tout ce qui suit a été **MESURÉ**
+(`docker exec -i supabase_db_nutriclaude psql`, chaque sonde en `begin … rollback`). Les
+constats bloquants et les correctifs restent dans le fichier de story ; ces trois-là sont
+reportés parce qu'ils appartiennent à une story qui possède le chemin d'écriture concerné.*
+
+### `deleted_at` accepte une date future, et `(status, deleted_at)` n'est contraint par rien — pour la 4.5 / 4.10
+
+**Mesuré** : `insert … (deleted_at) values ('2999-01-01Z')` → accepté. `insert … (deleted_at,
+status) values (now() + interval '100 years', 'bought')` → accepté. Une ligne peut donc être
+simultanément achetée et supprimée, ou supprimée dans le futur.
+
+La vue `grocery_list_by_aisle` teste `deleted_at is null`, **jamais** `deleted_at <= now()` :
+un tombstone daté de 2999 fait disparaître la ligne **immédiatement** et reste indiscernable
+d'un tombstone posé maintenant.
+
+*Reporté* : la 4.5 possède le chemin d'écriture du tombstone et la 4.10 l'arbitrage LWW — c'est
+là que la question « un tombstone futur veut-il dire quelque chose ? » se tranche. La contrainte
+candidate est `check (deleted_at is null or deleted_at >= created_at)`.
+⚠️ **La fenêtre bon marché se referme à la 4.4** (table encore vide) : après, c'est une
+migration de données.
+
+### `unit` n'est normalisé nulle part, contrairement à `name` — pour l'Epic 6 / la 4.4
+
+**Mesuré** : `insert … (unit) values (normalize('pièce', NFD))` → `23514
+grocery_list_items_unite_fermee`, sur une unité que le membre a pourtant **choisie dans une
+liste fermée**. `name` traverse `normalize(name, NFC)` dans l'expression de l'index ; `unit` ne
+traverse rien — ni dans `grocery_list_items_unite_fermee`, ni dans la clé canonique.
+
+Les 7 jetons faux du test de `contraintes.test.ts` sont tous en NFC : le cas n'est mesuré par
+rien.
+
+*Reporté* : sans conséquence tant que l'unité vient d'un sélecteur d'écran. À rouvrir quand le
+**pont Google** écrira (AD-12 : « l'ingestion normalise vers le vocabulaire fermé ») — un texte
+dont personne ne contrôle la forme Unicode. Correctif candidat : `normalize(unit, NFC)` dans les
+deux expressions, ou un test qui **fige** le refus actuel comme voulu.
+
+### ⛔ `recipe_ingredients_nom_non_vide` garde le trou que la 4.1 vient de fermer — pour la 4.x recettes
+
+**Mesuré le 2026-08-05.** La regex d'invisibles de `20260802112511:84` laisse passer **241**
+points de code `Default_Ignorable`/`Cf`, en deux plages :
+
+- **U+180F** — voisin immédiat de la plage `᠋-᠎` déjà énumérée, ajouté par
+  **Unicode 14** après la rédaction de la regex ;
+- **U+E0100–U+E01EF** — les sélecteurs de variante supplémentaires.
+
+La revue de la story 4.1 a **étendu** la forme dans `20260805092611` (mesuré : 0 survivant), mais
+`20260802112511` **n'est pas retouchée** — elle est appliquée, et une migration appliquée ne se
+retouche plus (`docs/migrations.md`). Les deux formes divergent donc à partir d'aujourd'hui.
+
+**Ce qui reste ouvert côté recettes** : un nom d'ingrédient composé uniquement de ces points de
+code passe `recipe_ingredients_nom_non_vide`. Sans conséquence d'unicité là-bas — aucune clé
+canonique n'est bâtie sur `recipe_ingredients.name` — mais c'est le même défaut, et il porte le
+jour où l'Epic 4 ingérera les ingrédients (`generate_grocery_list_from_menu`, story 4.7).
+
+⚠️ **Et la règle §3 n'est pas satisfaite pour autant.** C'est la troisième rédaction d'une
+énumération que ce dépôt sait perdante : Postgres n'a pas de propriété Unicode dans ses
+expressions rationnelles, donc ce n'est pas une victoire, c'est un report **mesuré**. La
+prochaine version d'Unicode rouvrira l'écart. Le seul contrôle qui le dira est le test d'accord
+client ↔ base de `contraintes.test.ts` — et il ne le dira que pour `grocery_list_items`.
+
+### La régénération de `lib/supabase/types.ts` n'est pas reproductible — pour qui touchera au schéma
+
+**Mesuré le 2026-08-05, en revue de la story 4.1.** Le premier jet de la story emportait deux
+changements sans rapport avec sa migration : `__InternalSupabase: { PostgrestVersion: "14.5" }`
+**supprimé**, et un schéma `graphql_public` entier **ajouté**. Ni l'un ni l'autre ne vient du
+schéma — PostgREST tourne toujours en v14.5 (mesuré :
+`public.ecr.aws/supabase/postgrest:v14.5`).
+
+**La cause : deux CLI Supabase coexistent sur le poste, et rien ne dit laquelle employer.**
+
+| Chemin | Version mesurée |
+|---|---|
+| `/opt/homebrew/bin/supabase` | **2.100.0** |
+| `npx supabase` | **2.111.0** |
+
+`package.json` n'épingle aucune version (décision de Florian du 2026-08-05 : ne pas en ajouter,
+NFR-10), et l'en-tête des migrations prescrit `npx supabase gen types` — donc *la plus récente du
+jour*. La story 4.1 a été corrigée en régénérant avec la version d'origine, mais **le problème
+n'est pas résolu, il est circonscrit** : la prochaine personne qui régénérera produira un
+troisième diff sans rapport avec son travail, et ne saura pas pourquoi.
+
+**Ce que la revue a fait** : l'en-tête de `20260805092611` porte désormais la commande **exacte**
+— `npx -y supabase@2.106.0 gen types typescript --local --schema public` — et le fichier a été
+régénéré avec elle. `graphql_public` a disparu du diff, qui est retombé de **53 insertions / 4
+suppressions à 26 / 5**.
+
+⚠️ **CE QUI N'A PAS PU ÊTRE REFERMÉ, ET C'EST MESURÉ, PAS SUPPOSÉ.** Aucune version de CLI ne
+reproduit la ligne de base :
+
+| Version | Lit `config.toml` ? | `graphql_public` | bloc `__InternalSupabase` |
+|---|---|---|---|
+| 2.103.0 · 2.104.0 · 2.105.0 | **non** — `invalid keys: local_smtp` | — | — |
+| 2.106.0 · 2.107.0 | oui | oui (évitable par `--schema public`) | **non** |
+| 2.111.0 | oui | oui | non |
+
+La ligne de base porte le bloc `__InternalSupabase: { PostgrestVersion: "14.5" }` ; plus aucune
+CLI lisant ce `config.toml` ne l'émet. Sa **suppression subsiste donc dans le diff de la story
+4.1** — 5 lignes, sans conséquence mesurée (`typecheck` et `lint` verts), mais sans rapport avec
+elle. La restaurer à la main dans un fichier généré aurait été reperdu à la régénération
+suivante, et aurait de toute façon contredit la ligne 663 du même fichier, que la CLI émet
+toujours : `type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">` — une omission
+d'une clé qui n'existe plus. **C'est une incohérence du générateur, pas du dépôt.**
+
+⚠️ **Ce que ça coûtera si personne ne le reprend** : la commande épinglée ne vit que dans l'en-tête
+d'**une** migration. La prochaine personne qui régénérera depuis une autre story emploiera la
+commande nue, et `graphql_public` entrera dans le contrat PostgREST que la story **4.12** doit
+geler sans qu'aucune story l'ait décidé. Les pistes, à arbitrer : un script `gen:types` dans
+`package.json` portant la commande épinglée (**aucune dépendance ajoutée** — `npx -y` la tire à
+la demande, donc NFR-10 tient), figer la version dans `.github/workflows/ci.yml` via
+`supabase/setup-cli@v1`, ou épingler la CLI en `devDependencies`.
+
+### Rien n'attache `actor_id` à l'appelant — pour la 4.6
+
+**Mesuré** : `grocery_insert` porte `with check (household_id = current_household_id())` et **rien
+d'autre** ; `grocery_update` de même. Un membre peut donc attribuer un article à **un autre
+membre de son foyer** — la provenance de FR-7 est auto-déclarée par le client, alors que
+l'écriture est client-direct (AD-13).
+
+*Reporté sur décision de Florian du 2026-08-05, en revue de la story 4.1.* C'est le seul des
+quatre invariants trouvés en revue que la 4.1 n'a pas les éléments de trancher :
+
+- la forme correcte dépend de l'**Epic 5**, où `actor_kind = 'device'` rend `auth.uid()`
+  dépourvu de sens — un appareil n'est jamais une FK `profiles` (AD-9/NFR-6) ;
+- **aucune surface n'écrit encore** `actor_kind`/`actor_id` (mesuré) ;
+- se tromper de forme ici coûterait une migration corrective sur une table peuplée.
+
+La candidate est `with check (actor_kind is distinct from 'profile' or actor_id = auth.uid())`.
+La story **4.6** possède le chemin de lecture de la provenance et tranchera.
+⚠️ **À ne pas confondre avec `check ((actor_kind is null) = (actor_id is null))`**, qui est
+posée par la 4.1 : celle-là dit que la provenance est un **couple**, celle-ci dirait **qui** a le
+droit de le remplir. Deux questions distinctes.
+
+### `strip_accents` est exposée en RPC appelable par `anon` — pour la 4.12
+
+**Mesuré** : `has_function_privilege('anon', 'public.strip_accents(text)', 'execute')` → `t`.
+C'est un effet de l'`alter default privileges … grant all on functions to anon, authenticated,
+service_role` de `20260729094500`, sur lequel le volet 1 de `20260805092611` s'appuie
+**explicitement** pour ne pas écrire de `grant`.
+
+`lib/supabase/types.ts` l'enregistre désormais dans `Functions` : la primitive entre donc dans
+le contrat PostgREST. Aucune ligne de la story 4.1 ne **décide** qu'elle doit être appelable
+sans session — c'est hérité, pas choisi.
+
+*Reporté* : sans danger (fonction pure, `strict`, `immutable`, n'expose aucune donnée). La story
+**4.12** gèle le contrat versionné : c'est elle qui doit trancher si cette primitive interne en
+fait partie, ou si elle mérite un `revoke execute … from anon`.

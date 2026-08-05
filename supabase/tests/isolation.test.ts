@@ -1312,3 +1312,407 @@ test("A lit SA semaine de menu de bout en bout, jointure comprise", async () => 
   const titres = embarquee.map((r) => r?.title).sort();
   assert.deepEqual(titres, ["Gratin de courgettes", "Salade de lentilles"]);
 });
+
+// ── Liste de courses : isolation, et le DELETE qui n'existe plus (story 4.1) ─
+//
+// ⚠️ **AUCUN test ne touchait `grocery_list_items` avant cette story** — mesuré le
+// 2026-08-05. La table existe depuis le squelette du 2026-05-02 et sa politique
+// `grocery_all` n'a jamais été éprouvée par rien. AD-17 : l'isolation se prouve par
+// un test EXÉCUTÉ.
+//
+// ⚠️ **La story 4.1 retire le verbe DELETE aux surfaces** : `grocery_all … for all`
+// est remplacée par trois politiques nommées, et l'ABSENCE de politique DELETE est
+// le mécanisme (la RLS refuse par défaut ce qu'aucune politique n'autorise). C'est
+// la seule forme qui tienne le critère « suppression par tombstone, JAMAIS par
+// DELETE dur » (AD-3) au niveau de la donnée plutôt que dans la vigilance d'une
+// surface (AD-1/AD-2).
+
+/** Pose un article chez `foyer` avec la clé de service, et rend son identifiant. */
+async function articleDeService(
+  foyerId: string,
+  nom: string,
+  unite: string | null = null
+): Promise<string> {
+  const { data, error } = await admin
+    .from("grocery_list_items")
+    .insert({ household_id: foyerId, name: nom, unit: unite })
+    .select("id")
+    .single();
+  assert.equal(error, null, `l'article « ${nom} » n'a pas pu être posé`);
+  return data!.id as string;
+}
+
+test("A ne lit pas les articles de B, même en nommant leur identifiant", async () => {
+  const chezB = await articleDeService(b.foyerId, "Poireaux de Bruno");
+
+  const { data: tout, error } = await a.client.from("grocery_list_items").select("id, name");
+  assert.equal(error, null);
+  assert.equal(
+    tout?.some((l) => l.id === chezB),
+    false,
+    "A voit un article de B dans sa propre liste"
+  );
+
+  // Et en le désignant explicitement : la RLS filtre les LIGNES, pas la requête.
+  const { data: cible } = await a.client
+    .from("grocery_list_items")
+    .select("id, name")
+    .eq("id", chezB);
+  assert.deepEqual(cible, [], "A lit un article de B en le nommant");
+
+  // La vue aussi : `security_invoker = true` est ce qui le garantit.
+  const { data: parRayon } = await a.client
+    .from("grocery_list_by_aisle")
+    .select("id")
+    .eq("id", chezB);
+  assert.deepEqual(parRayon, [], "la vue laisse fuir un article de B");
+});
+
+test("A ne peut ni poser, ni modifier un article chez B", async () => {
+  const chezB = await articleDeService(b.foyerId, "Beurre de Bruno");
+
+  const { error: pose } = await a.client
+    .from("grocery_list_items")
+    .insert({ household_id: b.foyerId, name: "Intrus" });
+  assert.notEqual(pose, null, "A a posé un article dans le foyer de B");
+
+  /*
+   * ⚠️ **Zéro ligne modifiée est un SUCCÈS PostgREST, pas une erreur.** Sous RLS,
+   * écrire sur une ligne masquée ne rend AUCUNE erreur — le `update` porte sur un
+   * ensemble vide. C'est le faux positif que la story 2.2 a mesuré : sans
+   * `.select()` et sans compter les lignes rendues, ce test passerait en ne
+   * prouvant rien.
+   */
+  const { data: modifiees, error: modif } = await a.client
+    .from("grocery_list_items")
+    .update({ name: "Détourné" })
+    .eq("id", chezB)
+    .select("id");
+  assert.equal(modif, null, "erreur inattendue");
+  assert.deepEqual(modifiees, [], "A a modifié un article de B");
+
+  const { data: intact } = await admin
+    .from("grocery_list_items")
+    .select("name")
+    .eq("id", chezB)
+    .single();
+  assert.equal(intact!.name, "Beurre de Bruno", "le nom de l'article de B a bougé");
+});
+
+test("A ne peut pas SUPPRIMER son propre article — la suppression est un tombstone", async () => {
+  /*
+   * ⚠️ **LE TEST LE PLUS IMPORTANT DE LA STORY 4.1.** Le critère dit « la
+   * suppression se fait par tombstone, JAMAIS par DELETE dur ». Ce n'est pas une
+   * convention de code : c'est l'absence de politique DELETE qui le tient, au
+   * niveau de la donnée (AD-1/AD-2). L'écriture de la liste étant client-direct
+   * (AD-13), le membre possède sa clé anon et son jeton — un `DELETE` PostgREST
+   * direct est à un appel près.
+   *
+   * ⚠️ **Il passe par le client authentifié de A, JAMAIS par `admin`.** La clé de
+   * service traverse la RLS : le même test écrit avec `admin` supprimerait la ligne
+   * et « prouverait » l'inverse.
+   *
+   * ⚠️ **Et comme au-dessus, zéro ligne supprimée est un succès PostgREST.** C'est
+   * le compte des lignes rendues qui mesure, pas l'absence d'erreur.
+   */
+  const { data: pose, error: erreurPose } = await a.client
+    .from("grocery_list_items")
+    .insert({ household_id: a.foyerId, name: "Article que A voudrait effacer" })
+    .select("id")
+    .single();
+  assert.equal(erreurPose, null, "A n'a pas pu poser son propre article");
+  const sien = pose!.id as string;
+
+  const { data: supprimees, error } = await a.client
+    .from("grocery_list_items")
+    .delete()
+    .eq("id", sien)
+    .select("id");
+  assert.equal(error, null, "erreur inattendue");
+  assert.deepEqual(supprimees, [], "A a supprimé une ligne en dur : le tombstone est contournable");
+
+  const { data: survivant } = await admin
+    .from("grocery_list_items")
+    .select("id, deleted_at")
+    .eq("id", sien)
+    .single();
+  assert.notEqual(survivant, null, "la ligne a disparu de la base");
+  assert.equal(survivant!.deleted_at, null, "rien n'aurait dû poser de tombstone ici");
+});
+
+test("A ne peut pas supprimer un article de B non plus", async () => {
+  // Le pendant inter-foyers du test précédent : deux raisons de refuser se
+  // superposent (aucune politique DELETE, et la ligne n'est pas visible). Le
+  // mesurer séparément évite qu'un futur assouplissement de l'une passe inaperçu.
+  const chezB = await articleDeService(b.foyerId, "Pommes de Bruno");
+  const { data: supprimees, error } = await a.client
+    .from("grocery_list_items")
+    .delete()
+    .eq("id", chezB)
+    .select("id");
+  assert.equal(error, null, "erreur inattendue");
+  assert.deepEqual(supprimees, [], "A a supprimé un article de B");
+
+  const { count } = await admin
+    .from("grocery_list_items")
+    .select("id", { count: "exact", head: true })
+    .eq("id", chezB);
+  assert.equal(count, 1, "l'article de B a disparu");
+});
+
+test("A gère SON article de bout en bout, tombstone compris", async () => {
+  /*
+   * ⚠️ **LE TÉMOIN POSITIF, et il n'est pas décoratif.** Sans lui, tous les tests
+   * négatifs ci-dessus passeraient sur une table simplement inaccessible — c'est la
+   * forme de faux positif la plus difficile à voir, et le dépôt l'a déjà rencontrée
+   * (story 3.5 : supprimer une politique rend la table PLUS restrictive, donc les
+   * tests négatifs restent verts gratuitement).
+   */
+  const { data: pose, error: erreurPose } = await a.client
+    .from("grocery_list_items")
+    .insert({ household_id: a.foyerId, name: "Farine", unit: "kg", quantity: 1 })
+    .select("id, updated_at")
+    .single();
+  assert.equal(erreurPose, null, "A n'a pas pu poser son article");
+  const sien = pose!.id as string;
+
+  // Il apparaît dans la vue groupée par rayon : « À classer », sans rayon résolu.
+  const { data: visible } = await a.client
+    .from("grocery_list_by_aisle")
+    .select("id, name, aisle_name")
+    .eq("id", sien);
+  assert.equal(visible?.length, 1, "l'article de A n'apparaît pas dans sa propre vue");
+  assert.equal(visible![0].aisle_name, null, "sans rayon résolu, c'est « À classer » (story 4.17)");
+
+  // Il se modifie.
+  const { data: modifie, error: erreurModif } = await a.client
+    .from("grocery_list_items")
+    .update({ status: "bought" })
+    .eq("id", sien)
+    .select("id, status, updated_at")
+    .single();
+  assert.equal(erreurModif, null, "A n'a pas pu modifier son article");
+  assert.equal(modifie!.status, "bought");
+  assert.notEqual(
+    modifie!.updated_at,
+    pose!.updated_at,
+    "le trigger `set_updated_at` n'a pas posé le nouvel horodatage"
+  );
+
+  // Et il se supprime — par tombstone, la seule voie qui reste.
+  const { data: tombstone, error: erreurTombstone } = await a.client
+    .from("grocery_list_items")
+    .update({ deleted_at: new Date().toISOString(), status: "pending" })
+    .eq("id", sien)
+    .select("id, deleted_at")
+    .single();
+  assert.equal(erreurTombstone, null, "A n'a pas pu poser le tombstone");
+  assert.notEqual(tombstone!.deleted_at, null);
+
+  // Tombstoné, il quitte la vue — sans quitter la table.
+  const { data: apres } = await a.client.from("grocery_list_by_aisle").select("id").eq("id", sien);
+  assert.deepEqual(apres, [], "la vue montre encore un article supprimé");
+
+  const { data: enBase } = await a.client
+    .from("grocery_list_items")
+    .select("id")
+    .eq("id", sien);
+  assert.equal(enBase?.length, 1, "le tombstone a fait disparaître la ligne de la table");
+});
+
+test("le tombstone GARDE sa clé canonique — rajouter est un UPDATE, jamais un INSERT", async () => {
+  /*
+   * ⚠️ **La conséquence de l'index TOTAL (aucun `where deleted_at is null`), et
+   * celle que les stories 4.5 et 4.7 doivent connaître AVANT de coder.** AD-3 :
+   * « l'id sur lequel s'arbitre LWW/tombstone doit rester stable ». Un index
+   * partiel laisserait naître une ligne neuve à côté du tombstone, et un cochage
+   * hors ligne flushé après une suppression arbitrerait contre une ligne disparue.
+   *
+   * Ce test dit donc deux choses au développeur de la 4.5 : ton INSERT rendra
+   * `23505` sur un geste parfaitement légitime, et ton UPDATE est la bonne voie.
+   */
+  const nom = "Lentilles corail";
+  const { data: pose } = await a.client
+    .from("grocery_list_items")
+    .insert({ household_id: a.foyerId, name: nom, unit: "g" })
+    .select("id")
+    .single();
+  const ligne = pose!.id as string;
+
+  await a.client
+    .from("grocery_list_items")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", ligne);
+
+  // Rajouter par INSERT : refusé, la clé est toujours occupée.
+  const { error: reinsertion } = await a.client
+    .from("grocery_list_items")
+    .insert({ household_id: a.foyerId, name: nom, unit: "g" });
+  assert.notEqual(reinsertion, null, "un INSERT a créé une ligne jumelle à côté du tombstone");
+  assert.equal(reinsertion!.code, "23505");
+
+  // Rajouter par UPDATE : c'est la voie, et elle ressuscite la MÊME ligne.
+  const { data: ressuscite, error: erreurUpdate } = await a.client
+    .from("grocery_list_items")
+    .update({ deleted_at: null })
+    .eq("id", ligne)
+    .select("id, deleted_at")
+    .single();
+  assert.equal(erreurUpdate, null, "l'UPDATE de résurrection a été refusé");
+  assert.equal(ressuscite!.id, ligne, "la ligne ressuscitée n'est pas la même");
+  assert.equal(ressuscite!.deleted_at, null);
+});
+
+test("A ne peut pas déplacer son article vers le foyer de B", async () => {
+  /*
+   * L'écriture chez l'autre foyer par la porte de derrière : A garde la main sur sa
+   * ligne (le `using` la lui donne) et change son `household_id`.
+   *
+   * ⚠️ **CE TEST MESURE LE RÉSULTAT, PAS LE `with check` — et la première rédaction
+   * de ce commentaire prétendait le contraire.** Mesuré au banc des dents le
+   * 2026-08-05, en `set local role authenticated` avec un claim JWT forgé :
+   *
+   *   with check (true) + grocery_select using (household_id = …)  →  42501, refusé
+   *   with check (true) + grocery_select using (true)              →  ACCEPTÉ
+   *
+   * C'est donc la politique **SELECT** qui refuse la ligne d'arrivée : Postgres
+   * exige que le nouvel état d'une ligne mise à jour reste visible à celui qui la
+   * modifie. Retirer le seul `with check` ne fait tomber aucun test, et c'est écrit
+   * ici plutôt que laissé croire — le `with check` est gardé comme ceinture en plus
+   * des bretelles, pour le jour où `grocery_select` s'assouplira (dashboard, pont).
+   */
+  const { data: pose } = await a.client
+    .from("grocery_list_items")
+    .insert({ household_id: a.foyerId, name: "Article voyageur" })
+    .select("id")
+    .single();
+  const sien = pose!.id as string;
+
+  const { data: deplacees, error } = await a.client
+    .from("grocery_list_items")
+    .update({ household_id: b.foyerId })
+    .eq("id", sien)
+    .select("id");
+  assert.notEqual(
+    error === null && (deplacees?.length ?? 0) > 0,
+    true,
+    "A a déplacé son article dans le foyer de B"
+  );
+
+  const { data: reste } = await admin
+    .from("grocery_list_items")
+    .select("household_id")
+    .eq("id", sien)
+    .single();
+  assert.equal(reste!.household_id, a.foyerId, "l'article a changé de foyer");
+});
+
+test("un appel ANONYME ne lit ni n'écrit la liste", async () => {
+  /*
+   * Toutes les politiques s'ancrent sur `current_household_id()`, qui résout depuis
+   * `profiles.id = auth.uid()`. Sans session, `auth.uid()` est nul, donc la
+   * fonction rend `null`, et `household_id = null` n'est jamais vrai. Le mesurer
+   * plutôt que le déduire : c'est le raisonnement qui a été démenti deux fois sur
+   * ce dépôt.
+   */
+  const anonyme = createClient(apiUrl, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const chezA = await articleDeService(a.foyerId, "Article visible de personne");
+
+  const { data: lu } = await anonyme.from("grocery_list_items").select("id").eq("id", chezA);
+  assert.deepEqual(lu, [], "un appel anonyme lit la liste");
+
+  const { error: ecrit } = await anonyme
+    .from("grocery_list_items")
+    .insert({ household_id: a.foyerId, name: "Intrus anonyme" });
+  assert.notEqual(ecrit, null, "un appel anonyme écrit dans la liste");
+});
+
+test("le MÊME article existe chez A et chez B — la clé est unique PAR FOYER", async () => {
+  /*
+   * ⚠️ **AJOUTÉ EN REVUE le 2026-08-05, parce que `household_id` n'avait AUCUNE
+   * dent.** Tous les noms insérés par les 21 tests de la story étaient deux à
+   * deux distincts entre foyers (« Poireaux de Bruno », « Farine », « Lentilles
+   * corail »…), et `contraintes.test.ts` travaille sur un foyer unique. Retirer
+   * `household_id` de l'index — donc unicité **globale** — laissait toute la
+   * suite verte.
+   *
+   * Ce que ça aurait coûté : une **fuite d'information inter-foyers par
+   * `23505`**. Un membre apprend qu'un autre foyer a déjà « lait / L » en
+   * essayant de l'ajouter chez lui. C'est un défaut NFR-5 qu'aucun test négatif
+   * n'aurait vu, puisqu'aucune ligne n'aurait été lue.
+   */
+  const nom = "Article rigoureusement homonyme";
+
+  const { error: chezA } = await a.client
+    .from("grocery_list_items")
+    .insert({ household_id: a.foyerId, name: nom, unit: "L" });
+  assert.equal(chezA, null, "A n'a pas pu poser son article");
+
+  const { error: chezB } = await b.client
+    .from("grocery_list_items")
+    .insert({ household_id: b.foyerId, name: nom, unit: "L" });
+  assert.equal(
+    chezB,
+    null,
+    "B ne peut pas poser le même nom que A : la clé n'est pas ancrée sur le foyer"
+  );
+
+  // Et chacun ne voit que le sien.
+  const { data: vusParA } = await a.client
+    .from("grocery_list_items")
+    .select("id, household_id")
+    .eq("name", nom);
+  assert.equal(vusParA?.length, 1, "A voit plus que son propre article homonyme");
+  assert.equal(vusParA![0].household_id, a.foyerId);
+
+  // Le doublon reste refusé À L'INTÉRIEUR du foyer — sans quoi ce test passerait
+  // sur une clé qui aurait simplement perdu son unicité.
+  const { error: doublon } = await a.client
+    .from("grocery_list_items")
+    .insert({ household_id: a.foyerId, name: nom.toUpperCase(), unit: "L" });
+  assert.notEqual(doublon, null, "la clé n'est plus unique dans le foyer");
+  assert.equal(doublon!.code, "23505");
+});
+
+test("un membre authentifié ne peut PAS appeler la génération de liste", async () => {
+  /*
+   * ⚠️ **LE TEST DU VOLET 8, ET IL EST NÉ D'UN DÉFAUT QUE LA STORY DÉCLARAIT
+   * FERMÉ.** La story affirmait « l'AC4 est tenu pour les SURFACES, et pas pour
+   * cette fonction `security definer` ». Mesuré en revue le 2026-08-05 : cette
+   * fonction *est* une surface. PostgREST l'expose en RPC, et `execute` lui était
+   * accordé à `anon` et `authenticated` — dont, surtout, **par l'entrée `PUBLIC`
+   * de son ACL**, que révoquer les rôles nommés ne retire pas.
+   *
+   * Ce qu'un membre ordinaire pouvait donc faire, avec sa seule clé anon et son
+   * jeton (AD-13) :
+   *
+   *   avant  = 2 lignes (1 vivante + 1 tombstonée)
+   *   POST /rest/v1/rpc/generate_grocery_list_from_menu
+   *   après  = 0 ligne, tombstones compris
+   *
+   * — un DELETE dur, exactement ce que l'AC4 proscrit, par la porte de derrière.
+   *
+   * ⚠️ **Ce test ne dit PAS que la fonction est réparée.** Elle ne l'est pas :
+   * elle échoue en `23505` sur deux chemins mesurés et fait toujours son DELETE
+   * dur. C'est la story 4.7, et c'est daté. Ce test dit seulement qu'aucune
+   * surface ne peut plus l'atteindre.
+   */
+  const { error } = await a.client.rpc("generate_grocery_list_from_menu", {
+    p_start_date: "2026-08-01",
+    p_end_date: "2026-08-07",
+  });
+  assert.notEqual(error, null, "un membre authentifié peut encore appeler la génération");
+
+  // Et un appel anonyme non plus — même mécanisme, mesuré séparément pour qu'un
+  // futur assouplissement de l'un ne passe pas inaperçu derrière l'autre.
+  const anonyme = createClient(apiUrl, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { error: sansSession } = await anonyme.rpc("generate_grocery_list_from_menu", {
+    p_start_date: "2026-08-01",
+    p_end_date: "2026-08-07",
+  });
+  assert.notEqual(sansSession, null, "un appel anonyme peut encore appeler la génération");
+});
