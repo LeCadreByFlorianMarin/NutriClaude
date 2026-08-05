@@ -476,9 +476,13 @@ development_status:
   # « intact » alors qu'il ne suivait plus la hauteur des cases (saut de mise en page sur 28
   # cases), et une empreinte SHA-256 de `.env.local` qui ne prouvait rien — le fichier porte un
   # jeton Vercel de 12 h que la CLI réécrit seule.
-  # ⛔ `in-progress` ET NON `review` : la passe de correction DOIT ÊTRE REVUE À SON TOUR
+  # ✅ 2026-08-05 — Requête de contrôle EXÉCUTÉE SUR LA PRODUCTION, zéro ligne aux trois volets.
+  #    ⚠️ RAPPORTÉ PAR FLORIAN, pas mesuré par l'agent (règle §1) : l'URI de production avait
+  #    disparu de `.env.local`, emportée par la réécriture de la CLI Vercel. Condition de
+  #    fusion levée. Statut `in-progress` → `review`, puis fusion demandée par Florian.
+  # ⛔ RESTE OUVERT, DATÉ PLUTÔT QU'EFFACÉ : la passe de correction n'a été revue par personne
   # (règle §6 — 3 des 6 défauts majeurs de l'Epic 1 sont nés d'une passe de revue).
-  3-6-assigner-recettes-et-nombre-de-personnes-aux-cases-du-menu: in-progress
+  3-6-assigner-recettes-et-nombre-de-personnes-aux-cases-du-menu: review
   epic-3-retrospective: optional
 
   # ── Epic 4 : La liste qui ne lâche jamais — hors-ligne, convergence & contrat ──

@@ -4,7 +4,7 @@ baseline_commit: a56ba0b0458d741f7c8f86f7624923a99b198559
 
 # Story 3.6: Assigner recettes et nombre de personnes aux cases du menu
 
-Status: in-progress
+Status: review
 
 <!-- Sixième et dernière story de l'Epic 3, et la PREMIÈRE qui ÉCRIT dans
      `meal_plan_entries`. Trois choses la distinguent de toutes les stories précédentes de
@@ -167,13 +167,16 @@ mesurer une fois, c'est fermer les deux.
 
   - [x] `npx supabase migration new contraindre_les_assignations_de_menu`
   - [x] **L'en-tête porte sa requête de contrôle**, et `npm run check:migrations` le vérifie.
-        <!-- ⚠️ COCHÉE POUR CE QU'ELLE DIT — la requête EST écrite, et le script la voit.
-             ⛔ **SON EXÉCUTION SUR LA PRODUCTION N'A PAS EU LIEU ET NE POUVAIT PAS AVOIR
-             LIEU ICI** : c'est le geste de la revue de PR, et c'est une CONDITION DE FUSION.
-             Ce qui a été exécuté : les trois volets sur le STACK LOCAL le 2026-08-04, qui
-             rendent zéro ligne — et le stack local venait d'être remis à zéro, donc ça ne
-             prouve rien sur le distant. C'est écrit dans l'en-tête de la migration comme une
-             DÉDUCTION, pas comme une mesure. -->
+        <!-- ✅ **EXÉCUTÉE SUR LA PRODUCTION LE 2026-08-05 — zéro ligne aux trois volets.**
+             ⚠️ **RAPPORTÉ PAR FLORIAN, PAS MESURÉ PAR L'AGENT** (règle §1) : l'URI Postgres
+             de production n'était plus dans `.env.local` au moment de la fusion — la ligne
+             nue qui la portait a disparu quand la CLI Vercel a réécrit le fichier pour
+             rafraîchir `VERCEL_OIDC_TOKEN`, la même réécriture qui avait déjà invalidé
+             l'empreinte SHA-256. L'agent n'avait donc aucun accès au distant et s'est arrêté
+             plutôt que de fusionner sans le contrôle.
+             Ce qui reste une DÉDUCTION : rien d'autre que ces trois requêtes n'a été observé
+             sur la production. Ce qu'elles établissent : aucune ligne existante ne viole les
+             trois volets qui pouvaient échouer. La condition de fusion est levée. -->
         ⚠️ **Elle s'exécute EN REVUE, sur la PRODUCTION** — il n'y a plus de `db push`
         manuel depuis le 2026-07-29, donc plus de moment « juste avant de pousser ». Les
         trois volets qui peuvent échouer, **zéro ligne** attendue chacun :
@@ -1649,6 +1652,7 @@ couches indépendantes.**
 | Date | Quoi |
 |---|---|
 | 2026-08-04 | Story créée sur `a56ba0b`. Statut `backlog` → `ready-for-dev`. **Quatre questions posées, dont deux structurantes** (forme de la contrainte de provenance, place de l'assignation). Trois prémisses rouvertes et citées (règle §5), dont **l'AC2 de la 3.5, fusionné sans avoir été observé** — sa démonstration passe dans la Task 8 de cette story |
+| 2026-08-05 | **Requête de contrôle exécutée sur la PRODUCTION — zéro ligne aux trois volets.** ⚠️ **Rapporté par Florian, pas mesuré par l'agent** (règle §1) : l'URI Postgres de production avait disparu de `.env.local`, emportée par la réécriture de la CLI Vercel. L'agent s'est arrêté plutôt que de fusionner sans le contrôle. **La condition de fusion est levée**, et la story passe `in-progress` → `review`. ⛔ **Ce qui reste ouvert et est DATÉ plutôt qu'effacé** (règle §6 bis) : la passe de correction du 2026-08-05 n'a été revue par personne — c'est la règle §6, et sur ce dépôt trois des six défauts majeurs de l'Epic 1 sont nés d'une passe de revue. Fusion demandée par Florian en connaissance de cette réserve |
 | 2026-08-05 | **Revue adversariale à trois couches** (contexte vierge), puis passe de correction. ⚠️ **Menée par le modèle qui a implémenté** — règle §6 non satisfaite à la lettre. **21 findings, dont 7 levés par au moins deux couches indépendantes.** 2 décisions tranchées par Florian : décocher la case du refus `23514` (chemin inatteignable), et **refondre `AssignerRepas` en « une ligne ouverte à la fois »** — cette refonte referme à elle seule quatre findings (copie locale `personnesEditees`, région de statut unique, `occupe` global, focus de la confirmation). 14 correctifs appliqués, 6 reports datés. **Quatre affirmations fausses du Dev Agent Record corrigées** : « six mutations » pour huit, `estCodeRepas` coché sans exister, `loading.tsx` déclaré intact alors qu'il ne suivait plus les cases, et une empreinte SHA-256 de `.env.local` qui ne prouvait rien (jeton Vercel de 12 h réécrit tout seul). Correctifs **rejoués à l'écran**. ⛔ Statut `review` → `in-progress` : la passe de correction doit être revue à son tour |
 | 2026-08-04 | **Implémentée sur `feat/menu-assignation`** (branchée sur `a56ba0b`). 11 fichiers créés, 13 modifiés. Une migration à **quatre volets**. 18 tests unitaires neufs (179 → 197), 6 tests d'isolation/contraintes neufs (60 → 66), **8 mutations** jouées, chacune faisant tomber le test qu'elle vise et lui seul. Six portes vertes. ✅ **PARCOURS À L'ÉCRAN JOUÉ EN ENTIER** — les quatre AC de cette story, la moitié d'AC4 de la 3.5, **et l'AC2 de la 3.5 qui n'avait jamais été observé**. Il a trouvé **2 défauts qu'aucune porte ne voyait** : un message de navigateur en anglais qui rendait deux messages français inatteignables, et « et des 2repas » — les deux corrigés et revérifiés. ⛔ **Reste avant fusion** : la requête de contrôle de la migration sur la PRODUCTION (geste de revue), et le dire dans la PR |
 | 2026-08-04 | **Les quatre questions tranchées par Florian, avant démarrage.** (1) Politique `meal_plan_all` resserrée — la clé étrangère composite est écartée et le piège n°3 est DATÉ plutôt qu'effacé. (2) Route dédiée `/menu/[jour]/[repas]`, slug français porté par `REPAS` — les pièges n°8 et n°10 deviennent actifs. (3) `meal_plan_entries_servings_positif` dans la même migration. (4) **Le nombre de personnes se règle au FOYER puis s'ajuste par assignation** — réponse hors des options proposées, qui ajoute `households.default_servings`, une section sur `/foyer`, la **première écriture du produit dans `households`**, un `supabase gen types` désormais **dû**, et le piège n°14 (trois nombres de personnes, deux du même nom en base). Périmètre passé de 9 à **10 tâches** ; toutes ouvertes, plus rien n'attend |
