@@ -149,9 +149,14 @@
   --spacing-item: 46px; /* hauteur de ligne-article, téléphone */
 
   /*
-   * Échelle typographique de DESIGN.md. Seuls les rôles que l'Epic 1 emploie
-   * sont posés — `counter`, `clock` et les variantes dashboard arriveront avec
-   * les écrans qui les portent (Epics 2 et 5).
+   * Échelle typographique de DESIGN.md. **Un rôle ne se pose qu'avec le
+   * composant qui l'emploie** — un token publié devient écrivable comme
+   * utilitaire, donc une surface d'erreur de plus. `counter`, `clock` et les
+   * variantes dashboard restent à poser (Epics 4 et 5).
+   *
+   * ⚠ `qty` est la première exception assumée : son composant existe
+   * (`app/_lib/CarteRayon.tsx`) mais aucun écran ne le monte encore — la story
+   * 4.2 sera le premier. État au 2026-08-07.
    */
   --text-eyebrow: 11px;
   --text-eyebrow--line-height: 1.4;
@@ -159,6 +164,21 @@
   --text-eyebrow--font-weight: 700;
   --text-meta: 12px;
   --text-meta--line-height: 1.5;
+  /*
+   * `qty` — quantités d'articles et ratio `n/total` des cartes-rayon.
+   *
+   * ⚠ **Même taille que `meta`, mais PAS la même hauteur de ligne** (1.4 contre
+   * 1.5, DESIGN.md). S'en remettre à `text-meta` était tentant et n'aurait pas
+   * été iso-spec.
+   *
+   * ⚠ **`tabular-nums` N'EST PAS ICI, et ne peut pas y être.** Tailwind 4
+   * n'expose pas `font-variant-numeric` comme modificateur de `--text-*` : c'est
+   * un utilitaire à écrire sur l'élément. L'oublier échoue en silence — un ratio
+   * qui sautille quand « 12 » devient « 11 » (UX-DR12, DESIGN.md : « les
+   * colonnes de chiffres ne doivent jamais sautiller »).
+   */
+  --text-qty: 12px;
+  --text-qty--line-height: 1.4;
   --text-body: 15px;
   --text-body--line-height: 1.4;
   --text-title: 19px;

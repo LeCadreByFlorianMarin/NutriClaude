@@ -41,7 +41,59 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
-last_updated: 2026-08-05  # 2026-08-05 — Story 4.1 REVUE puis fermée (`done`), avec deux conditions
+last_updated: 2026-08-07  # 2026-08-07 (2ᵉ passe) — Story 2.4 REVUE UNE SECONDE FOIS, sur sa propre
+                          # passe de correction (règle §6). Reste `done` : 3 décisions tranchées,
+                          # 15 correctifs APPLIQUÉS, 7 reportés, 6 écartés. ✅ La 1ʳᵉ passe tient —
+                          # 16 des 19 correctifs réellement fermés, six portes reproduites au
+                          # chiffre près, banc des mutations 9/9 conforme. ⛔ Les 3 constats
+                          # survivants étaient tous de la même forme : corrigés dans le CODE,
+                          # oubliés dans le REGISTRE. Et la correction phare de la 1ʳᵉ passe
+                          # surestimait sa portée — « la divergence est devenue inexprimable » est
+                          # FAUX, mesuré : elle se réécrit en une ligne sous 216 tests verts.
+                          # ⛔ Deux défauts de code NEUFS, encore dans le JSX qu'aucune porte
+                          # n'exécute : `Boolean([])` vaut vrai — donc un rayon vide, cas nominal
+                          # de l'AC2 et idiome exact de la 4.2, rendait une marge sous rien — et
+                          # une jointure orpheline peignait la pastille abricot vide.
+                          # ✅ D2 : `nomDeRayon`/`iconeDeRayon` sont désormais des ENVELOPPES de
+                          # `lib/rayons/saisie.ts`, dont elles réimplémentaient la moitié.
+                          # ⚠️ Défaut de RACINE reporté et mesuré : U+FE0F n'est pas exclu
+                          # d'`INVISIBLES_HORS_JOINTURE`, donc ❤️ enregistre ❤ et 🏳️‍🌈 est démembré
+                          # — À LA SAISIE (`lib/texte.ts`), pas à l'affichage. Story à créer.
+                          # ⛔ Leçon de méthode : deux constats REJETÉS pour contamination croisée
+                          # — une couche de revue avait créé une route de sonde et lancé un build,
+                          # fabriquant la preuve qu'elle croyait lire. Portes : `npm test` 220/220
+                          # (+4), isolation 95/95, typecheck, lint, migrations 16/14/2/0, build.
+                          #
+                          # 2026-08-07 — Story 2.4 REVUE puis FERMÉE (`done`). La story 4.2 est
+                          # DÉBLOQUÉE POUR DE BON. ⛔ Les deux défauts majeurs étaient dans le JSX
+                          # qu'aucune porte n'exécute : un `aria-label` sur un `<span>` nu
+                          # (name-prohibited en ARIA 1.2, remède déjà écrit dans le dépôt), et un
+                          # « banc des dents » qui déclarait tenu un invariant qu'aucun test ne
+                          # peut tenir. ⚠️ Trois commentaires affirmaient un état FAUX de la base
+                          # de code — quatrième epic d'affilée (règle §2). ✅ L'AC3 est désormais
+                          # tenu EN ENTIER : route jetable, sept cartes, deux réglages système.
+                          # ⚠️ Reste ouvert et daté : le composant en SITUATION, story 4.2.
+                          # Détail à son entrée.
+                          #
+                          # 2026-08-06 — Story 2.4 IMPLÉMENTÉE (statut `review`), ce qui DÉBLOQUE
+                          # la story 4.2. ⚠️ Son AC3 n'est tenu qu'à moitié — le rendu n'est
+                          # éprouvé par rien, faute de consommateur. Détail à son entrée.
+                          #
+                          # 2026-08-06 — Story 2.4 contextualisée HORS ORDRE (`backlog` →
+                          # `ready-for-dev`) : elle porte le composant carte-rayon que la décision
+                          # D1 lui confie, et la 4.2 est arrêtée en attendant. Détail à son entrée.
+                          #
+                          # 2026-08-06 — Story 4.2 : D1 et D2 tranchées. ⛔ D1 → la story 2.4
+                          # construit le composant carte-rayon, donc LA 4.2 EST BLOQUÉE tant que
+                          # la 2.4 n'est pas `done`. ✅ D2 → les articles achetés partent à la 4.5.
+                          #
+                          # 2026-08-05 — Story 4.2 contextualisée : `backlog` → `ready-for-dev`.
+                          # PREMIÈRE surface de l'Epic 4, et première lecture client-direct du
+                          # dépôt. ⛔ CINQ décisions ouvertes, dont le composant carte-rayon que
+                          # son critère dit de réutiliser et qui N'EXISTE PAS (story 2.4, backlog).
+                          # Détail à son entrée.
+                          #
+                          # 2026-08-05 — Story 4.1 REVUE puis fermée (`done`), avec deux conditions
                           # ouvertes DATÉES : la requête de contrôle en production, et la fonction
                           # de génération toujours cassée (4.7). La revue a trouvé DEUX défauts
                           # bloquants — l'AC4 défait par une RPC, et l'AC2 faux pour 241 points de
@@ -260,7 +312,65 @@ development_status:
   # l'est pas). C'est la classe d'erreur qui a fait écarter `draggable` HTML5.
   2-2-reordonner-le-parcours-par-manipulation-directe: done
   2-3-definir-des-regles-mot-cle-rayon: backlog
-  2-4-composant-carte-rayon: backlog
+  # Contextualisée le 2026-08-06, HORS ORDRE : elle passe devant la 2.3 parce que la décision D1
+  # de la story 4.2 (Florian, 2026-08-06) lui confie le composant carte-rayon, et que la 4.2 est
+  # ARRÊTÉE en attendant. C'est la plus petite story du dépôt, et la plus inhabituelle : elle
+  # livre un composant React de présentation, SANS écran et SANS consommateur.
+  # ⛔ ONZE MESURES, et trois invalident le cadrage :
+  #   · LE DÉPÔT N'A AUCUN MOYEN D'ÉPROUVER UN COMPOSANT. `npm test` ne globe que
+  #     `lib/**/*.test.ts`, et les 22 fichiers de test portent tous sur des fonctions pures ou sur
+  #     la base. NFR-10 interdit d'ajouter un harnais. Or l'AC3 dit « il est éprouvé sans liste ni
+  #     base » — sans décision, ce critère est un vœu. C'est la décision D1.
+  #   · LA PRÉMISSE QUI A GARDÉ CETTE STORY DANS L'EPIC 2 EST PÉRIMÉE.
+  #     `epic-2-revision-2026-07-29.md` §5-D2 la justifie par « il est bâtissable et VISIBLE SUR
+  #     L'ÉCRAN DES RAYONS » — écrit AVANT que cet écran existe. Celui que la story 2.1 a construit
+  #     rend des LIGNES avec poignée de glisser, pas des cartes, et `app/rayons/page.tsx:20-23`
+  #     exclut explicitement la carte-rayon. Règle §5 : la prémisse se rouvre.
+  #   · LE TOKEN `--text-qty` QUE LE RATIO EXIGE N'EXISTE PAS (`DESIGN.md:278` le prescrit).
+  # ⚠️ ELLE LIVRE UNE CARTE, ET LA CARTE EST UN PIÈGE EN THÈME SOMBRE : mesuré,
+  # `--card-shadow: none` et `--surface-card` à 5,5 % de blanc — LA BORDURE EST LE SEUL SÉPARATEUR.
+  # C'est exactement ce qui a rendu la ligne tirée invisible à la story 2.2 (« cinq portes vertes,
+  # zéro signal — le troisième epic d'affilée où le défaut décisif est trouvé par l'œil »).
+  # ⚠️ Et c'est une story presque entièrement hors de portée des tests : le motif de `86fafe7`
+  # (2.2 fusionnée sans revue, six défauts d'usage ensuite, TOUS dans du JSX qu'aucun test
+  # n'exécute) s'applique mot pour mot.
+  # ⛔ DEUX DÉCISIONS OUVERTES, chacune avec son défaut prescrit : D1 comment la story se démontre
+  # (logique pure extraite dans `lib/rayons/carte.ts` + preuve visuelle reportée à la 4.2, ou
+  # montage sur `/rayons` qui toucherait la story 2.2), D2 le contrat de props (`id` pour la 4.18,
+  # `pris` optionnel, `children`).
+  # ✅ IMPLÉMENTÉE le 2026-08-06 (statut `review`). Trois fichiers, aucune dépendance, aucune
+  # migration : `lib/rayons/carte.ts` (+ 9 tests), `app/_lib/CarteRayon.tsx`, et le token
+  # `--text-qty`. D1 et D2 n'ayant pas été tranchées, les DÉFAUTS PRESCRITS ont été appliqués.
+  # ⚠️ À l'implémentation, l'AC3 n'était tenu QU'À MOITIÉ, et c'était écrit plutôt que maquillé :
+  # le rendu n'était éprouvé par rien, aucun écran ne montant le composant.
+  # ✅ REVUE ADVERSARIALE À QUATRE COUCHES PUIS FERMÉE (`done`) le 2026-08-07. 27 constats :
+  # 3 décisions tranchées par Florian, 19 correctifs appliqués, 5 reportés, 5 écartés.
+  # ⛔ LES DEUX DÉFAUTS MAJEURS ÉTAIENT DANS LE JSX QU'AUCUNE PORTE N'EXÉCUTE — là où la story
+  # avait prédit qu'ils seraient :
+  #   (1) l'`aria-label` du ratio était posé sur un `<span>` NU (rôle `generic`, name-prohibited
+  #       en ARIA 1.2) : tout le type `RatioDeRayon`, testé et documenté trois fois, alimentait un
+  #       attribut qui n'atteignait AUCUN lecteur d'écran. Le dépôt avait déjà payé cette leçon
+  #       sur `InviteCard` et écrit le remède (`.sr-only`) ;
+  #   (2) le « banc des dents » annonçait quatre passages propres — MESURÉ, l'un était FAUX. Le
+  #       mutant qui reconstruit l'annonce à part du visible laisse la suite entière verte, et
+  #       aucun test ne peut l'attraper. `libelleRatio` dérive désormais `pourLecteur` de
+  #       `visible` : l'invariant est tenu PAR CONSTRUCTION.
+  # ⚠️ TROIS COMMENTAIRES AFFIRMAIENT UN ÉTAT DE LA BASE, ET LES TROIS ÉTAIENT FAUX (règle §2) :
+  # « seed_default_aisles couvre les onze rayons » (« À classer » n'a pas de ligne `aisles`),
+  # « muted-2 est à 2,46:1 » (valeur d'avant l'arbitrage, puisée dans le document que
+  # `globals.css:5-9` interdit de citer), « déstructurer `id` ferait échouer lint »
+  # (`eslint.config.mjs` pose `^_`). AUCUN n'était détectable par une porte automatique.
+  # ✅ AC3 TENU : Florian a tranché pour une ROUTE JETABLE plutôt que le report. Sept cartes
+  # parcourues aux DEUX RÉGLAGES SYSTÈME, à 390 px et en large, puis route supprimée avant le
+  # commit (`git diff` vide sur `proxy.ts`).
+  # ⚠️ CE QUI RESTE OUVERT, DATÉ PLUTÔT QU'EFFACÉ (§6 bis) : le composant n'a toujours AUCUN
+  # appelant en production. Le voir EN SITUATION — vraie liste, vraies données, sous un vrai
+  # `<h1>` — reste à la story 4.2. Et entre les deux, aucune porte ne garde ce JSX.
+  # ✅ Portes : npm test 216/216 (+18 sur la story) · isolation 95/95 · lint · typecheck ·
+  # check:migrations 16/14/2/0 · build · 23 utilitaires sur 23 générés, contrôle négatif OK.
+  # ✅ `project-context.md` corrigé dans le même commit : l'interdit sur l'abricot est BORNÉ, pas
+  # effacé — cette story pose le premier abricot du produit (la pastille de la carte-rayon).
+  2-4-composant-carte-rayon: done
   epic-2-retrospective: optional
 
   # ── Epic 3 : Recettes & menu — les affluents de la liste ──
@@ -599,7 +709,58 @@ development_status:
   # garde le trou que la 4.1 vient de fermer, et la régénération des types n'est PAS reproductible
   # (deux CLI Supabase sur le poste, aucune version épinglée).
   4-1-modele-canonique-de-la-ligne-d-article-isolation-rls: done
-  4-2-lecture-client-direct-de-la-liste-groupee-par-rayon: backlog
+  # Contextualisée le 2026-08-05. SEIZE MESURES exécutées sur le stack local (`fb7b5c4`), et
+  # trois d'entre elles invalident le cadrage naïf :
+  #   ⛔ LE COMPOSANT QUE SON CRITÈRE DIT DE « RÉUTILISER TEL QUEL » N'EXISTE PAS. L'AC2 renvoie
+  #     au « composant carte-rayon de l'Epic 2, story 2.4 » — mesuré, `2-4` est en `backlog`.
+  #     `app/rayons/ListeRayons.tsx` est l'éditeur CRUD du parcours, pas ce composant. Décision D1.
+  #   ⛔ LE REGROUPEMENT NAÏF EST FAUX. `aisles.sort_order` n'a aucune contrainte d'unicité :
+  #     deux rayons ex æquo font S'INTERCALER leurs articles (mesuré). Regrouper « par lignes
+  #     consécutives » rendrait DEUX cartes portant le même rayon. Il faut grouper par CLÉ.
+  #   ⛔ AUCUN ARTICLE N'A DE RAYON RÉSOLU en base — et pas pour la raison qu'on croit :
+  #     `resolve_aisle_id` EST câblée, c'est `product_aisle_map` qui est VIDE (story 2.3, backlog).
+  #     Sur une base réelle l'écran n'affiche qu'un groupe : il faut poser `aisle_id` à la main
+  #     pour éprouver le regroupement.
+  # ⚠️ ELLE EST LA PREMIÈRE LECTURE CLIENT-DIRECT DU DÉPÔT. Mesuré : les 20 appels du client
+  # navigateur sont des écritures, et aucun des 8 `useEffect` ne fait d'`await` de données. Il n'y
+  # a donc AUCUN motif à copier pour les états chargement/erreur/vide — c'est le vrai poids de la
+  # story, et ce n'est écrit dans aucun de ses critères. Corollaire mesuré : un `throw` dans un
+  # `useEffect` NE TRAVERSE PAS `app/error.tsx` — l'écran resterait sur son squelette, muet.
+  # ⚠️ L'AC1 dit « plus via des Server Actions `force-dynamic` » : mesuré, il n'y en a AUCUNE.
+  # Rien à démanteler — la formulation vise le prototype retiré à la story 1.1.
+  # ✅ CONTRAINTE INVERSÉE : contrairement à toutes les stories récentes, celle-ci EST démontrable
+  # sur la prévisualisation Vercel — la migration de la 4.1 est en production depuis le 2026-08-05.
+  # ✅ D1 ET D2 TRANCHÉES PAR FLORIAN LE 2026-08-06 :
+  #   ✅ D1 → LA STORY 2.4 construit le composant carte-rayon. La 4.2 le CONSOMME, elle ne l'écrit
+  #     pas. ✅ **DÉBLOCAGE COMPLET le 2026-08-07** : la 2.4 est revue et `done`. (Le déblocage du
+  #     2026-08-06 n'était que PARTIEL — elle était alors en `review`.)
+  #     Le composant existe (`app/_lib/CarteRayon.tsx`) et son contrat est désormais EXPORTÉ sous
+  #     `ProprietesCarteRayon` : ⚠️ **l'IMPORTER, ne pas le recopier.**
+  #     ⚠️ DEUX AJUSTEMENTS DE CONTRAT ISSUS DE LA REVUE, déjà répercutés dans le fichier de la
+  #     4.2 : `pris?: number | null` (`null` ne veut PAS dire « zéro pris ») et `children`
+  #     OPTIONNEL — il était requis, ce qui faisait du rayon vide de l'AC2 une erreur de typage
+  #     chez l'appelant (`TS2741`, mesuré).
+  #     ⛔ UNE OBLIGATION QUE LE COMPOSANT NE PEUT PAS VÉRIFIER, ET QUI EST CELLE DE LA 4.2 :
+  #     `pris`/`total` et `children` DOIVENT être dérivés du MÊME tableau, dans la même expression.
+  #     L'AC3 de la 2.4 interdit à la carte de connaître le type des articles, donc un filtrage des
+  #     enfants avec un compte sur la liste non filtrée ferait annoncer « 3 sur 5 pris » au-dessus
+  #     de 4 lignes — et AUCUNE porte ne le verrait. Le correctif par le type (`compte?: {…}`) a
+  #     été pesé à la revue et écarté par Florian : le contrat D2 reste gelé.
+  #     ⚠️ La 4.2 reste la PREMIÈRE à voir la carte EN SITUATION — vraie liste, vraies données,
+  #     sous un vrai `<h1>`. Le parcours de la 2.4 s'est fait sur une route jetable : il a tenu
+  #     l'AC3 et trouvé deux défauts, mais il ne remplace pas l'écran réel (piège n°1 de la 2.4,
+  #     défaut réel de la story 2.2).
+  #   ✅ D2 → LA STORY 4.5 rend les articles achetés. La 4.2 reste une lecture PURE : aucune
+  #     migration, `check:migrations` reste à 16/14/2/0, et `lib/supabase/types.ts` n'est pas
+  #     régénéré. Conséquence visible : le ratio `n/total` des cartes vaut structurellement `0/n`
+  #     jusqu'à la story 4.3 (rien ne coche avant elle). Entrée datée dans `deferred-work.md`.
+  # ⚠️ TROIS DÉCISIONS RESTENT SUR LEURS DÉFAUTS PRESCRITS : D3 la forme de la lecture
+  # client-direct (`useEffect` + squelette dans le composant), D4 « Ma liste » et la route
+  # `/courses`, D5 le gros compteur livré ici plutôt qu'en 4.13.
+  # ⚠️ Passe de validation en contexte neuf : elle a trouvé UN TROU (la story ne disait pas ce
+  # qu'une ligne d'article affiche — sans l'unité, AD-7 rend deux « Lait » inexplicables) et
+  # QUATRE affirmations fausses, toutes corrigées.
+  4-2-lecture-client-direct-de-la-liste-groupee-par-rayon: ready-for-dev
   4-3-cocher-et-decocher-idempotent-et-reversible: backlog
   4-4-ajouter-un-article-avec-agregation-et-unites-fermees: backlog
   4-5-supprimer-archiver-les-achetes-vider-la-liste: backlog
