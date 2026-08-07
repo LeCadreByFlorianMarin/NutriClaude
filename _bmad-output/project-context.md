@@ -244,4 +244,21 @@ Jamais un message technique brut — `error.tsx` est le dernier filet, pas le pr
 fonctionner enferme l'utilisateur dans une boucle. *Défaut réel : un rayon supprimé par
 l'autre membre rendait « Ça n'a pas marché. Réessaie dans un instant. » indéfiniment.*
 
-**Pas d'abricot** hors de l'anneau de focus : UX-DR2 le réserve à l'action courses.
+### L'abricot : réservé à l'action courses, et l'interdit a été levé le 2026-08-06
+
+Jusqu'à la story 2.4, la règle tenait en une ligne — « pas d'abricot hors de l'anneau de focus » —
+parce qu'aucune surface courses n'existait encore. **Elle existe maintenant.**
+
+UX-DR2 énumère les emplois légitimes : compteur, coche cochée, provenance active, tuile Courses,
+pastille « arrive… », bouton d'ajout, anneau de focus. `DESIGN.md:150-151` y ajoute la **pastille
+d'emoji de la carte-rayon**, seul abricot que la story 2.4 a introduit (`bg-accent-soft`).
+
+⚠ **Partout ailleurs, l'interdit tient toujours** — et c'est le sens de la règle, pas son
+exception : « une pastille abricot veut toujours dire *ça concerne tes courses*, jamais *c'est
+joli* ». Pas d'abricot sur un titre, un sous-titre, un nom de rayon, un ratio, une quantité, une
+bordure de carte, ni sur aucun écran de configuration. *La story 3.6 a refusé l'abricot que sa
+maquette proposait pour marquer « aujourd'hui » — décoratif, donc interdit.*
+
+⚠ **Les valeurs brutes `--accent` et `--accent-strong` ne sont PAS publiées comme utilitaires**, et
+c'est délibéré : `text-accent` rendait 1,90:1 sur carte blanche. Employer `accent-fill`,
+`accent-text` ou `accent-ink`, qui basculent avec le thème.

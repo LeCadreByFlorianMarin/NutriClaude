@@ -957,6 +957,35 @@ rien.
 dont personne ne contrôle la forme Unicode. Correctif candidat : `normalize(unit, NFC)` dans les
 deux expressions, ou un test qui **fige** le refus actuel comme voulu.
 
+### ⛔ Les articles ACHETÉS ne sont rendus par aucune surface — pour la story 4.5
+
+*Décision de Florian du 2026-08-06, à la contextualisation de la story 4.2.*
+
+`grocery_list_by_aisle` filtre `status = 'pending' and deleted_at is null`. Or :
+
+- **FR-3** — « Les articles achetés **restent consultables et récupérables**. »
+- **`DESIGN.md:283`** décrit un séparateur « **Dans le panier** » qui sépare, *à l'intérieur d'un
+  rayon*, les articles à prendre (en haut) des articles déjà cochés (repoussés en bas).
+- **`DESIGN.md:279`** décrit l'état acheté : « libellé **barré** + muted (reste lisible pour
+  permettre la récupération, FR-3) ».
+
+La story **4.1** avait laissé le filtre en écrivant : « **La vue ne change PAS son filtre
+`status = 'pending'`** : c'est le périmètre de la **4.2 / 4.5**. » Sans dire laquelle.
+
+**Tranché : c'est la 4.5.** Motif — **cocher est la story 4.3**. Tant que rien ne coche, aucun
+article n'est `bought` : un panier livré en 4.2 serait **vide et invérifiable**, donc un critère
+non démontrable. La 4.5 possède le chemin d'écriture du tombstone et l'archivage des achetés ;
+elle arrive après la 4.3 et pourra l'éprouver.
+
+⚠️ **Ce que la 4.5 devra trancher, et qui n'est PAS décidé ici** : élargir la vue (⚠️
+`create or replace view` n'autorise l'ajout de colonnes **qu'en fin** — mesuré story 4.1, M8), ou
+une seconde lecture. ⚠️ **Une seconde source de lecture heurterait l'AC3 de la 4.2** (« aucune
+surface ne calculant son propre regroupement ») : le contrat n'en prévoit qu'une.
+
+⚠️ **Conséquence visible en attendant** : le ratio `n/total` de chaque carte-rayon vaut **`0/n`**,
+puisque `pris` se calculerait sur des articles que la vue ne rend pas. C'est écrit dans la Task 2
+de la 4.2 pour qu'un relecteur n'y voie pas un défaut.
+
 ### ⛔ `recipe_ingredients_nom_non_vide` garde le trou que la 4.1 vient de fermer — pour la 4.x recettes
 
 **Mesuré le 2026-08-05.** La regex d'invisibles de `20260802112511:84` laisse passer **241**
@@ -1067,3 +1096,161 @@ sans session — c'est hérité, pas choisi.
 *Reporté* : sans danger (fonction pure, `strict`, `immutable`, n'expose aucune donnée). La story
 **4.12** gèle le contrat versionné : c'est elle qui doit trancher si cette primitive interne en
 fait partie, ou si elle mérite un `revoke execute … from anon`.
+
+## Deferred from: code review of 2-4-composant-carte-rayon (2026-08-06)
+
+*Revue adversariale à quatre couches. Ce qui suit est **réel et non actionnable maintenant** — soit
+pré-existant, soit propriété d'une autre story. Les correctifs de la 2.4 elle-même sont dans son
+fichier, § Review Findings.*
+
+### ⛔ Le ratio `n/total` est inatteignable depuis la vue qu'il cite — `total` RÉTRÉCIT
+
+**Mesuré le 2026-08-06.** `grocery_list_by_aisle` filtre `status = 'pending'`
+(`20260805092611_poser_le_modele_canonique_de_la_liste.sql:625`). `deferred-work.md` note déjà que
+le ratio vaudra `0/n` tant que la 4.3 n'a pas posé la coche — ⚠️ **mais la conséquence est plus
+mordante que ça, et elle n'était pas écrite** : parce qu'un article coché **sort de la vue**,
+`total` diminue à chaque coche. Le ratio parcourt `0/4 → 0/3 → 0/2 → …`, il n'affiche **jamais**
+`1/4`. Un compteur qui décroît des deux côtés n'apprend rien au membre.
+
+Or `DESIGN.md:283` décrit l'inverse : un séparateur « Dans le panier » qui repousse les achetés
+**en bas du même rayon**, donc toujours comptés. Le `n/total` d'UX-DR4 suppose cette lecture.
+
+**Pour la 4.5** (qui possède l'archivage des achetés) — et ⚠️ **à signaler à la 4.2**, qui prévient
+son relecteur qu'il verra des `0/n` sans dire que le dénominateur bouge aussi. Le commentaire de
+`lib/rayons/carte.ts:47-51` présente `0/n` comme un état transitoire bénin ; c'est un contrat que
+la source citée ne peut pas honorer.
+
+### ⚠️ `break-all` hache les noms français qui ont pourtant des espaces où couper
+
+`app/_lib/CarteRayon.tsx:106`, et **c'est un motif pré-existant** : `ListeRayons.tsx:935` fait
+pareil, et la story 2.4 le prescrivait explicitement. Mais les rayons semés portent des espaces
+(« Fruits & Légumes », « Hygiène & Entretien », « Épicerie sèche ») : `break-all` les ignore et
+coupe à un caractère arbitraire.
+
+Le précédent invoqué — `InviteCard.tsx:126` — est un code hexadécimal de 8 caractères, qui n'a
+**aucune** opportunité de coupure. C'est la situation inverse. `overflow-wrap: anywhere`
+(`wrap-anywhere`) protège du cas sans coupure possible **sans** mutiler le cas courant.
+
+⚠️ **Transverse** : le changer touche les deux fichiers, donc la story 2.2. À grouper avec un
+passage typographique, pas à faire au fil d'une story de composant.
+
+### ⚠️ `<h2>` est figé dans un composant que trois surfaces doivent monter
+
+`app/_lib/CarteRayon.tsx:106`. Le commentaire affirme que tout consommateur rend un `<h1>`
+au-dessus — rien ne l'impose. La **tuile Courses du dashboard** (`DESIGN.md:277`, Epic 5) porte
+déjà son propre titre : le même composant produira une hiérarchie juste sur `/courses` et cassée
+sur le dashboard, **en silence**.
+
+⚠️ Le raisonnement que la story tient pour `id` (« l'ajouter plus tard obligerait à toucher les
+trois appelants ») vaut mot pour mot pour un `niveauDeTitre` et n'a pas été appliqué. **Pour l'Epic
+5**, ou pour la 4.17 si elle arrive d'abord.
+
+### ⚠️ Aucun `dir="auto"` ni isolation bidi sur un nom en champ libre
+
+`app/_lib/CarteRayon.tsx:106`. Le document est `<html lang="fr">` sans `dir`. Un nom arabe ou
+hébreu, ou mêlant chiffres et ponctuation, se rend contre la direction de base : la ponctuation
+finale saute du mauvais côté, et un `U+202E` non terminé retourne la suite du titre.
+
+⚠️ **Pré-existant et transverse** — tout champ libre du produit est concerné, pas cette carte.
+Produit francophone : faible priorité, mais le champ accepte n'importe quel texte.
+
+### ⚠️ Une icône de plus d'un glyphe déborde la pastille de 24 px sans rognage
+
+`app/_lib/CarteRayon.tsx:89-94` : `size-6 shrink-0`, aucun `overflow-hidden`. La propriété est
+typée `string | null`, pas « un point de code ». `normaliserIcone` réduit à un grapheme **à
+l'écriture**, ce qui couvre le chemin normal — mais une séquence ZWJ rendue en deux glyphes par une
+plateforme qui ne la connaît pas peindra hors de la boîte, par-dessus le `<h2>`.
+
+*Reporté* : le chemin d'écriture protège le cas réel. À refermer d'un `overflow-hidden` le jour où
+la pastille sera retouchée.
+
+---
+
+## Deferred from: code review of story-2.4 (2026-08-07, seconde passe)
+
+*Seconde passe adversariale, sur la passe de correction elle-même (règle §6). Les trois derniers
+points étaient DÉJÀ reportés le 2026-08-07 : ils sont re-mesurés ici, pas rouverts.*
+
+### ⚠️ Le thème sombre : la bordure, seul séparateur, mesure 1,30:1
+
+`app/globals.css` (`--card-border`, `--card-shadow`) et `app/_lib/CarteRayon.tsx:93`. **Mesuré** en
+sRGB sur les trois arrêts de `--surface-base-image` sombre, `--card-shadow` valant `none` :
+`--card-border` rend **1,30–1,33:1 vs la page** et **1,14–1,15:1 vs la carte** ; `--surface-card`
+rend 1,14–1,16:1.
+
+⚠️ **La story déclare le piège n°1 « refermé par construction ». Mesuré, il ne l'est qu'en CLAIR**,
+où l'ombre `0 6px 18px` relaie la bordure. En sombre il n'y a aucune seconde affordance, et
+WCAG 1.4.11 demande 3:1. Le parcours à l'œil du 2026-08-07 a bien vu les cartes se détacher — sur
+**sept cartes de sonde bien espacées**, pas sur la pile serrée que la 4.2 rendra.
+
+*Reporté* : les tokens sont pré-existants et transverses (toute carte du produit est concernée).
+**À rouvrir à la story 4.2**, qui est la première à empiler des cartes-rayon.
+
+### ⚠️ Le `<section>` de la carte n'a aucun nom accessible : ce n'est pas une `region`
+
+`app/_lib/CarteRayon.tsx:92`. Ni `aria-label` ni `aria-labelledby`. Par HTML-AAM, un `<section>`
+sans nom accessible prend le rôle `generic`, pas `region` : le regroupement n'existe pas pour une
+aide technique. Le composant a soigné la navigation par titres (`<h2>`) et laissé la navigation par
+régions vide — sur un écran qui empilera dix cartes, c'est le mode de parcours naturel qui manque.
+
+⚠️ Le correctif naturel (`aria-labelledby` vers un `id` du `<h2>`) emploierait précisément la
+propriété `id` que le contrat exige et que personne ne lit.
+
+*Reporté* : **story 4.13**, le plancher d'accessibilité de la liste.
+
+### ⚠️ Le ratio `.sr-only` est FRÈRE du `<h2>`, donc absent de la navigation par titres
+
+`app/_lib/CarteRayon.tsx:155-165`. Le couple `aria-hidden` + jumeau `.sr-only` est correct — c'est
+son **rattachement** qui manque. En mode « titre suivant », qui est la façon de survoler une liste
+de rayons, l'utilisateur entend « Fruits & légumes » et **jamais** « 3 sur 4 pris ».
+
+*Reporté* : **story 4.13**. À traiter avec le point précédent — les deux se corrigent ensemble.
+
+### ⚠️ `nomDeRayon("À classer")` est indiscernable du repli
+
+`lib/rayons/carte.ts:130`. **Mesuré** : `nomDeRayon("À classer") === nomDeRayon(null)`. Rien ne
+réserve ce nom en base — `aisles` ne porte qu'un `unique (household_id, name)`. Un membre qui
+nomme un rayon « À classer » obtient deux cartes titrées « À CLASSER », et la seule chose qui les
+distinguerait — `id` — n'est lue par rien. La 4.17 triera l'une en fin de parcours et pas l'autre,
+sans que l'écran le dise.
+
+*Reporté* : **story 4.17**, qui possède le libellé et le groupe « À classer ».
+
+### ⚠️ `ListeRayons.tsx` affiche l'icône SANS passer par `iconeDeRayon`
+
+`app/rayons/ListeRayons.tsx:932` fait `{rayon.icone ?? ""}`. La même icône échappe donc, sur l'écran
+des rayons, aux nettoyages que la story 2.4 vient de canoniser pour la carte. Deux surfaces, deux
+traitements de la même donnée — c'est la forme d'invariant que la règle §4 veut mesurée.
+
+*Reporté* : pré-existant et hors du diff de la 2.4. À refermer quand `/rayons` sera retouché, ou
+par un test qui mesure que les deux surfaces s'accordent.
+
+### ⛔ U+FE0F n'est pas exclu d'`INVISIBLES_HORS_JOINTURE` : les emoji composés sont démembrés
+
+`lib/texte.ts:58-59`. Le sélecteur de variante U+FE0F est `Cf` **et** `Default_Ignorable`, donc dans
+la plage ; l'anticipation négative n'exclut que ZWJ (U+200D) et ZWNJ (U+200C). **Mesuré** :
+
+| entrée | rendu | conséquence |
+|---|---|---|
+| `❤️` (U+2764 U+FE0F) | `❤` | glyphe **texte** noir, plus l'emoji |
+| `🏳️‍🌈` | `🏳‍🌈` | séquence **non-RGI**, rendue en 2 glyphes |
+| `👨‍❤️‍👨` | `👨‍❤‍👨` | non-RGI, 3 glyphes |
+| `1️⃣` | `1⃣` | cassé |
+| `🏴󠁧󠁢󠁳󠁣󠁴󠁿` (Écosse) | `🏴` | les 6 caractères de tag retirés |
+| `🧑‍🍳` | inchangé | ✅ le seul cas testé — et le seul emoji composé **sans** VS16 |
+
+⛔ **La racine est à la SAISIE, pas à l'affichage.** `normaliserIcone` (`lib/rayons/saisie.ts:32`)
+emploie la même plage : un membre qui choisit ❤️ **enregistre déjà ❤**. `iconeDeRayon` ne fait que
+réappliquer une transformation déjà subie — d'où le report plutôt qu'un correctif dans la 2.4.
+
+✅ **Le semis est hors d'atteinte** — vérifié, les 11 icônes de `seed_default_aisles` sont des
+pictogrammes à un seul point de code, sans VS16.
+
+⚠️ **Ce qui rend le défaut invisible** : les claviers iOS et Android insèrent VS16 automatiquement
+pour tout symbole à présentation texte par défaut, et le test unique de la classe (`🧑‍🍳`) est
+précisément celui qui n'en porte pas. Aucune porte ne le voit.
+
+*Reporté* : **décision de Florian du 2026-08-07** (option B). Transverse — le correctif touche
+`lib/texte.ts`, `lib/rayons/saisie.ts`, leurs tests et le test d'accord client/base. Story dédiée à
+créer. ⚠️ Règle §3 : la correction s'écrit par **exclusion de catégorie**, jamais en énumérant les
+points de code à garder.
