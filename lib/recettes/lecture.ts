@@ -2,7 +2,11 @@
  * Le pur de l'affichage d'une recette : mettre en français ce que la base rend
  * en nombres.
  *
- * **Pourquoi un module, et pas trois expressions dans le JSX.** Les trois
+ * ⚠️ **`formaterQuantite` n'habite plus ici** — c'est une règle de quantité, et
+ * elle a un appelant hors des recettes depuis la story 4.2. Elle vit dans
+ * `lib/quantite.ts` et n'est ré-exportée ici que pour les appelants existants.
+ *
+ * **Pourquoi un module, et pas trois expressions dans le JSX.** Les
  * fonctions ci-dessous portent chacune une règle qu'un test peut tenir, là où le
  * JSX n'est couvert par rien (NFR-10 interdit le harnais de composants). C'est le
  * même partage que `lib/recettes/saisie.ts` : le pur descend dans `lib/`, le
@@ -13,43 +17,14 @@
  * laisserait une espace ou une marge. AC3 est un critère d'absence.
  */
 
-/**
- * La locale, écrite en dur et pas déduite.
- *
- * ⚠️ **`toLocaleString()` sans argument suit la locale du NAVIGATEUR** : un
- * membre dont le système est en anglais verrait « 0.5 » là où il a tapé « 0,5 ».
- * Le produit est en français par NFR-8, pas par coïncidence de configuration.
+/*
+ * ⚠️ **`formaterQuantite` A DÉMÉNAGÉ dans `lib/quantite.ts` le 2026-08-07** —
+ * décision D-5 de la revue de la story 4.2. C'est une règle de QUANTITÉ, pas de
+ * recette, et elle a désormais un appelant qui n'est pas une recette
+ * (`app/courses/ListeCourses.tsx`). Ré-exportée ici pour ne casser aucun
+ * appelant existant ; les nouveaux l'importent depuis `@/lib/quantite`.
  */
-const LOCALE = "fr-FR";
-
-/**
- * Une quantité, en français, ou `null` s'il n'y en a pas.
- *
- * ⚠️ **Le vrai défaut que cette fonction répare.** `normaliserQuantite` accepte
- * explicitement la virgule française à la saisie — « un clavier français produit
- * une virgule, et `Number("0,5")` vaut NaN ». Mais PostgREST rend `quantity` en
- * **nombre JSON** (mesuré : `0.50` sur le fil, `0.5` après `JSON.parse`), et un
- * nombre rendu tel quel en JSX s'affiche « 0.5 ». Le membre tape donc « 0,5 » et
- * le produit lui répond « 0.5 ».
- *
- * ⚠️ **`useGrouping: false`, et ce n'est pas cosmétique.**
- * `(1500).toLocaleString("fr-FR")` rend « 1 500 » avec une **espace insécable
- * étroite (U+202F)** — mesuré. C'est exactement la famille de caractères
- * invisibles que `lib/texte.ts` passe son temps à retirer des saisies, et
- * l'introduire nous-mêmes dans un texte qu'on relit serait absurde. Sur une
- * quantité de cuisine, le groupement n'apporte de toute façon rien.
- *
- * `maximumFractionDigits: 2` suit la colonne, qui est un `numeric(8,2)` : la base
- * n'en rendra jamais davantage, et le fixer ici évite qu'un flottant de passage
- * fasse apparaître une troisième décimale.
- */
-export function formaterQuantite(quantite: number | null): string | null {
-  if (quantite === null) return null;
-  return quantite.toLocaleString(LOCALE, {
-    useGrouping: false,
-    maximumFractionDigits: 2,
-  });
-}
+export { formaterQuantite } from "../quantite.ts";
 
 /**
  * Le temps de la recette, ou `null` quand il n'y a rien à dire.

@@ -1676,7 +1676,231 @@ test("le MÊME article existe chez A et chez B — la clé est unique PAR FOYER"
   assert.equal(doublon!.code, "23505");
 });
 
-test("un membre authentifié ne peut PAS appeler la génération de liste", async () => {
+/* ─────────────────────────────────────────────────────────────────────────
+ * L'ORDRE rendu par la vue, et le `left join` côté RENSEIGNÉ (story 4.2)
+ *
+ * ⛔ **DEUX TROUS MESURÉS LE 2026-08-05, ET C'EST CETTE STORY QUI LES OUVRE.**
+ * (M14) Trois tests touchent `grocery_list_by_aisle`, tous de la story 4.1, et
+ * **aucun ne mesure l'ORDRE** — or « dans l'ordre du parcours » (FR-2) est le
+ * critère central de la 4.2. (M8) Et les articles de tous les tests existants
+ * ont `aisle_id` nul, parce que `product_aisle_map` est vide (story 2.3) : le
+ * `left join` de la vue n'a **jamais été éprouvé côté renseigné**.
+ *
+ * ⚠️ **Lu par le client authentifié de A, JAMAIS par `admin`** : la clé de
+ * service traverse la RLS, et le test passerait en ne prouvant rien.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/** Un rayon posé par A elle-même, à une position choisie. */
+async function rayonDeA(
+  nom: string,
+  ordre: number,
+  icone: string | null = null,
+) {
+  const { data, error } = await a.client
+    .from("aisles")
+    .insert({
+      household_id: a.foyerId,
+      name: nom,
+      sort_order: ordre,
+      icon: icone,
+    })
+    .select("id")
+    .single();
+  assert.equal(error, null, `le rayon « ${nom} » n'a pas pu être posé`);
+  return data!.id as string;
+}
+
+/*
+ * ⛔ **UN PRÉFIXE PAR TEST, ET C'EST UNE GARDE, PAS UNE COQUETTERIE.** Les trois
+ * tests ci-dessous écrivent dans LE MÊME foyer. Le premier compare la liste
+ * rendue à une séquence EXACTE de cinq noms : si les deux autres semaient sous
+ * le même préfixe, il suffirait de les réordonner — ou de lancer la suite avec
+ * `--test-name-pattern` — pour que le premier échoue sur des données qui ne le
+ * concernent pas. Un échec dont la cause n'a rien à voir avec son objet est
+ * exactement ce que l'encadré du segfault, plus bas, déplore.
+ */
+const PREFIXE_ORDRE = "zzordre-";
+
+/** Un article posé par A, éventuellement rattaché à un rayon. */
+async function articleDeA(nom: string, rayonId: string | null) {
+  const { error } = await a.client
+    .from("grocery_list_items")
+    .insert({ household_id: a.foyerId, name: nom, aisle_id: rayonId });
+  assert.equal(error, null, `l'article « ${nom} » n'a pas pu être posé`);
+}
+
+test("la vue rend l'ordre du parcours, et DEUX RAYONS EX ÆQUO INTERCALENT leurs articles", async () => {
+  /*
+   * ⛔ **LE TEST QUI JUSTIFIE `grouperParRayon`.** `aisles.sort_order` n'a
+   * aucune contrainte d'unicité (M11) : deux rayons peuvent légalement partager
+   * une position. La vue trie par `(coalesce(sort_order, 9999), g.name)` —
+   * `g.name` étant le nom de l'**ARTICLE**, pas celui du rayon. Deux rayons ex
+   * æquo voient donc leurs articles **s'intercaler** dans le flux rendu.
+   *
+   * C'est ce que ce test mesure, et c'est la raison pour laquelle un
+   * regroupement « j'ouvre une carte quand le rayon change » rendrait deux
+   * cartes portant le même rayon.
+   */
+  const precoce = await rayonDeA("ZZ Précoce", 5);
+  const alpha = await rayonDeA("ZZ Alpha", 20);
+  const exaequo = await rayonDeA("ZZ Exaequo", 20);
+
+  // Les noms sont choisis pour que l'ordre alphabétique CROISE l'ordre des rayons.
+  await articleDeA("zzordre-aaa", exaequo);
+  await articleDeA("zzordre-bbb", alpha);
+  await articleDeA("zzordre-ccc", exaequo);
+  await articleDeA("zzordre-ddd", precoce);
+  await articleDeA("zzordre-eee", null); // sans rayon → « À classer »
+
+  /*
+   * Lecture SANS `order=` : c'est l'`ORDER BY` de la vue elle-même qu'on mesure
+   * ici, pas celui qu'on demanderait.
+   */
+  const { data: brut, error } = await a.client
+    .from("grocery_list_by_aisle")
+    .select("name, aisle_name, aisle_sort");
+  assert.equal(error, null, "A n'a pas pu lire sa propre liste");
+
+  const rendus = (brut ?? [])
+    .filter((l) => (l.name as string | null)?.startsWith(PREFIXE_ORDRE))
+    .map((l) => l.name as string);
+
+  assert.deepEqual(
+    rendus,
+    ["zzordre-ddd", "zzordre-aaa", "zzordre-bbb", "zzordre-ccc", "zzordre-eee"],
+    "l'ordre du parcours n'est pas celui que la vue rend",
+  );
+
+  /*
+   * ⛔ **L'ASSERTION QUI COMPTE** : entre `zzordre-aaa` et `zzordre-ccc`, tous deux du
+   * rayon « ZZ Exaequo », se glisse `zzordre-bbb` qui est du rayon « ZZ Alpha ».
+   * Les lignes d'un même rayon NE SONT PAS consécutives.
+   */
+  const rayonsRendus = (brut ?? [])
+    .filter((l) => (l.name as string | null)?.startsWith(PREFIXE_ORDRE))
+    .map((l) => l.aisle_name as string | null);
+  assert.deepEqual(
+    rayonsRendus,
+    ["ZZ Précoce", "ZZ Exaequo", "ZZ Alpha", "ZZ Exaequo", null],
+    "les rayons ex æquo n'intercalent plus leurs articles — le piège a disparu",
+  );
+
+  /*
+   * ⚠️ **Règle §4 : l'accord entre la vue et la requête explicite se MESURE.**
+   * `articlesDuFoyer` écrit `.order("aisle_sort").order("name")` alors que la
+   * vue porte déjà son `ORDER BY`. Les deux doivent rendre la même chose — sinon
+   * l'un des deux ment, et rien ne le dirait.
+   */
+  const { data: trie } = await a.client
+    .from("grocery_list_by_aisle")
+    .select("name")
+    .order("aisle_sort")
+    .order("name");
+  assert.deepEqual(
+    (trie ?? [])
+      .filter((l) => (l.name as string | null)?.startsWith(PREFIXE_ORDRE))
+      .map((l) => l.name as string),
+    rendus,
+    "le tri explicite de `articlesDuFoyer` diverge de celui de la vue",
+  );
+});
+
+test("un article dont le rayon EXISTE rend son nom, son icône et son ordre", async () => {
+  /*
+   * ⛔ **Trou M8 : tous les tests existants ont `aisle_id` nul**, parce que
+   * `product_aisle_map` est vide (story 2.3). Le `left join` de la vue n'était
+   * donc éprouvé que du côté où il ne joint rien — et un écran groupé par rayon
+   * repose entièrement sur l'autre côté.
+   */
+  const rayon = await rayonDeA("ZZ Crèmerie", 42, "🧀");
+  await articleDeA("zzjoint-fromage", rayon);
+
+  const { data, error } = await a.client
+    .from("grocery_list_by_aisle")
+    .select("name, aisle_id, aisle_name, aisle_icon, aisle_sort")
+    .eq("name", "zzjoint-fromage");
+  assert.equal(error, null);
+  assert.equal(
+    data?.length,
+    1,
+    "l'article rattaché n'apparaît pas dans la vue",
+  );
+
+  const ligne = data![0];
+  assert.equal(ligne.aisle_id, rayon, "la vue perd le rattachement au rayon");
+  assert.equal(ligne.aisle_name, "ZZ Crèmerie");
+  assert.equal(ligne.aisle_icon, "🧀");
+  assert.equal(ligne.aisle_sort, 42, "l'ordre du parcours ne remonte pas");
+});
+
+test("supprimer un rayon bascule ses articles en « À classer », il ne les détruit pas", async () => {
+  /*
+   * ⚠️ `grocery_list_items.aisle_id` est une FK `on delete set null` (M12).
+   * C'est ce qui rend le groupe « À classer » atteignable autrement que par une
+   * résolution manquante — et donc ce qui rend la carte à `rayonId` nul un cas
+   * NOMINAL de l'écran, pas une anomalie.
+   */
+  const rayon = await rayonDeA("ZZ Éphémère", 77);
+  await articleDeA("zzorph-orphelin", rayon);
+
+  const { error: suppression } = await a.client
+    .from("aisles")
+    .delete()
+    .eq("id", rayon);
+  assert.equal(suppression, null, "A n'a pas pu supprimer son propre rayon");
+
+  const { data } = await a.client
+    .from("grocery_list_by_aisle")
+    .select("name, aisle_id, aisle_name")
+    .eq("name", "zzorph-orphelin");
+  assert.equal(data?.length, 1, "l'article a disparu avec son rayon");
+  assert.equal(
+    data![0].aisle_id,
+    null,
+    "l'article n'a pas basculé en « À classer »",
+  );
+  assert.equal(data![0].aisle_name, null);
+});
+
+/* ⛔ ────────────────────────────────────────────────────────────────────────
+ * LE TEST CI-DESSOUS EST **SAUTÉ** DEPUIS LE 2026-08-07, ET C'EST LA DÉCISION
+ * D-1 DE LA REVUE DE LA STORY 4.2 (Florian).
+ *
+ * ⚠️ **MESURÉ le 2026-08-07** : chaque appel de `generate_grocery_list_from_menu`
+ * fait tomber PostgreSQL en `signal 11: Segmentation fault` sur le stack local
+ * (sonde à deux appels → **delta de exactement 2 segfauts**, journal du
+ * conteneur `supabase_db_nutriclaude`). Tout ce qui s'exécute APRÈS lui frappe
+ * une base en `recovery mode` et échoue sans rapport avec son objet.
+ *
+ * ⛔ **ET IL PASSAIT POUR LA MAUVAISE RAISON.** Il assertionne `error !== null`
+ * sans regarder LEQUEL. L'erreur réellement rendue est
+ * `PGRST001 « no connection to the server »` — l'erreur du CRASH, pas un refus
+ * de permission. **Il ne démontrait donc pas le `revoke execute` du volet 8** ;
+ * il observait sa propre panne, en vert.
+ *
+ * ⛔ **POURQUOI `skip` PLUTÔT QU'UN ORDRE D'EXÉCUTION CHOISI.** La première
+ * rédaction plaçait simplement les tests de la 4.2 avant lui. Ça protégeait les
+ * tests de la 4.2 et rien d'autre : la garde n'était qu'un encadré, à ~190
+ * lignes de distance dans un fichier de 1913, et la story suivante qui ajoute
+ * son test à la fin du fichier — l'endroit naturel — retombait dedans.
+ * **`skip` est mécanique** : plus aucun test ne peut tomber derrière le crash,
+ * et surtout un test sauté le DIT, là où un test vert le cachait. C'est la
+ * règle §1 appliquée à une porte : une case vide honnête vaut mieux qu'une case
+ * cochée à tort.
+ *
+ * ⚠️ **CE QUI EST PERDU, ET QUI DOIT ÊTRE ROUVERT** : le `revoke execute` du
+ * volet 8 n'est plus mesuré par rien. Il ne l'était déjà pas — le test observait
+ * le crash — donc `skip` ne retire aucune couverture réelle, il cesse d'en
+ * simuler une. **Story 4.7** : diagnostiquer le segfault, puis RÉTABLIR ce test
+ * avec une assertion sur le SQLSTATE (`42501`) et non sur « une erreur,
+ * n'importe laquelle ».
+ *
+ * ⚠️ **Pré-existant, hors périmètre de la story 4.2**, daté dans
+ * `deferred-work.md`. Mesuré sur le stack LOCAL seulement : rien n'a été
+ * vérifié en production, et rien n'est affirmé à son sujet.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+test.skip("un membre authentifié ne peut PAS appeler la génération de liste", async () => {
   /*
    * ⚠️ **LE TEST DU VOLET 8, ET IL EST NÉ D'UN DÉFAUT QUE LA STORY DÉCLARAIT
    * FERMÉ.** La story affirmait « l'AC4 est tenu pour les SURFACES, et pas pour

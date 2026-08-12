@@ -41,7 +41,27 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
-last_updated: 2026-08-07  # 2026-08-07 (2ᵉ passe) — Story 2.4 REVUE UNE SECONDE FOIS, sur sa propre
+last_updated: 2026-08-07  # 2026-08-07 — Story 4.2 IMPLÉMENTÉE (statut `review`). **Le premier
+                          # écran du produit qui lit depuis le NAVIGATEUR** (AC1/AD-13) : les 20
+                          # appels du client navigateur étaient jusqu'ici tous des écritures.
+                          # D3/D4/D5 tranchées par Florian sur leurs défauts prescrits — lecture
+                          # tout-client, « Ma liste » sur `/courses`, gros compteur livré ici.
+                          # ⚠️ Le regroupement se fait par CLÉ, jamais par lignes consécutives :
+                          # deux rayons ex æquo intercalent leurs articles, et le banc des
+                          # mutations tue les 5 mutants dont celui-là. ✅ Parcours à l'œil fait
+                          # aux deux réglages système, thème remis. NFR-3 mesuré à 390/360/320px,
+                          # nom de 200 caractères insécable compris : aucun débordement.
+                          # ⛔ DÉFAUT MAJEUR TROUVÉ EN CHEMIN, HORS PÉRIMÈTRE ET CONSIGNÉ :
+                          # `generate_grocery_list_from_menu` fait SEGFAUTER PostgreSQL (un crash
+                          # par appel, mesuré sur le stack local), et le test censé la garder passe
+                          # pour la MAUVAISE RAISON — il observait l'erreur du crash, pas un refus
+                          # de permission. La suite le cachait : ce test était le dernier du
+                          # fichier, donc le crash tombait après sa dernière assertion.
+                          # → `deferred-work.md`, adressé à la story 4.7.
+                          # Portes : npm test 227/227 (+7), isolation 98/98 (+3), typecheck, lint,
+                          # migrations 16/14/2/0 INCHANGÉ (aucune migration), build.
+                          #
+                          # 2026-08-07 (2ᵉ passe) — Story 2.4 REVUE UNE SECONDE FOIS, sur sa propre
                           # passe de correction (règle §6). Reste `done` : 3 décisions tranchées,
                           # 15 correctifs APPLIQUÉS, 7 reportés, 6 écartés. ✅ La 1ʳᵉ passe tient —
                           # 16 des 19 correctifs réellement fermés, six portes reproduites au
@@ -760,7 +780,7 @@ development_status:
   # ⚠️ Passe de validation en contexte neuf : elle a trouvé UN TROU (la story ne disait pas ce
   # qu'une ligne d'article affiche — sans l'unité, AD-7 rend deux « Lait » inexplicables) et
   # QUATRE affirmations fausses, toutes corrigées.
-  4-2-lecture-client-direct-de-la-liste-groupee-par-rayon: ready-for-dev
+  4-2-lecture-client-direct-de-la-liste-groupee-par-rayon: review
   4-3-cocher-et-decocher-idempotent-et-reversible: backlog
   4-4-ajouter-un-article-avec-agregation-et-unites-fermees: backlog
   4-5-supprimer-archiver-les-achetes-vider-la-liste: backlog

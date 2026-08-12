@@ -1,0 +1,128 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "../supabase/types";
+
+/**
+ * Un article de la liste, tel que l'écran l'affiche.
+ *
+ * ⚠️ **`unite` n'est PAS décoratif.** AD-7 fait de l'unité un morceau de la clé
+ * canonique : « lait / L » et « lait / pièce » sont **deux lignes distinctes du
+ * même rayon**, et deux unités ne sont jamais additionnées ni converties. Les
+ * omettre rendrait deux « Lait » identiques que rien n'expliquerait, et le
+ * membre en conclurait que l'agrégation est cassée.
+ */
+export type ArticleDeListe = {
+  id: string;
+  /** `name`, tel que le membre l'a tapé. Jusqu'à 200 caractères (mesuré). */
+  nom: string;
+  quantite: number | null;
+  unite: string | null;
+  /** `aisle_id` — **la CLÉ de groupement**, `null` étant une clé de plein droit. */
+  rayonId: string | null;
+  rayonNom: string | null;
+  rayonIcone: string | null;
+  /** `aisle_sort` — l'ordre du parcours magasin. `null` passe en dernier. */
+  rayonOrdre: number | null;
+};
+
+/**
+ * Les articles vivants de la liste du foyer courant.
+ *
+ * **La PREMIÈRE lecture client-direct du produit** (AC1, AD-13). Mesuré le
+ * 2026-08-05 : les 20 appels de `createNavigateurClient()` du dépôt étaient tous
+ * des écritures ou de l'auth, et aucun des 8 `useEffect` ne faisait d'`await` de
+ * données. Il n'y avait donc aucun motif à copier.
+ *
+ * Le client est **passé en paramètre**, jamais construit ici — motif de
+ * `rayonsDuFoyer`. C'est ce qui rend cette fonction appelable telle quelle par le
+ * dashboard (Epic 5) et le serveur MCP (Epic 7) : `createNavigateurClient()` et
+ * `createServerComponentClient()` rendent le même `SupabaseClient<Database>`.
+ *
+ * ⚠️ **Aucun filtre `household_id` à la main.** La vue est en
+ * `security_invoker = true` et les politiques de `grocery_list_items` sont
+ * ancrées sur `current_household_id()` : la RLS s'en charge. L'écrire laisserait
+ * croire que c'est lui qui protège, ce qu'AD-1/AD-2 refusent.
+ *
+ * ⚠️ **Le tri est explicite alors que la vue en porte déjà un.** Mesuré (M5) :
+ * l'`ORDER BY` de la vue survit à PostgREST aujourd'hui, par deux sondes
+ * convergentes. Mais Postgres ne le **garantit** pas pour une sous-requête, et
+ * l'écrire coûte zéro. ⛔ **Ce n'est de toute façon pas lui qui rend le
+ * regroupement correct** — voir `grouperParRayon`, qui regroupe par clé.
+ *
+ * ⚠️ **Aucune borne de volume.** Mesuré : aucune décision d'architecture ne
+ * traite la pagination ni la volumétrie. C'est un silence assumé, pas un oubli —
+ * ne pose pas de `.limit()` sans décision.
+ */
+export async function articlesDuFoyer(
+  supabase: SupabaseClient<Database>
+): Promise<ArticleDeListe[]> {
+  const { data, error } = await supabase
+    .from("grocery_list_by_aisle")
+    .select("id, name, quantity, unit, aisle_id, aisle_name, aisle_icon, aisle_sort")
+    .order("aisle_sort")
+    .order("name");
+
+  /*
+   * Lève si la lecture échoue, rend `[]` sur zéro ligne : **une liste vide est
+   * l'état nominal, pas une panne** — c'est même l'état d'un foyer neuf, que
+   * l'écran doit savoir montrer (`EXPERIENCE.md` : « Ta liste est vide. »).
+   *
+   * ⛔ **Sur un écran CLIENT, personne n'attrape ce `throw`.** `app/error.tsx`
+   * est une frontière d'erreur de *rendu* : un rejet de promesse dans un
+   * callback `async` de `useEffect` ne la traverse pas — il devient un
+   * `unhandledrejection`, et l'écran resterait sur son squelette indéfiniment,
+   * sans rien dire. C'est le motif de `rayonsDuFoyer` qui NE se transpose pas :
+   * lui est appelé depuis un composant serveur. L'appelant client doit donc
+   * envelopper cet appel dans un `try/catch` — voir `ListeCourses`.
+   */
+  if (error) {
+    throw new Error(`Lecture de la liste impossible : ${error.message}`);
+  }
+
+  return (data ?? []).flatMap(versArticle);
+}
+
+/**
+ * Rétrécit une ligne de la vue vers le type de domaine, ou l'écarte.
+ *
+ * ⚠️ **Rend un TABLEAU de zéro ou un article**, pour être consommé par
+ * `flatMap` — motif exact de `versCaseDeMenu` (`lib/menu/menu.ts`).
+ *
+ * ⛔ **Mesuré (M9) : TOUTES les colonnes de la vue sont `| null` dans les types
+ * générés**, `id` et `name` compris, alors qu'elles sont `not null` en base.
+ * Postgres ne propage pas la non-nullité à travers une vue, et le générateur ne
+ * peut pas l'inventer. ⚠️ **Ne pas affirmer la non-nullité par un `!`** : le
+ * dépôt le refuse explicitement — « le type décrit le schéma, pas la RLS », donc
+ * la garde d'exécution reste due.
+ *
+ * ⚠️ **EXPORTÉE POUR ÊTRE TESTÉE, et c'est une correction de revue du
+ * 2026-08-07.** Elle ne l'était pas, et rien ne l'exerçait : `groupement.test.ts`
+ * construit ses fixtures à la main, donc **aucune assertion ne reliait la forme
+ * rendue par PostgREST au type de domaine**. Intervertir `aisle_sort` et
+ * `quantity` ici laissait la suite entièrement verte — sur le seul point de
+ * contact entre la base et l'écran. Voir `liste.test.ts`.
+ */
+export function versArticle(ligne: {
+  id: string | null;
+  name: string | null;
+  quantity: number | null;
+  unit: string | null;
+  aisle_id: string | null;
+  aisle_name: string | null;
+  aisle_icon: string | null;
+  aisle_sort: number | null;
+}): ArticleDeListe[] {
+  if (ligne.id === null || ligne.name === null) return [];
+
+  return [
+    {
+      id: ligne.id,
+      nom: ligne.name,
+      quantite: ligne.quantity,
+      unite: ligne.unit,
+      rayonId: ligne.aisle_id,
+      rayonNom: ligne.aisle_name,
+      rayonIcone: ligne.aisle_icon,
+      rayonOrdre: ligne.aisle_sort,
+    },
+  ];
+}

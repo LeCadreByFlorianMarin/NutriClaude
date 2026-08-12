@@ -1254,3 +1254,197 @@ précisément celui qui n'en porte pas. Aucune porte ne le voit.
 `lib/texte.ts`, `lib/rayons/saisie.ts`, leurs tests et le test d'accord client/base. Story dédiée à
 créer. ⚠️ Règle §3 : la correction s'écrit par **exclusion de catégorie**, jamais en énumérant les
 points de code à garder.
+
+---
+
+## Deferred from: dev-story 4.2 (2026-08-07)
+
+### ⛔ `generate_grocery_list_from_menu` fait SEGFAUTER PostgreSQL — et le test qui la garde passe pour la mauvaise raison
+
+**Découvert en implémentant la story 4.2**, parce que ses nouveaux tests d'isolation
+étaient les premiers à s'exécuter APRÈS celui de la génération. Hors périmètre de la
+4.2 : la fonction appartient à la story **4.7**.
+
+**Mesuré le 2026-08-07, sur le stack LOCAL** (rien n'a été vérifié en production, et
+rien n'est affirmé à son sujet) :
+
+| Sonde | Résultat |
+|---|---|
+| Journal du conteneur `supabase_db_nutriclaude` | `LOG: server process (PID …) was terminated by **signal 11: Segmentation fault**`, puis `database system was not properly shut down; automatic recovery in progress` |
+| Sonde à **deux** appels RPC par un membre authentifié | **delta de exactement 2 segfaults** — un par appel, déterministe |
+| L'erreur réellement rendue par l'appel | `{"code":"PGRST001","details":"no connection to the server","message":"Database client error. Retrying the connection."}` |
+| Suite d'isolation, mes 3 tests placés APRÈS | 95 pass / 3 fail, systématiquement |
+| Les mêmes 3 tests lancés SEULS | **3 pass / 0 fail** |
+| Suite d'isolation SANS mes 3 tests | 86 pass / **9 fail** — le crash frappait déjà, il n'était pas vu |
+| Redémarrage du conteneur `db` | **ne corrige rien** — 8 segfauts de plus après |
+
+**Deux défauts distincts, et le second est le plus insidieux :**
+
+1. ⛔ **Un membre authentifié ordinaire fait tomber le serveur de base de données**
+   avec sa seule clé anon et son jeton. Sur le stack local, c'est un déni de service
+   à un appel RPC près.
+
+2. ⛔ **Le test `« un membre authentifié ne peut PAS appeler la génération de liste »`
+   ne mesure pas ce qu'il croit.** Il assertionne `error !== null` **sans regarder
+   lequel** : l'erreur non nulle qu'il observe est celle du CRASH (`PGRST001`), pas un
+   refus de permission. Il conclut « aucune surface ne peut plus l'atteindre » sur la
+   foi d'un segfault. ⚠️ **C'est le motif récidiviste du dépôt** — la revue de la
+   story 4.1 avait déjà trouvé « deux tests qui ne mesuraient pas ce qu'ils
+   croyaient », et `project-context.md` §1 en fait une règle.
+
+⚠️ **Et la suite le CACHAIT par construction** : ce test était le **dernier** du
+fichier, donc le crash tombait après sa dernière assertion et la suite rendait 95/95
+verts. Il a fallu qu'une story ajoute des tests **après** lui pour que ça se voie.
+C'est la forme exacte du piège « `node --test` sur un glob vide rend 0 » que
+`project-context.md` documente : *une porte qui ne peut pas signaler son propre
+échec*.
+
+**Contournement en place, et il est écrit** : les tests de la 4.2 sont placés **avant**
+celui de la génération, avec un encadré qui dit pourquoi (`isolation.test.ts`). Ce
+n'est pas une correction — c'est un ordre d'exécution choisi pour qu'un test mesure
+autre chose qu'un crash.
+
+**À faire, story 4.7 (ou une story dédiée) :**
+- diagnostiquer le segfault (`prosrc` de la fonction, plan d'exécution, version
+  PostgreSQL 17.6 du stack local) ;
+- **resserrer l'assertion du test existant** pour qu'il exige le code d'erreur d'un
+  refus de permission (`42501`) plutôt que « une erreur, n'importe laquelle » — sans
+  quoi il continuera de passer sur un crash ;
+- vérifier si le défaut existe en production, **sans l'y déclencher**.
+
+---
+
+## Deferred from: code review of 4-2-lecture-client-direct-de-la-liste-groupee-par-rayon (2026-08-07)
+
+*Revue adversariale à trois couches (Blind Hunter, Edge Case Hunter, Acceptance Auditor) plus les
+grilles `/clean-code`, `/clean-architecture` et `/tdd`. Six constats reportés — aucun n'est causé par
+la story 4.2, mais chacun devient atteignable ou visible à cause d'elle.*
+
+### 1. `aisle_id` renseigné avec `aisle_name` nul rendrait DEUX cartes « À classer »
+
+**Adressé aux stories 4.4 et 4.18** — celles qui ouvrent le chemin d'écriture de `aisle_id`.
+
+**Mesuré.** La politique `grocery_insert` (volet 6 de la migration `20260805092611`) ne vérifie que
+`household_id = current_household_id()`. Elle **ne vérifie jamais que `aisle_id` appartient au même
+foyer**, et la FK est un simple `references aisles(id) on delete set null` — aucune contrainte de
+cohérence croisée.
+
+La vue étant `security_invoker = true`, son `left join aisles` est filtré par la RLS d'`aisles` :
+une ligne dont `aisle_id` pointe un rayon invisible à l'invocateur ressort avec `aisle_id`
+**renseigné** et `aisle_name` / `aisle_icon` / `aisle_sort` **nuls**. `grouperParRayon` regroupe par
+`rayonId`, donc en fait un groupe distinct ; `nomDeRayon(null)` rend « À classer » ; `rayonOrdre`
+nul le place en dernier, **juste à côté du vrai groupe « À classer »**.
+
+⛔ **Deux cartes au titre identique, articles répartis entre elles** — le défaut même que
+`grouperParRayon` existe pour empêcher, atteint par un autre chemin. La clé React diffère, donc
+**rien ne le signale**.
+
+⚠️ **Inatteignable aujourd'hui, et c'est la seule raison du report** : rien n'écrit `aisle_id` depuis
+une surface, `product_aisle_map` est vide et `resolve_aisle_id` rend toujours `null`. C'est le même
+trou de cohérence croisée que `meal_plan_entries` a eu ; il n'a pas été refermé pour `aisle_id`.
+
+### 2. Quantité `0` ou négative s'affiche telle quelle
+
+**Adressé à la story 4.4**, qui possède déjà la contrainte de positivité.
+
+**Mesuré.** `quantity numeric(8,2)` **ne reçoit délibérément aucune contrainte de positivité** —
+c'est écrit en toutes lettres dans l'en-tête de la migration (`20260805092611:306`), et reporté à la
+4.4. `formaterQuantite(0)` rend la **chaîne** `"0"`, qui est *truthy* : elle survit au
+`filter(Boolean)` de `ListeCourses.tsx:231` et l'écran affiche « 0 kg » ; `-3` affiche « -3 kg ».
+
+⚠️ Le garde du dépôt sur ce motif (`formaterTemps`, `=== null` et jamais `if (!temps)`) est
+correctement repris par `formaterQuantite` — il ne couvre simplement pas ce cas-ci.
+
+### 3. Ni le début ni la fin de la lecture ne sont annoncés aux aides techniques
+
+**Adressé à la story 4.13** (plancher d'accessibilité de la liste).
+
+**Mesuré.** Le squelette porte `aria-hidden="true"` (correct, cohérent avec `app/menu/loading.tsx`),
+et le `<Notice reserve>` — seule région `role="status" aria-live="polite"` de l'écran — ne
+transporte **que** `echec`. Il reste vide pendant tout le chargement **et le reste après**, la liste
+apparaissant hors de la région live. Ni `aria-busy`, ni jumeau `sr-only` de transition.
+
+Conséquence : un lecteur d'écran arrive sur `/courses`, lit « Ma liste » puis « Rangée dans l'ordre
+de ton magasin. », puis **plus rien** — le squelette est masqué, la région de statut est vide. Une
+seconde plus tard le contenu existe, mais rien ne l'annonce. C'est la première lecture
+client-direct du produit, donc la première fois que le contenu arrive **après** le rendu.
+
+⚠️ **Le remède tient en une ligne** dans le `Notice` déjà monté :
+`{echec ?? (enChargement ? "Je charge ta liste…" : null)}`. **Reporté par périmètre, pas par
+difficulté** — à arbitrer avec la 4.13 plutôt qu'à laisser tomber.
+
+### 4. `.order("aisle_sort")` diverge du `coalesce(…, 9999)` de la vue, et le test qui prétend mesurer l'accord ne l'atteint pas
+
+**Sans story assignée** — à reprendre avec la 4.12 (versionnage du contrat) ou la 4.15 (filet de
+vérification nommé).
+
+**Mesuré.** `.order()` sans `nullsFirst` n'émet **aucun modificateur** — vérifié dans
+`node_modules/@supabase/postgrest-js` (`nullsFirst === void 0 ? "" : …`) — donc Postgres applique
+NULLS LAST. La vue, elle, applique `coalesce(a.sort_order, 9999)`, qui place les nuls **à égalité
+avec un rayon légitimement classé à 9999**, puis départage par nom d'**article**.
+
+À `sort_order = 10000` (aucune borne en base ; la colonne est écrivable par la surface), la vue
+place « À classer » **avant** ce rayon et la requête explicite **après**.
+
+⚠️ **Sans conséquence visible** — `comparerGroupes` retrie côté client, et son écart aux nuls est
+délibéré. Ce qui est en défaut, c'est le **test** : `isolation.test.ts:1975-1981` affirme mesurer
+l'accord entre l'`ORDER BY` de la vue et le tri explicite d'`articlesDuFoyer`, mais n'emploie que
+5 / 20 / 20 / 42 — il passerait quand même. Règle §4 : l'invariant qu'il affirme tenir n'est pas
+celui qu'il mesure.
+
+### 5. Le `after()` des tests d'isolation ignore ses erreurs de ménage
+
+**Pré-existant** (`isolation.test.ts:110-123`, seulement reformaté par la 4.2).
+
+**Mesuré.** `await admin.auth.admin.deleteUser(compte.id)` et `await admin.from("households")
+.delete()…` — aucun résultat n'est lu, aucune assertion. Le client Supabase rend un objet
+`{ error }` plutôt que de lever.
+
+Conséquence, et elle est actuelle : le test de génération étant le dernier, le `after()` s'exécute
+sur une base **en récupération** après le segfault. Les deux boucles échouent, la suite reste verte,
+et **chaque exécution laisse deux comptes `auth.users` et deux foyers orphelins** sur le stack
+local. Le symptôme n'apparaîtra que le jour où quelqu'un comptera les lignes — ou expliquera une
+dérive de `db reset`.
+
+### 6. Deux assertions `notEqual(error, null)` sans SQLSTATE
+
+**Pré-existant** (`isolation.test.ts` ~`:758` « un appel anonyme est refusé », ~`:1135` « les gardes
+de cardinal et de doublon »), seulement reformatées par la 4.2.
+
+Les deux assertionnent qu'**une** erreur existe sans regarder laquelle, là où les tests voisins de
+la même famille exigent `P0001` / `23505`. Pour `:758`, l'assertion d'état qui suit (« rien n'a
+bougé ») serait vraie aussi si la fonction n'existait pas.
+
+⛔ **C'est la même famille que le défaut mesuré sur `generate_grocery_list_from_menu`** (entrée
+précédente de ce fichier) : un test qui observe l'erreur d'un crash en croyant observer un refus.
+Le remède est déjà écrit dans le dépôt — `lib/foyer/erreurs.ts`, motif « SQLSTATE d'abord ».
+**`notEqual(error, null)` seul ne prouve jamais qu'un refus est le bon refus.**
+
+### 7. Une session navigateur absente ou expirée rend « Ta liste est vide. », sans erreur
+
+**Adressé aux stories 4.13 (plancher d'accessibilité) et 4.14 (hors-ligne)**, qui possèdent les
+états dégradés de cet écran.
+
+✅ **Reporté sur décision de Florian du 2026-08-07, en revue de la 4.2. Motif :** *« la 4.2 est une
+lecture pure ; distinguer “vide” de “pas de session” relève du plancher d'accessibilité (4.13) ou du
+hors-ligne (4.14), qui possèdent les états dégradés de cet écran. »*
+
+**Mesuré.** La politique `grocery_select` est ancrée sur `current_household_id()`. Sans profil, la
+fonction vaut `NULL`, donc le prédicat ne retient aucune ligne : **zéro ligne, HTTP 200,
+`error === null`** — c'est ce que le dépôt mesure déjà lui-même (« zéro ligne est un succès
+PostgREST, pas une erreur », et le test d'appel anonyme qui obtient `data: []`).
+
+`requireProfile()` (`app/courses/page.tsx`) est une garde **serveur** : elle ne dit rien de la
+session dont dispose le client navigateur. Aucune branche de `ListeCourses` ne distingue « 0 ligne »
+de « 0 ligne parce que je ne suis personne » — le membre voit sa liste pleine annoncée comme vide,
+sans erreur ni recours.
+
+⚠️ **Faible atteignabilité** : il faut une divergence entre la session du rendu serveur et celle de
+l'`useEffect` (jeton expiré entre les deux, cookie non propagé). Aucune occurrence mesurée.
+
+⛔ **Mais c'est structurel à la PREMIÈRE lecture client-direct du produit**, et les stories 4.8
+(cache local) et 4.11 (temps réel) rafraîchiront ce même état — elles en hériteront.
+
+⚠️ **À cadrer avant d'écrire du code** : un contrôle de session côté client frôle le contrôle
+d'accès applicatif qu'AD-2 et AD-16 interdisent. La RLS reste seule garante ; ce qui manque est un
+état d'**interface**, pas une garde de sécurité.
