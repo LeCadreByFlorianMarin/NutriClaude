@@ -28,9 +28,12 @@ export type ArticleDeListe = {
  * Les articles vivants de la liste du foyer courant.
  *
  * **La PREMIÈRE lecture client-direct du produit** (AC1, AD-13). Mesuré le
- * 2026-08-05 : les 20 appels de `createNavigateurClient()` du dépôt étaient tous
- * des écritures ou de l'auth, et aucun des 8 `useEffect` ne faisait d'`await` de
- * données. Il n'y avait donc aucun motif à copier.
+ * 2026-08-05, **chiffre corrigé le 2026-08-12** : les 20 appels de
+ * `createNavigateurClient()` du dépôt étaient tous des écritures ou de l'auth, et
+ * aucun des **10** `useEffect` ne faisait d'`await` de données. Il n'y avait donc
+ * aucun motif à copier. *(La revue avait écrit « 8 » ; `git grep -c "useEffect("
+ * 69a34fa -- app` en rend 10, et le nombre n'a pas bougé sur les trois commits
+ * qui encadrent cette date. La conclusion tenait, le dénombrement non.)*
  *
  * Le client est **passé en paramètre**, jamais construit ici — motif de
  * `rayonsDuFoyer`. C'est ce qui rend cette fonction appelable telle quelle par le
@@ -111,7 +114,24 @@ export function versArticle(ligne: {
   aisle_icon: string | null;
   aisle_sort: number | null;
 }): ArticleDeListe[] {
-  if (ligne.id === null || ligne.name === null) return [];
+  if (ligne.id === null || ligne.name === null) {
+    /*
+     * ⛔ **UN ÉCART SILENCIEUX EST UN SOUS-COMPTAGE INVISIBLE, et c'est une
+     * correction de revue du 2026-08-12.** La ligne sort de la liste ET du
+     * compteur « n à prendre » : sans trace, un membre verrait un total faux
+     * sans qu'aucun signal n'existe nulle part. Le `catch` voisin de
+     * `ListeCourses` s'est vu ajouter son journal le 2026-08-07 sur l'argument
+     * exact « le membre voit une phrase ; le développeur doit voir la cause » —
+     * ce chemin-ci ne l'avait pas reçu.
+     *
+     * ⚠️ **`warn` et non `error`** : ce n'est pas un échec de lecture, et rien
+     * n'est cassé pour le membre. C'est une ligne que la base n'aurait pas dû
+     * rendre — `id` et `name` sont `not null`, le `| null` des types n'étant
+     * qu'un artefact de vue (M9).
+     */
+    console.warn("[courses] Ligne de liste écartée : id ou name nul.", ligne);
+    return [];
+  }
 
   return [
     {

@@ -157,8 +157,55 @@ jobs:
             exit 1
           fi
 
+      # `shell: bash` apporte `-o pipefail` : sans lui, le code de sortie du
+      # pipeline serait celui de `tee` et un test rouge passerait pour vert.
       - name: Tests d'isolation
-        run: npm run test:isolation
+        shell: bash
+        run: npm run test:isolation 2>&1 | tee /tmp/isolation.log
+
+      # Le compte de FICHIERS plus haut ne voit pas un test SAUTÉ : `node --test`
+      # sort à 0 en présence de `skipped`, donc tout le fichier pourrait passer en
+      # `test.skip` sans que ce job rougisse. La story 4.2 est la première à
+      # employer `skip` ici — le test de génération, qui observait un segfault au
+      # lieu d'un refus de permission (deferred-work.md, à rétablir en 4.7).
+      #
+      # `skipped == 0` est exclu : il échouerait immédiatement sur ce saut-là. On
+      # tolère EXACTEMENT le saut attendu, nommé en dur. Tout saut neuf rougit —
+      # et le jour où la 4.7 rétablira celui-ci sans toucher cette garde, elle
+      # rougira aussi. C'est voulu : une garde se fait relire quand son objet
+      # change.
+      - name: Contrôler qu'aucun test d'isolation n'est sauté hors celui attendu
+        shell: bash
+        run: |
+          SAUT_ATTENDU="un membre authentifié ne peut PAS appeler la génération de liste"
+
+          # Le rapporteur `spec` écrit « ℹ skipped N » et colore la ligne ; le
+          # rapporteur `tap` écrit « # skipped N ». On retire les séquences ANSI
+          # et on accepte les deux.
+          n=$(sed -e 's/\x1b\[[0-9;]*m//g' /tmp/isolation.log \
+              | grep -E '^(#|ℹ) skipped [0-9]+$' | tail -1 | grep -oE '[0-9]+$' || true)
+
+          # ⛔ La question que project-context.md pose à toute porte neuve : « que
+          # se passe-t-il si elle ne trouve rien à contrôler ? » Ici, ne rien
+          # trouver veut dire que le format de sortie a changé — la garde est
+          # devenue aveugle. Une garde aveugle qui rend vert est pire que pas de
+          # garde : elle échoue.
+          if [ -z "$n" ]; then
+            echo "::error::Impossible de lire le nombre de tests sautés dans la sortie de node --test. Le format du rapporteur a changé : cette garde ne contrôle plus rien et doit être corrigée avant d'être crue."
+            exit 1
+          fi
+
+          echo "tests d'isolation sautés : $n"
+
+          if [ "$n" -gt 1 ]; then
+            echo "::error::$n tests d'isolation sautés, 1 seul est attendu. Un test sauté ne prouve rien, et node --test sort à 0 : NFR-5 n'est plus démontré d'autant. Rétablis-le, ou déclare-le ici avec sa raison datée."
+            exit 1
+          fi
+
+          if [ "$n" -eq 1 ] && ! grep -qF "$SAUT_ATTENDU" /tmp/isolation.log; then
+            echo "::error::Un test d'isolation est sauté, mais ce n'est pas celui attendu (« $SAUT_ATTENDU »). Un saut non déclaré retire une preuve d'isolation sans le dire."
+            exit 1
+          fi
 
       # Sans `if: always()`, un test rouge laisserait les conteneurs debout et
       # le runner serait recyclé sans les arrêter — sans conséquence ici, mais

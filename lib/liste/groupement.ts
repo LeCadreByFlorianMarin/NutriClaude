@@ -121,8 +121,17 @@ export function grouperParRayon(
  * rayons ex æquo aux noms accentués, `/rayons` et `/courses` peuvent diverger.
  * Personne ne l'a mesuré, et l'application ne produit pas d'ex æquo elle-même
  * (`prochainOrdre` rend `max+10`, `reorder_aisles` renumérote au pas de 10).
+ *
+ * ⛔ **EXPORTÉE POUR ÊTRE TESTÉE, et c'est une correction de revue du
+ * 2026-08-12.** Elle ne l'était pas, et `grouperParRayon` ne produit **jamais** de
+ * groupe vide : le champ `ordre` — né de la revue du 2026-08-07 précisément pour
+ * que le cas vide soit correct — n'était donc mesuré par rien. **Vérifié** :
+ * rétablir `a.articles[0]?.rayonOrdre` à la place de `a.ordre` laissait les 235
+ * tests verts. L'invariant était affirmé par un docblock (« correct par
+ * construction »), pas mesuré — règle §4, sur un type **exporté** que la story
+ * 4.17 construira avec des groupes vides. Voir `groupement.test.ts`.
  */
-function comparerGroupes(a: GroupeDeRayon, b: GroupeDeRayon): number {
+export function comparerGroupes(a: GroupeDeRayon, b: GroupeDeRayon): number {
   const ordreA = a.ordre;
   const ordreB = b.ordre;
 

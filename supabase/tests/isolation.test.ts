@@ -3,6 +3,13 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { stackLocal } from "./stack-local.ts";
+/*
+ * ⚠️ **La fonction que l'ÉCRAN exécute, importée telle quelle.** Le test d'ordre
+ * recopiait sa requête à la main jusqu'au 2026-08-12 : il mesurait alors l'accord
+ * entre la vue et sa propre copie, pas entre la vue et le code livré (règle §4).
+ * `articlesDuFoyer` prend son client en paramètre précisément pour ça.
+ */
+import { articlesDuFoyer } from "../../lib/liste/liste.ts";
 
 /**
  * NFR-5 — l'isolation entre foyers, prouvée par exécution.
@@ -1790,19 +1797,32 @@ test("la vue rend l'ordre du parcours, et DEUX RAYONS EX ÆQUO INTERCALENT leurs
    * `articlesDuFoyer` écrit `.order("aisle_sort").order("name")` alors que la
    * vue porte déjà son `ORDER BY`. Les deux doivent rendre la même chose — sinon
    * l'un des deux ment, et rien ne le dirait.
+   *
+   * ⛔ **ON APPELLE LA FONCTION, ON NE RÉÉCRIT PLUS SA REQUÊTE — correction du
+   * 2026-08-12.** Ce test recopiait `.select(…).order("aisle_sort").order("name")`
+   * à la main : il mesurait donc l'accord entre la vue et **sa propre copie**, pas
+   * entre la vue et le code que l'écran exécute. Vérifié : retirer `.order("name")`
+   * de `liste.ts`, ou son `?? []`, laissait les deux suites vertes.
+   * `articlesDuFoyer` prend son client **en paramètre** exactement pour ça — c'est
+   * ce qui la rend appelable ici sans faux client, et c'est le seul endroit du
+   * dépôt où elle s'exécute réellement contre Postgres.
    */
-  const { data: trie } = await a.client
-    .from("grocery_list_by_aisle")
-    .select("name")
-    .order("aisle_sort")
-    .order("name");
+  const articles = await articlesDuFoyer(a.client);
   assert.deepEqual(
-    (trie ?? [])
-      .filter((l) => (l.name as string | null)?.startsWith(PREFIXE_ORDRE))
-      .map((l) => l.name as string),
+    articles.filter((x) => x.nom.startsWith(PREFIXE_ORDRE)).map((x) => x.nom),
     rendus,
     "le tri explicite de `articlesDuFoyer` diverge de celui de la vue",
   );
+
+  /*
+   * ⚠️ **Et le MAPPING colonne → champ se mesure du même coup.** `liste.test.ts`
+   * exerce `versArticle` sur des fixtures écrites à la main ; ici la forme vient
+   * réellement de PostgREST. Intervertir `aisle_sort` et `quantity` dans
+   * `versArticle` échouerait ici, et nulle part ailleurs.
+   */
+  const articleDuPrecoce = articles.find((x) => x.nom === "zzordre-ddd");
+  assert.equal(articleDuPrecoce?.rayonNom, "ZZ Précoce", "le nom du rayon ne remonte pas");
+  assert.equal(articleDuPrecoce?.rayonOrdre, 5, "l'ordre du parcours ne remonte pas");
 });
 
 test("un article dont le rayon EXISTE rend son nom, son icône et son ordre", async () => {
@@ -1843,16 +1863,32 @@ test("supprimer un rayon bascule ses articles en « À classer », il ne les dé
   const rayon = await rayonDeA("ZZ Éphémère", 77);
   await articleDeA("zzorph-orphelin", rayon);
 
+  /*
+   * ⚠️ **Le message ne sur-promet pas — correction du 2026-08-12.** Il disait
+   * « A n'a pas pu supprimer son propre rayon » : un `DELETE` PostgREST refusé
+   * par la RLS rend `error: null` et zéro ligne supprimée, donc cette assertion
+   * seule ne prouve PAS que la suppression a eu lieu. Ce sont les assertions
+   * suivantes, sur l'état de l'article, qui l'établissent.
+   */
   const { error: suppression } = await a.client
     .from("aisles")
     .delete()
     .eq("id", rayon);
-  assert.equal(suppression, null, "A n'a pas pu supprimer son propre rayon");
+  assert.equal(suppression, null, "la suppression du rayon a rendu une erreur");
 
-  const { data } = await a.client
+  /*
+   * ⛔ **`error` SE LIT AUTANT QUE `data` — correction du 2026-08-12.** Cette
+   * lecture ne le destructurait pas. Une lecture refusée ou en échec rend
+   * `data === null`, donc `data?.length` valait `undefined` et le test échouait
+   * en accusant la FK `on delete set null` — alors que la cause aurait été une
+   * erreur jamais regardée. C'est le piège que `DisplayNameForm.tsx:70-78` est
+   * le motif désigné du dépôt pour éviter, et les deux tests voisins le font.
+   */
+  const { data, error } = await a.client
     .from("grocery_list_by_aisle")
     .select("name, aisle_id, aisle_name")
     .eq("name", "zzorph-orphelin");
+  assert.equal(error, null, "la relecture de l'article a échoué");
   assert.equal(data?.length, 1, "l'article a disparu avec son rayon");
   assert.equal(
     data![0].aisle_id,

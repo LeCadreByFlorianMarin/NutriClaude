@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { grouperParRayon } from "./groupement.ts";
+import { comparerGroupes, grouperParRayon, type GroupeDeRayon } from "./groupement.ts";
 import type { ArticleDeListe } from "./liste.ts";
 
 /**
@@ -192,4 +192,60 @@ test("le groupe porte le nom et l'icône de son rayon", () => {
   assert.equal(groupes[0]?.icone, "🍎");
   assert.equal(groupes[0]?.ordre, 20, "le groupe porte AUSSI son ordre");
   memeArticles(groupes, articles);
+});
+
+/* ── comparerGroupes, exercée DIRECTEMENT ─────────────────────────────────── */
+
+test("un groupe VIDE se trie sur SON ordre, pas sur celui de son premier article", () => {
+  /*
+   * ⛔ **CE TEST EXISTE PARCE QUE LE CHAMP `ordre` N'ÉTAIT MESURÉ PAR RIEN.**
+   * Il est né de la revue du 2026-08-07 — `comparerGroupes` allait alors chercher
+   * sa clé dans `a.articles[0]?.rayonOrdre`, et un groupe vide partait
+   * silencieusement en fin de parcours quel que soit son `sort_order`. Le
+   * correctif a porté l'ordre sur le groupe, mais **sans test** : `grouperParRayon`
+   * ne produit jamais de groupe vide, donc `comparerGroupes` n'était pas
+   * atteignable par l'API publique. Vérifié le 2026-08-12 : rétablir
+   * `a.articles[0]?.rayonOrdre` laissait les 235 tests verts.
+   *
+   * ⚠️ **Règle §4** : l'invariant était affirmé par un docblock (« correct par
+   * construction »), pas mesuré — et `GroupeDeRayon` est un type **exporté** que
+   * la story 4.17 construira précisément avec des groupes vides.
+   */
+  const videMaisTot: GroupeDeRayon = { rayonId: "v", nom: "Vide", icone: null, ordre: 5, articles: [] };
+  const pleinMaisTard: GroupeDeRayon = {
+    rayonId: "p",
+    nom: "Plein",
+    icone: null,
+    ordre: 50,
+    articles: [article("pomme", { id: "p", nom: "Plein", ordre: 50 })],
+  };
+
+  assert.deepEqual(
+    [pleinMaisTard, videMaisTot].sort(comparerGroupes).map((g) => g.rayonId),
+    ["v", "p"],
+    "le groupe vide d'ordre 5 passe AVANT le groupe plein d'ordre 50"
+  );
+});
+
+test("un groupe vide SANS ordre reste en dernier, comme tout groupe sans ordre", () => {
+  const videSansOrdre: GroupeDeRayon = { rayonId: null, nom: null, icone: null, ordre: null, articles: [] };
+  const tardif: GroupeDeRayon = { rayonId: "t", nom: "Tardif", icone: null, ordre: 9999, articles: [] };
+
+  assert.deepEqual(
+    [videSansOrdre, tardif].sort(comparerGroupes).map((g) => g.rayonId),
+    ["t", null],
+    "« À classer » reste en fin de parcours même face à un rayon d'ordre 9999"
+  );
+});
+
+test("deux groupes EX ÆQUO se départagent par le nom du RAYON", () => {
+  // Sans ce départage, l'ordre de deux ex æquo est celui que le moteur choisit ce
+  // jour-là, et l'écran « bouge tout seul » d'un rechargement à l'autre.
+  const zebre: GroupeDeRayon = { rayonId: "z", nom: "Zèbre", icone: null, ordre: 20, articles: [] };
+  const abricot: GroupeDeRayon = { rayonId: "a", nom: "Abricot", icone: null, ordre: 20, articles: [] };
+
+  assert.deepEqual(
+    [zebre, abricot].sort(comparerGroupes).map((g) => g.rayonId),
+    ["a", "z"]
+  );
 });

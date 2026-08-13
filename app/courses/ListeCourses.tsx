@@ -6,15 +6,17 @@ import { Notice } from "@/app/_lib/Notice";
 import { createNavigateurClient } from "@/lib/supabase/client";
 import { articlesDuFoyer, type ArticleDeListe } from "@/lib/liste/liste";
 import { grouperParRayon, type GroupeDeRayon } from "@/lib/liste/groupement";
-import { formaterQuantite } from "@/lib/quantite";
+import { formaterQuantiteEtUnite } from "@/lib/quantite";
 
 /**
  * La liste de courses, **lue depuis le navigateur** (AC1, AD-13).
  *
  * ⚠️ **PREMIÈRE LECTURE CLIENT-DIRECT DU PRODUIT, et il n'y avait aucun motif à
- * copier.** Mesuré le 2026-08-05 : les 20 appels de `createNavigateurClient()`
- * du dépôt sont des écritures ou de l'auth, et aucun des 8 `useEffect` ne faisait
- * d'`await` de données. Les états chargement / erreur / vide d'une lecture sont
+ * copier.** Mesuré le 2026-08-05, **chiffre corrigé le 2026-08-12** : les 20
+ * appels de `createNavigateurClient()` du dépôt sont des écritures ou de l'auth,
+ * et aucun des **10** `useEffect` ne faisait d'`await` de données *(la revue avait
+ * écrit « 8 » ; `git grep` en rend 10 — la conclusion tenait, le compte non)*.
+ * Les états chargement / erreur / vide d'une lecture sont
  * donc écrits ici pour la première fois — les surfaces suivantes (4.8, 4.11)
  * rafraîchiront ce même état.
  *
@@ -53,8 +55,15 @@ export function ListeCourses() {
      * montage de développement, où la requête du PREMIER effet peut résoudre
      * après celle du second. Le nettoyage ferme le `annule` de SON effet ; le
      * montage suivant en ouvre un neuf. C'est donc toujours la lecture la plus
-     * récente qui écrit, jamais l'inverse. Tous les `useEffect` du dépôt rendent
-     * un nettoyage ; le premier qui lit des données ne fait pas exception.
+     * récente qui écrit, jamais l'inverse.
+     *
+     * ⚠️ **Ce nettoyage n'est PAS une convention du dépôt — correction du
+     * 2026-08-12.** Cette ligne affirmait « tous les `useEffect` du dépôt rendent
+     * un nettoyage ». **Mesuré** (`git grep -n "useEffect(" 69a34fa -- app`) :
+     * **3 sur 10** en rendent un — `app/foyer/InviteCard.tsx`,
+     * `app/rayons/ListeRayons.tsx`, `FormulaireRecette.tsx`. Les sept autres
+     * n'en rendent aucun, et ils ont raison : aucun n'attend de données. C'est
+     * la LECTURE qui rend ce nettoyage dû ici, pas un usage maison.
      */
     let annule = false;
 
@@ -85,7 +94,7 @@ export function ListeCourses() {
          * distinguer un réseau coupé d'une configuration absente. Le membre voit
          * une phrase ; le développeur doit voir la cause.
          */
-        console.error("Lecture de la liste de courses :", erreur);
+        console.error("[courses] Lecture de la liste :", erreur);
         setEchec(true);
       }
     }
@@ -106,8 +115,15 @@ export function ListeCourses() {
        * un message rendu à l'intérieur de la liste partirait avec elle au
        * premier rendu vide, et un lecteur d'écran ne l'annoncerait jamais.
        *
-       * `reserve` : elle surplombe la liste, donc elle garde sa hauteur pour ne
-       * pas pousser le contenu sous le doigt au moment où un message arrive.
+       * ⛔ **PAS DE `reserve` ICI, et c'est une correction du 2026-08-12.** Le
+       * contrat de `reserve` est de ne pas pousser une CIBLE sous le doigt quand
+       * un message arrive. Cet écran n'a **ni formulaire ni cible tactile** sous
+       * la zone, et le message et la liste **ne coexistent jamais** — sur
+       * `echec`, la branche suivante rend `null`. `reserve` y immobilisait donc
+       * 24 px (`.notice { min-h-6 }`) en permanence, sur le seul écran dont
+       * `page.tsx` justifie `p-screen` (8 px) par « chaque pixel de largeur sert
+       * le contenu » : 32 px gagnés en largeur, 24 px dépensés en hauteur, pour
+       * un motif appliqué par analogie et non par sa cause.
        *
        * ⛔ **PAS DE « Reviens dans un instant », ET C'EST UNE CORRECTION DE
        * REVUE (2026-08-07).** Ce `catch` attrape tout, y compris
@@ -119,9 +135,7 @@ export function ListeCourses() {
        * ⚠️ **Et pas de bouton « réessayer » non plus** : AD-8 proscrit le reload
        * manuel, et la propagation est la story 4.11.
        */}
-      <Notice reserve>
-        {echec ? "On n'a pas réussi à ouvrir ta liste." : null}
-      </Notice>
+      <Notice>{echec ? "On n'a pas réussi à ouvrir ta liste." : null}</Notice>
 
       {/*
        * ⚠️ **Les trois états se testent DANS CET ORDRE, et `groupes === null`
@@ -153,7 +167,13 @@ export function ListeCourses() {
            * `gap-gutter` (14px) : l'espace inter-cartes du système, pas une
            * valeur inventée ici.
            */}
-          <ul className="mt-6 flex list-none flex-col gap-gutter p-0">
+          {/*
+           * Ni `list-none` ni `p-0` : le preflight de Tailwind pose déjà
+           * `list-style: none` sur `ul` et `padding: 0` sur `*`. Les écrire
+           * ferait croire que cet écran exige un traitement que les sept autres
+           * `<ul>` du dépôt n'ont pas. Retiré le 2026-08-12.
+           */}
+          <ul className="mt-6 flex flex-col gap-gutter">
             {groupes.map((groupe) => (
               <li key={groupe.rayonId ?? "a-classer"}>
                 <CarteRayon
@@ -182,7 +202,7 @@ export function ListeCourses() {
                    */
                   total={groupe.articles.length}
                 >
-                  <ul className="list-none p-0">
+                  <ul>
                     {groupe.articles.map((article) => (
                       <LigneArticle key={article.id} article={article} />
                     ))}
@@ -225,10 +245,20 @@ export function ListeCourses() {
  * emploi d'`accent-text` hors carte, et le fond y mesure **4,72 / 4,55 /
  * 4,42:1** sur ses trois arrêts (`#f7f4ee`, `#eef1ee`, `#f3ece3`).
  *
- * ✅ **Ça tient largement** — 4,42:1 passe AA même en texte normal, et 48px/800
- * est du grand texte (seuil 3:1). ⛔ **Mais la marge est celle du fond de page,
- * pas celle de la carte** : réduire la taille de `.compteur` sous 24px, ou sa
- * graisse sous 700, se juge contre 4,42:1 et non contre 5,18:1.
+ * ✅ **Ça tient, mais de justesse et POUR UNE SEULE RAISON** — 48px/800 est du
+ * grand texte, dont le seuil AA est **3:1**.
+ *
+ * ⛔ **CORRECTION DU 2026-08-12 : cette ligne disait « 4,42:1 passe AA même en
+ * texte normal ». C'EST FAUX.** Le seuil AA du texte normal est **4,5:1** ; 4,42
+ * échoue. L'erreur n'était pas cosmétique — la phrase suivante en faisait une
+ * règle de décision, donc un futur compteur à 22px régulier aurait été validé
+ * contre un chiffre présenté comme conforme alors qu'il ne l'est pas, et sur
+ * l'arrêt le plus chaud du dégradé, c'est-à-dire en bas de page.
+ *
+ * ⛔ **Ce qui reste vrai, et qui est la vraie garde** : la marge est celle du fond
+ * de page, pas celle de la carte. Réduire `.compteur` sous **24px** ou sa graisse
+ * sous **700** le fait sortir du « grand texte » et le juge alors contre 4,5:1,
+ * qu'il **ne tient pas** — ce n'est donc pas une prudence, c'est un interdit.
  */
 function CompteurAPrendre({ nombre }: { nombre: number }) {
   return (
@@ -268,7 +298,7 @@ function CompteurAPrendre({ nombre }: { nombre: number }) {
  * muted-2 ». `muted-2` est réservé à l'article déjà coché, donc à la story 4.3.
  */
 function LigneArticle({ article }: { article: ArticleDeListe }) {
-  const quantite = formaterQuantite(article.quantite);
+  const quantite = formaterQuantiteEtUnite(article.quantite, article.unite);
 
   return (
     <li className="flex min-h-item items-center gap-2">
@@ -295,14 +325,18 @@ function LigneArticle({ article }: { article: ArticleDeListe }) {
        *
        * ⚠️ **C'est la quantité qui commande.** Une unité qualifie un nombre :
        * sans nombre elle ne veut rien dire, alors qu'un nombre nu (« 3 ») en dit
-       * déjà quelque chose. Le `??` couvre donc le cas inverse, sans le
-       * `filter(Boolean)` — qui aurait avalé le « 0 » que `formaterQuantite`
-       * rend en CHAÎNE.
+       * déjà quelque chose.
+       *
+       * ⛔ **L'APPARIEMENT A QUITTÉ CE JSX le 2026-08-12, et le motif compte.**
+       * Il rendait « **2 pièce** » — l'unité ne s'accordait jamais en nombre,
+       * alors que NFR-8 veut du français et que 2 des 8 jetons du vocabulaire
+       * fermé sont des noms communs. Le défaut était **intestable là où il
+       * vivait** : NFR-10 interdit un harnais de composants. `formaterQuantiteEtUnite`
+       * le descend dans `lib/quantite.ts`, où il est mesuré — c'est la raison du
+       * déplacement, pas un rangement.
        */}
       {quantite !== null ? (
-        <span className="text-qty shrink-0 text-muted tabular-nums">
-          {article.unite === null ? quantite : `${quantite} ${article.unite}`}
-        </span>
+        <span className="text-qty shrink-0 text-muted tabular-nums">{quantite}</span>
       ) : null}
     </li>
   );
@@ -330,6 +364,14 @@ function LigneArticle({ article }: { article: ArticleDeListe }) {
  * `p-card` et `rounded-md` sur les cartes, `gap-gutter` entre elles. La story
  * 3.6 a rendu ses cases à 44px sans toucher son squelette resté à ~40px : saut
  * de mise en page rattrapé en revue. Si l'une bouge, celui-ci bouge avec.
+ *
+ * ⛔ **`--card-shadow` EN FAIT PARTIE, et il manquait — correction du 2026-08-12.**
+ * `CarteRayon` porte `style={{ boxShadow: "var(--card-shadow)" }}` ; le squelette
+ * ne l'avait pas, alors que ce docblock promettait la parité. En clair, le token
+ * vaut `0 6px 18px rgba(60,50,30,.06)` : les trois cartes **se décollaient du
+ * fond d'un coup** au passage de relais. ⚠️ **En sombre le token vaut `none`,
+ * donc le défaut ne se voyait que dans UN thème** — la moitié exacte qui a piégé
+ * la story 2.2, et la famille que la règle §7 réserve à l'œil.
  */
 function SqueletteDeRayons() {
   return (
@@ -343,6 +385,7 @@ function SqueletteDeRayons() {
           <div
             key={carte}
             className="rounded-md border border-card-border bg-surface-card p-card"
+            style={{ boxShadow: "var(--card-shadow)" }}
           >
             {/* L'en-tête de carte : pastille, nom, ratio */}
             <div className="flex items-center gap-2">

@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { formaterQuantite } from "./quantite.ts";
+import { formaterQuantite, formaterQuantiteEtUnite } from "./quantite.ts";
+import { UNITES } from "./recettes/unites.ts";
 
 /* ── formaterQuantite ─────────────────────────────────────────────────────── */
 
@@ -72,4 +73,109 @@ test("le séparateur de milliers n'est PAS celui de la locale", () => {
   const rendu = formaterQuantite(1500);
   assert.equal(rendu, "1500");
   assert.ok(!/\s/u.test(rendu!), "aucune espace, fût-elle insécable");
+});
+
+test("une quantité NON FINIE rend null, jamais « NaN » ni « ∞ »", () => {
+  /*
+   * ⛔ **Défaut mesuré en revue le 2026-08-12.** Seul `=== null` était gardé :
+   * `formaterQuantite(NaN)` rendait la chaîne `"NaN"`, `Infinity` rendait `"∞"`,
+   * et `ListeCourses` les affichait tels quels — « **NaN kg** » à droite de la
+   * ligne, dans la liste de courses d'un membre.
+   *
+   * ⚠️ **Ce n'est pas théorique** : `quantity` est un `numeric(8,2)` sans
+   * AUCUNE contrainte (la positivité est reportée à la 4.4, écrit dans l'en-tête
+   * de la migration), `numeric` accepte le littéral `'NaN'`, et l'écriture de la
+   * liste est client-direct. Le présentateur frère `lib/rayons/carte.ts` a reçu
+   * son `Number.isInteger` le 2026-08-07 pour exactement ce défaut.
+   */
+  assert.equal(formaterQuantite(Number.NaN), null);
+  assert.equal(formaterQuantite(Number.POSITIVE_INFINITY), null);
+  assert.equal(formaterQuantite(Number.NEGATIVE_INFINITY), null);
+});
+
+/* ── formaterQuantiteEtUnite ──────────────────────────────────────────────── */
+
+test("l'unité s'ACCORDE EN NOMBRE à partir de 2", () => {
+  /*
+   * ⛔ **Défaut mesuré en revue le 2026-08-12 : l'écran affichait « 2 pièce ».**
+   * L'appariement vivait dans le JSX de `ListeCourses`, donc aucun test ne
+   * pouvait l'atteindre — NFR-10 interdit un harnais de composants. Le descendre
+   * dans `lib/quantite.ts` est ce qui rend le cas couvrable ; c'est la raison du
+   * déplacement, pas un rangement.
+   */
+  assert.equal(formaterQuantiteEtUnite(2, "pièce"), "2 pièces");
+  assert.equal(formaterQuantiteEtUnite(3, "pincée"), "3 pincées");
+  assert.equal(formaterQuantiteEtUnite(1, "pièce"), "1 pièce");
+});
+
+test("la frontière du pluriel français est 2, donc 1,5 reste au SINGULIER", () => {
+  // Règle française : le pluriel commence à 2, pas au-dessus de 1.
+  assert.equal(formaterQuantiteEtUnite(1.5, "pièce"), "1,5 pièce");
+  assert.equal(formaterQuantiteEtUnite(1.99, "pincée"), "1,99 pincée");
+  assert.equal(formaterQuantiteEtUnite(2, "pincée"), "2 pincées");
+});
+
+test("un SYMBOLE d'unité ne prend jamais la marque du pluriel", () => {
+  /*
+   * Six des huit jetons du vocabulaire fermé sont des symboles : « 500 gs »
+   * serait une faute. Le `Record<Unite, boolean>` de `quantite.ts` force à
+   * trancher pour tout jeton neuf, plutôt que de laisser une `Set` l'ignorer.
+   */
+  assert.equal(formaterQuantiteEtUnite(500, "g"), "500 g");
+  assert.equal(formaterQuantiteEtUnite(2, "kg"), "2 kg");
+  assert.equal(formaterQuantiteEtUnite(3, "L"), "3 L");
+  assert.equal(formaterQuantiteEtUnite(250, "ml"), "250 ml");
+  assert.equal(formaterQuantiteEtUnite(2, "cs"), "2 cs");
+  assert.equal(formaterQuantiteEtUnite(4, "cc"), "4 cc");
+});
+
+test("les huit jetons du vocabulaire fermé sont TOUS traités, aucun ne rend undefined", () => {
+  /*
+   * ⚠️ **Mesure d'un invariant entre deux fichiers, pas une affirmation** —
+   * règle §4. `ACCORDE_EN_NOMBRE` est un `Record<Unite, boolean>`, donc le
+   * compilateur refuse déjà un jeton manquant ; ce test mesure la même chose à
+   * l'exécution, et surtout qu'aucun jeton ne sort déformé.
+   */
+  for (const unite of UNITES) {
+    const rendu = formaterQuantiteEtUnite(2, unite);
+    assert.ok(rendu !== null, `${unite} doit se rendre`);
+    assert.ok(rendu.startsWith("2 "), `${unite} doit suivre la quantité`);
+    assert.ok(
+      rendu === `2 ${unite}` || rendu === `2 ${unite}s`,
+      `${unite} rend « ${rendu} » : ni la forme simple ni l'accord`
+    );
+  }
+});
+
+test("une UNITÉ SANS QUANTITÉ ne rend rien — c'est la quantité qui commande", () => {
+  /*
+   * Le couple `(null, 'kg')` est possible et mesuré : `grocery_list_items_unite_fermee`
+   * ne contraint que le VOCABULAIRE, rien ne couple les deux colonnes, et le
+   * helper de test du dépôt insère précisément `{ name, unit }` sans `quantity`.
+   * Rendre « kg » tout seul à droite de la ligne serait un mot d'unité sans rien
+   * à mesurer — défaut trouvé en revue le 2026-08-07.
+   */
+  assert.equal(formaterQuantiteEtUnite(null, "kg"), null);
+  assert.equal(formaterQuantiteEtUnite(null, null), null);
+});
+
+test("une quantité SANS unité rend le nombre nu", () => {
+  // Un nombre nu (« 3 ») dit déjà quelque chose, contrairement à une unité nue.
+  assert.equal(formaterQuantiteEtUnite(3, null), "3");
+  assert.equal(formaterQuantiteEtUnite(0.5, null), "0,5");
+});
+
+test("une unité HORS VOCABULAIRE passe telle quelle, sans accord", () => {
+  /*
+   * Elle ne peut pas venir de l'application (contrainte en base + `<select>`) :
+   * si elle arrive, c'est un appel forgé ou un défaut. La déformer masquerait le
+   * signal — on veut la voir telle qu'elle est.
+   */
+  assert.equal(formaterQuantiteEtUnite(2, "bocal"), "2 bocal");
+  assert.equal(formaterQuantiteEtUnite(2, "piece"), "2 piece");
+});
+
+test("la garde de finitude vaut aussi pour le couple quantité + unité", () => {
+  assert.equal(formaterQuantiteEtUnite(Number.NaN, "kg"), null);
+  assert.equal(formaterQuantiteEtUnite(Number.POSITIVE_INFINITY, "pièce"), null);
 });
