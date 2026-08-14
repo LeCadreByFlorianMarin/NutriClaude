@@ -151,12 +151,15 @@
   /*
    * Échelle typographique de DESIGN.md. **Un rôle ne se pose qu'avec le
    * composant qui l'emploie** — un token publié devient écrivable comme
-   * utilitaire, donc une surface d'erreur de plus. `counter`, `clock` et les
-   * variantes dashboard restent à poser (Epics 4 et 5).
+   * utilitaire, donc une surface d'erreur de plus.
    *
-   * ⚠ `qty` est la première exception assumée : son composant existe
-   * (`app/_lib/CarteRayon.tsx`) mais aucun écran ne le monte encore — la story
-   * 4.2 sera le premier. État au 2026-08-07.
+   * ⚠ **Corollaire, et il a mordu** : un rôle qui ne tient pas ENTIER dans un
+   * `--text-*` (parce qu'il porte une fonte ou un `font-variant-numeric`) n'a
+   * rien à faire ici du tout — il vit dans la couche composants. Voir l'encadré
+   * `counter` plus bas. Ce bloc a annoncé « `counter` reste à poser » jusqu'au
+   * jour où il a été posé quarante lignes plus bas ; la règle §2 dit qu'un
+   * commentaire explique un *pourquoi*, jamais un état qui se périme, et ce
+   * paragraphe n'énumère donc plus ce qui manque.
    */
   --text-eyebrow: 11px;
   --text-eyebrow--line-height: 1.4;
@@ -179,6 +182,24 @@
    */
   --text-qty: 12px;
   --text-qty--line-height: 1.4;
+  /*
+   * ⛔ **`counter` N'EST PAS UN TOKEN, ET C'EST DÉLIBÉRÉ DEPUIS LE 2026-08-07.**
+   * Ses quatre valeurs vivaient ici jusqu'à la revue de la story 4.2 ; elles ont
+   * été inlinées dans `.compteur` (couche composants).
+   *
+   * **Pourquoi.** Le rôle porte aussi une `font-family` (l'humaniste arrondie) et
+   * un `font-variant-numeric`, que Tailwind 4 n'expose PAS comme modificateurs de
+   * `--text-*`. Le publier ici générait donc l'utilitaire `text-counter`, dont le
+   * commentaire d'alors disait lui-même qu'écrit seul il rendrait « un compteur
+   * dans la mauvaise fonte et aux chiffres qui sautillent, EN SILENCE ». Un
+   * fichier qui pose la règle « un token publié devient une surface d'erreur » ne
+   * peut pas publier le token dont il décrit le piège.
+   *
+   * ⚠️ **Le rôle est indivisible : une classe, tout ou rien.** C'est la même forme
+   * que `.titre-ecran`, dont le `letter-spacing` est écrit dans la classe et non
+   * en token. La leçon vient du ratio de la carte-rayon (2026-08-07), où les trois
+   * classes existaient et où une seule portait vraiment le rôle.
+   */
   --text-body: 15px;
   --text-body--line-height: 1.4;
   --text-title: 19px;
@@ -287,6 +308,34 @@ body::before {
   .titre-section {
     @apply text-base font-semibold;
     font-family: var(--font-rounded);
+  }
+
+  /*
+   * Le gros compteur de l'écran liste — « **12** à prendre ».
+   *
+   * Même forme que `.titre-ecran` : le rôle porte une `font-family`, donc il
+   * vit dans la couche composants et non dans le seul token. Ce qu'il ajoute :
+   * `tabular-nums`, sans quoi le chiffre **sautille** à chaque coche quand
+   * « 12 » devient « 11 » (UX-DR12, `DESIGN.md` : « les colonnes de chiffres ne
+   * doivent jamais sautiller »). Le compteur bougera à chaque coche dès la
+   * story 4.3 — c'est le pire endroit du produit pour l'oublier.
+   *
+   * ⚠️ **`text-accent-text`, JAMAIS `--accent` ni `--accent-strong`.** Ces deux
+   * valeurs ne basculent pas avec le thème et rendaient 1,90:1 sur carte
+   * blanche ; c'est la raison pour laquelle elles ne sont pas publiées comme
+   * utilitaires. La couleur est posée par l'appelant, pas ici : cette classe
+   * porte la FORME du rôle, pas sa teinte.
+   */
+  .compteur {
+    /* Valeurs de DESIGN.md, écrites ICI et non en token : voir l'encadré
+       `counter` du bloc `@theme`. Publier `--text-counter` générait l'utilitaire
+       `text-counter`, qui rend le rôle à moitié et échoue en silence. */
+    font-size: 48px;
+    line-height: 0.9;
+    letter-spacing: -0.03em;
+    font-weight: 800;
+    font-family: var(--font-rounded);
+    font-variant-numeric: tabular-nums;
   }
 
   /*

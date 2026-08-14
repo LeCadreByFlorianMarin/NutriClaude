@@ -1184,7 +1184,22 @@ WCAG 1.4.11 demande 3:1. Le parcours à l'œil du 2026-08-07 a bien vu les carte
 **sept cartes de sonde bien espacées**, pas sur la pile serrée que la 4.2 rendra.
 
 *Reporté* : les tokens sont pré-existants et transverses (toute carte du produit est concernée).
-**À rouvrir à la story 4.2**, qui est la première à empiler des cartes-rayon.
+~~**À rouvrir à la story 4.2**, qui est la première à empiler des cartes-rayon.~~
+
+> ✅ **ROUVERTE ET REFERMÉE LE 2026-08-12** — décision de Florian, en seconde passe de revue de la
+> story 4.2. **Cette entrée est SUPERSÉDÉE** par « ⛔ En thème SOMBRE, rien sur l'écran liste
+> n'atteint les 3:1 d'une frontière » (§0 du relevé du 2026-08-12, en fin de fichier), qui la
+> remplace pour la suite.
+>
+> ⚠️ **Deux de ses trois chiffres étaient faux, dans le sens sévère** : la sonde ne compositait pas
+> `--surface-card` sous la bordure (`background-clip: border-box`). Bordure/page vaut **1,538–1,586**
+> et non 1,30–1,33 ; bordure/carte **1,352–1,360** et non 1,14–1,15. Seul `carte/page`
+> (1,14–1,16) est confirmé.
+>
+> ⛔ **Mais la pile serrée a révélé pire que ce que cette entrée soupçonnait** : le séparateur réel
+> de deux cartes voisines n'est pas la bordure, c'est la **gouttière de 14 px de fond de page**, à
+> **1,138:1**. Le défaut tient donc, avec un autre coupable. **Règle §5 : cette prémisse ne peut plus
+> couvrir le défaut.**
 
 ### ⚠️ Le `<section>` de la carte n'a aucun nom accessible : ce n'est pas une `region`
 
@@ -1254,3 +1269,374 @@ précisément celui qui n'en porte pas. Aucune porte ne le voit.
 `lib/texte.ts`, `lib/rayons/saisie.ts`, leurs tests et le test d'accord client/base. Story dédiée à
 créer. ⚠️ Règle §3 : la correction s'écrit par **exclusion de catégorie**, jamais en énumérant les
 points de code à garder.
+
+---
+
+## Deferred from: dev-story 4.2 (2026-08-07)
+
+### ⛔ `generate_grocery_list_from_menu` fait SEGFAUTER PostgreSQL — et le test qui la garde passe pour la mauvaise raison
+
+**Découvert en implémentant la story 4.2**, parce que ses nouveaux tests d'isolation
+étaient les premiers à s'exécuter APRÈS celui de la génération. Hors périmètre de la
+4.2 : la fonction appartient à la story **4.7**.
+
+**Mesuré le 2026-08-07, sur le stack LOCAL** (rien n'a été vérifié en production, et
+rien n'est affirmé à son sujet) :
+
+| Sonde | Résultat |
+|---|---|
+| Journal du conteneur `supabase_db_nutriclaude` | `LOG: server process (PID …) was terminated by **signal 11: Segmentation fault**`, puis `database system was not properly shut down; automatic recovery in progress` |
+| Sonde à **deux** appels RPC par un membre authentifié | **delta de exactement 2 segfaults** — un par appel, déterministe |
+| L'erreur réellement rendue par l'appel | `{"code":"PGRST001","details":"no connection to the server","message":"Database client error. Retrying the connection."}` |
+| Suite d'isolation, mes 3 tests placés APRÈS | 95 pass / 3 fail, systématiquement |
+| Les mêmes 3 tests lancés SEULS | **3 pass / 0 fail** |
+| Suite d'isolation SANS mes 3 tests | 86 pass / **9 fail** — le crash frappait déjà, il n'était pas vu |
+| Redémarrage du conteneur `db` | **ne corrige rien** — 8 segfauts de plus après |
+
+**Deux défauts distincts, et le second est le plus insidieux :**
+
+1. ⛔ **Un membre authentifié ordinaire fait tomber le serveur de base de données**
+   avec sa seule clé anon et son jeton. Sur le stack local, c'est un déni de service
+   à un appel RPC près.
+
+2. ⛔ **Le test `« un membre authentifié ne peut PAS appeler la génération de liste »`
+   ne mesure pas ce qu'il croit.** Il assertionne `error !== null` **sans regarder
+   lequel** : l'erreur non nulle qu'il observe est celle du CRASH (`PGRST001`), pas un
+   refus de permission. Il conclut « aucune surface ne peut plus l'atteindre » sur la
+   foi d'un segfault. ⚠️ **C'est le motif récidiviste du dépôt** — la revue de la
+   story 4.1 avait déjà trouvé « deux tests qui ne mesuraient pas ce qu'ils
+   croyaient », et `project-context.md` §1 en fait une règle.
+
+⚠️ **Et la suite le CACHAIT par construction** : ce test était le **dernier** du
+fichier, donc le crash tombait après sa dernière assertion et la suite rendait 95/95
+verts. Il a fallu qu'une story ajoute des tests **après** lui pour que ça se voie.
+C'est la forme exacte du piège « `node --test` sur un glob vide rend 0 » que
+`project-context.md` documente : *une porte qui ne peut pas signaler son propre
+échec*.
+
+**Contournement en place, et il est écrit** : les tests de la 4.2 sont placés **avant**
+celui de la génération, avec un encadré qui dit pourquoi (`isolation.test.ts`). Ce
+n'est pas une correction — c'est un ordre d'exécution choisi pour qu'un test mesure
+autre chose qu'un crash.
+
+**À faire, story 4.7 (ou une story dédiée) :**
+- diagnostiquer le segfault (`prosrc` de la fonction, plan d'exécution, version
+  PostgreSQL 17.6 du stack local) ;
+- **resserrer l'assertion du test existant** pour qu'il exige le code d'erreur d'un
+  refus de permission (`42501`) plutôt que « une erreur, n'importe laquelle » — sans
+  quoi il continuera de passer sur un crash ;
+- vérifier si le défaut existe en production, **sans l'y déclencher**.
+
+---
+
+## Deferred from: code review of 4-2-lecture-client-direct-de-la-liste-groupee-par-rayon (2026-08-07)
+
+*Revue adversariale à trois couches (Blind Hunter, Edge Case Hunter, Acceptance Auditor) plus les
+grilles `/clean-code`, `/clean-architecture` et `/tdd`. Six constats reportés — aucun n'est causé par
+la story 4.2, mais chacun devient atteignable ou visible à cause d'elle.*
+
+### 1. `aisle_id` renseigné avec `aisle_name` nul rendrait DEUX cartes « À classer »
+
+**Adressé aux stories 4.4 et 4.18** — celles qui ouvrent le chemin d'écriture de `aisle_id`.
+
+**Mesuré.** La politique `grocery_insert` (volet 6 de la migration `20260805092611`) ne vérifie que
+`household_id = current_household_id()`. Elle **ne vérifie jamais que `aisle_id` appartient au même
+foyer**, et la FK est un simple `references aisles(id) on delete set null` — aucune contrainte de
+cohérence croisée.
+
+La vue étant `security_invoker = true`, son `left join aisles` est filtré par la RLS d'`aisles` :
+une ligne dont `aisle_id` pointe un rayon invisible à l'invocateur ressort avec `aisle_id`
+**renseigné** et `aisle_name` / `aisle_icon` / `aisle_sort` **nuls**. `grouperParRayon` regroupe par
+`rayonId`, donc en fait un groupe distinct ; `nomDeRayon(null)` rend « À classer » ; `rayonOrdre`
+nul le place en dernier, **juste à côté du vrai groupe « À classer »**.
+
+⛔ **Deux cartes au titre identique, articles répartis entre elles** — le défaut même que
+`grouperParRayon` existe pour empêcher, atteint par un autre chemin. La clé React diffère, donc
+**rien ne le signale**.
+
+⚠️ **Inatteignable aujourd'hui, et c'est la seule raison du report** : rien n'écrit `aisle_id` depuis
+une surface, `product_aisle_map` est vide et `resolve_aisle_id` rend toujours `null`. C'est le même
+trou de cohérence croisée que `meal_plan_entries` a eu ; il n'a pas été refermé pour `aisle_id`.
+
+### 2. Quantité `0` ou négative s'affiche telle quelle
+
+**Adressé à la story 4.4**, qui possède déjà la contrainte de positivité.
+
+**Mesuré.** `quantity numeric(8,2)` **ne reçoit délibérément aucune contrainte de positivité** —
+c'est écrit en toutes lettres dans l'en-tête de la migration (`20260805092611:306`), et reporté à la
+4.4. `formaterQuantite(0)` rend la **chaîne** `"0"`, qui est *truthy* : elle survit au
+`filter(Boolean)` de `ListeCourses.tsx:231` et l'écran affiche « 0 kg » ; `-3` affiche « -3 kg ».
+
+⚠️ Le garde du dépôt sur ce motif (`formaterTemps`, `=== null` et jamais `if (!temps)`) est
+correctement repris par `formaterQuantite` — il ne couvre simplement pas ce cas-ci.
+
+### 3. Ni le début ni la fin de la lecture ne sont annoncés aux aides techniques
+
+**Adressé à la story 4.13** (plancher d'accessibilité de la liste).
+
+**Mesuré.** Le squelette porte `aria-hidden="true"` (correct, cohérent avec `app/menu/loading.tsx`),
+et le `<Notice reserve>` — seule région `role="status" aria-live="polite"` de l'écran — ne
+transporte **que** `echec`. Il reste vide pendant tout le chargement **et le reste après**, la liste
+apparaissant hors de la région live. Ni `aria-busy`, ni jumeau `sr-only` de transition.
+
+Conséquence : un lecteur d'écran arrive sur `/courses`, lit « Ma liste » puis « Rangée dans l'ordre
+de ton magasin. », puis **plus rien** — le squelette est masqué, la région de statut est vide. Une
+seconde plus tard le contenu existe, mais rien ne l'annonce. C'est la première lecture
+client-direct du produit, donc la première fois que le contenu arrive **après** le rendu.
+
+⚠️ **Le remède tient en une ligne** dans le `Notice` déjà monté :
+`{echec ?? (enChargement ? "Je charge ta liste…" : null)}`. **Reporté par périmètre, pas par
+difficulté** — à arbitrer avec la 4.13 plutôt qu'à laisser tomber.
+
+### 4. `.order("aisle_sort")` diverge du `coalesce(…, 9999)` de la vue, et le test qui prétend mesurer l'accord ne l'atteint pas
+
+**Sans story assignée** — à reprendre avec la 4.12 (versionnage du contrat) ou la 4.15 (filet de
+vérification nommé).
+
+**Mesuré.** `.order()` sans `nullsFirst` n'émet **aucun modificateur** — vérifié dans
+`node_modules/@supabase/postgrest-js` (`nullsFirst === void 0 ? "" : …`) — donc Postgres applique
+NULLS LAST. La vue, elle, applique `coalesce(a.sort_order, 9999)`, qui place les nuls **à égalité
+avec un rayon légitimement classé à 9999**, puis départage par nom d'**article**.
+
+À `sort_order = 10000` (aucune borne en base ; la colonne est écrivable par la surface), la vue
+place « À classer » **avant** ce rayon et la requête explicite **après**.
+
+⚠️ **Sans conséquence visible** — `comparerGroupes` retrie côté client, et son écart aux nuls est
+délibéré. Ce qui est en défaut, c'est le **test** : `isolation.test.ts:1975-1981` affirme mesurer
+l'accord entre l'`ORDER BY` de la vue et le tri explicite d'`articlesDuFoyer`, mais n'emploie que
+5 / 20 / 20 / 42 — il passerait quand même. Règle §4 : l'invariant qu'il affirme tenir n'est pas
+celui qu'il mesure.
+
+### 5. Le `after()` des tests d'isolation ignore ses erreurs de ménage
+
+**Pré-existant** (`isolation.test.ts:110-123`, seulement reformaté par la 4.2).
+
+**Mesuré.** `await admin.auth.admin.deleteUser(compte.id)` et `await admin.from("households")
+.delete()…` — aucun résultat n'est lu, aucune assertion. Le client Supabase rend un objet
+`{ error }` plutôt que de lever.
+
+Conséquence, et elle est actuelle : le test de génération étant le dernier, le `after()` s'exécute
+sur une base **en récupération** après le segfault. Les deux boucles échouent, la suite reste verte,
+et **chaque exécution laisse deux comptes `auth.users` et deux foyers orphelins** sur le stack
+local. Le symptôme n'apparaîtra que le jour où quelqu'un comptera les lignes — ou expliquera une
+dérive de `db reset`.
+
+### 6. Deux assertions `notEqual(error, null)` sans SQLSTATE
+
+**Pré-existant** (`isolation.test.ts` ~`:758` « un appel anonyme est refusé », ~`:1135` « les gardes
+de cardinal et de doublon »), seulement reformatées par la 4.2.
+
+Les deux assertionnent qu'**une** erreur existe sans regarder laquelle, là où les tests voisins de
+la même famille exigent `P0001` / `23505`. Pour `:758`, l'assertion d'état qui suit (« rien n'a
+bougé ») serait vraie aussi si la fonction n'existait pas.
+
+⛔ **C'est la même famille que le défaut mesuré sur `generate_grocery_list_from_menu`** (entrée
+précédente de ce fichier) : un test qui observe l'erreur d'un crash en croyant observer un refus.
+Le remède est déjà écrit dans le dépôt — `lib/foyer/erreurs.ts`, motif « SQLSTATE d'abord ».
+**`notEqual(error, null)` seul ne prouve jamais qu'un refus est le bon refus.**
+
+### 7. Une session navigateur absente ou expirée rend « Ta liste est vide. », sans erreur
+
+**Adressé aux stories 4.13 (plancher d'accessibilité) et 4.14 (hors-ligne)**, qui possèdent les
+états dégradés de cet écran.
+
+✅ **Reporté sur décision de Florian du 2026-08-07, en revue de la 4.2. Motif :** *« la 4.2 est une
+lecture pure ; distinguer “vide” de “pas de session” relève du plancher d'accessibilité (4.13) ou du
+hors-ligne (4.14), qui possèdent les états dégradés de cet écran. »*
+
+**Mesuré.** La politique `grocery_select` est ancrée sur `current_household_id()`. Sans profil, la
+fonction vaut `NULL`, donc le prédicat ne retient aucune ligne : **zéro ligne, HTTP 200,
+`error === null`** — c'est ce que le dépôt mesure déjà lui-même (« zéro ligne est un succès
+PostgREST, pas une erreur », et le test d'appel anonyme qui obtient `data: []`).
+
+`requireProfile()` (`app/courses/page.tsx`) est une garde **serveur** : elle ne dit rien de la
+session dont dispose le client navigateur. Aucune branche de `ListeCourses` ne distingue « 0 ligne »
+de « 0 ligne parce que je ne suis personne » — le membre voit sa liste pleine annoncée comme vide,
+sans erreur ni recours.
+
+⚠️ **Faible atteignabilité** : il faut une divergence entre la session du rendu serveur et celle de
+l'`useEffect` (jeton expiré entre les deux, cookie non propagé). Aucune occurrence mesurée.
+
+⛔ **Mais c'est structurel à la PREMIÈRE lecture client-direct du produit**, et les stories 4.8
+(cache local) et 4.11 (temps réel) rafraîchiront ce même état — elles en hériteront.
+
+⚠️ **À cadrer avant d'écrire du code** : un contrôle de session côté client frôle le contrôle
+d'accès applicatif qu'AD-2 et AD-16 interdisent. La RLS reste seule garante ; ce qui manque est un
+état d'**interface**, pas une garde de sécurité.
+
+---
+
+## Deferred from: code review of 4-2-lecture-client-direct-de-la-liste-groupee-par-rayon — SECONDE PASSE (2026-08-12)
+
+*Seconde revue adversariale à trois couches, portant sur la **passe de correction** du 2026-08-07 —
+règle §6, « et la passe de correction doit être revue à son tour ». **Sept** constats reportés. Deux
+d'entre eux (n°0 et n°6) sont nés de décisions tranchées par Florian pendant la revue ; les cinq
+autres deviennent atteignables ou visibles à cause de cette story.*
+
+### 0. ⛔ En thème SOMBRE, rien sur l'écran liste n'atteint les 3:1 d'une frontière
+
+**Né de la mesure D-4 du 2026-08-12.** ⚠️ **Reporté parce que le correctif déborde la story** :
+relever `--card-border` en sombre touche **toute carte de l'application** et les cinq écrans
+existants — c'est `DESIGN.md` qui décide, pas la 4.2. **À trancher avant la story 4.3**, qui ajoutera
+l'état coché sur ces mêmes cartes.
+
+⚠️ **Ceci REFERME et REMPLACE la prémisse « À rouvrir à la story 4.2 »** posée le 2026-08-07 (entrée
+de la story 2.4, plus haut dans ce fichier). Elle a été rouverte, mesurée, et ne peut plus être
+réinvoquée pour couvrir ce défaut — **règle §5**.
+
+**Mesuré le 2026-08-12** — calcul WCAG 2.x (luminance relative sRGB, compositing `source-over`) sur
+les tokens du bloc `@media (prefers-color-scheme: dark)` d'`app/globals.css`. Script
+`d4-contraste.mjs`, exécuté.
+
+| Fond de page | carte / fond | bordure / carte | bordure / fond |
+|---|---|---|---|
+| `#211318` (haut) | 1,149:1 | **1,359:1** | 1,561:1 |
+| `#191016` (55 %) | 1,138:1 | **1,352:1** | 1,538:1 |
+| `#2a1512` (bas) | 1,155:1 | **1,360:1** | 1,571:1 |
+| `#2a1512` + halo prune | 1,171:1 | **1,355:1** | 1,586:1 |
+
+⚠️ **LES CHIFFRES DU REPORT D'ORIGINE ÉTAIENT FAUX, ET DANS LE SENS SÉVÈRE — corrigés ici.** Le
+report annonçait « bordure **1,30–1,33:1** vs la page » et « **1,14–1,15:1** vs la carte ». Sa sonde
+n'avait **pas composité le verre de carte sous la bordure** : or `background-clip` vaut `border-box`
+par défaut, donc `--surface-card` peint bien sous la bordure, dont l'alpha effectif est
+`1 − (1−0,055)(1−0,1) = 0,1495` et non `0,1`.
+
+| Grandeur | Report du 2026-08-07 | Mesure du 2026-08-12 | Verdict |
+|---|---|---|---|
+| bordure / page | 1,30–1,33:1 | **1,538–1,586:1** | corrigé **vers le haut** |
+| bordure / carte | 1,14–1,15:1 | **1,352–1,360:1** | corrigé **vers le haut** |
+| carte / page | 1,14–1,16:1 | **1,138–1,171:1** | ✅ confirmé |
+
+✅ **La conclusion ne bouge pas d'un pouce** : la bordure est moins mauvaise qu'annoncé, et
+**aucune des trois grandeurs n'approche les 3:1**. Le report avait raison sur le défaut, faux sur
+son ampleur.
+
+⛔ **Et la pile serrée change la NATURE du défaut, dans le sens que le report n'avait pas prévu.**
+Sur sept cartes bien espacées, la bordure est le séparateur. Sur la pile de la 4.2, **ce qui sépare
+deux cartes voisines, c'est 14 px de FOND DE PAGE** (`gap-gutter`), et `carte / gouttière` mesure
+**1,138:1** — soit **moins que la bordure elle-même**. Le séparateur réel de cet écran était le
+maillon le plus faible des trois, et personne ne le regardait.
+
+WCAG 1.4.11 exige **3:1** d'une frontière nécessaire à la compréhension de l'interface. Sur cet
+écran, cette frontière porte l'**AC1 lui-même** : si l'on ne voit pas où finit un rayon et où
+commence le suivant, le groupement par rayon — tout le livrable de la story — ne se lit plus.
+
+⚠️ **Ce qui n'est PAS affirmé ici, et qui reste à faire** : savoir si le défaut **se voit**. La
+structure typographique de l'en-tête de carte (pastille d'emoji, nom de rayon en capitales, ratio)
+porte peut-être assez de séparation pour que la frontière basse ne compte pas. **C'est un jugement
+d'œil, il n'a pas été fait**, et rien de ce qui précède ne prétend le contraire — le calcul dit que
+le contraste est insuffisant, pas que la carte est illisible.
+
+### 6. Le nom d'ARTICLE est rendu brut, quand le nom de RAYON est normalisé à l'affichage
+
+**Adressé à la story 4.4**, décision de Florian du 2026-08-12. *Raison du report : la 4.4 ouvre le
+chemin d'écriture du nom d'article et possédera `normaliserNomArticle` ; scinder la normalisation
+entre deux stories ferait diverger la valeur écrite de la valeur affichée, qui est exactement le
+défaut à éviter.* ⚠️ **Le périmètre de la 4.4 doit inclure le côté AFFICHAGE** — c'est une story
+d'écriture, elle n'ajouterait pas spontanément un présentateur.
+
+`app/courses/ListeCourses.tsx:282` rend `{article.nom}` tel quel. À 30 px de là, `CarteRayon` fait
+passer le nom de rayon par `nomDeRayon` → `normaliserTexte` (NFC, `\p{Cf}\p{Cc}\p{Cn}`, rognage,
+bornage), **au motif explicite que « la carte reçoit son nom d'une vue »**
+(`lib/rayons/carte.ts:145-149`). Le nom d'article ne reçoit rien.
+
+`grocery_list_items_nom_non_vide` n'exige qu'**un** caractère `[:graph:]` après dépouillement. Deux
+déclencheurs atteignables une fois l'écriture ouverte : un **U+202E (RLO)** dans le nom inverse
+l'ordre bidi du reste de la ligne — **la quantité change de côté** ; un **U+00A0** en tête rend une
+indentation qu'un `trim()` retirerait. Une forme NFD s'affiche correctement mais diverge de la clé
+canonique d'AD-7.
+
+⚠️ **Inatteignable aujourd'hui** : rien n'écrit d'article depuis une surface.
+
+### 1. Les groupes de rayons se trient sur le nom BRUT et s'affichent avec le nom NORMALISÉ
+
+**Sans story assignée** — à reprendre avec l'**Epic 7** (le serveur MCP est annoncé consommateur de
+`lib/liste/groupement.ts`) ou la **4.12** (contrat de liste versionné).
+
+**Mesuré.** `comparerGroupes` (`lib/liste/groupement.ts:135`) départage les ex æquo par
+`(a.nom ?? "").localeCompare(b.nom ?? "", "fr")` — sur la valeur **telle qu'elle sort de la vue**.
+`CarteRayon` affiche ce même nom via `nomDeRayon()` → `normaliserNomRayon()`, qui rogne, compose en
+NFC, retire les invisibles et borne à 40 caractères. La table `aisles` ne porte **aucune contrainte
+d'espacement ni de longueur** (seule `aisles_name_non_vide` existe), et `lib/rayons/carte.ts` le
+documente lui-même comme la raison d'être de son enveloppe.
+
+Deux rayons ex æquo à `sort_order = 20`, l'un enregistré `" Zèbre"` (espace de tête) et l'autre
+`"Abricot"` : le tri compare `" Zèbre"` à `"Abricot"` et place Zèbre **avant** ; l'écran affiche
+« ABRICOT » puis « ZÈBRE » sous une carte rangée avant elle. ⛔ **L'ordre visible contredit l'ordre
+calculé**, sans rien à l'écran qui l'explique — et c'est précisément le déterminisme que ce tri
+secondaire existe pour garantir.
+
+⚠️ **Inatteignable par l'application** : `prochainOrdre` rend `max+10` et `reorder_aisles`
+renumérote au pas de 10, donc elle ne produit pas d'ex æquo, et le formulaire `/rayons` normalise à
+la saisie. Le déclencheur est une **surface qui n'a pas normalisé** — MCP, écriture client-direct,
+import futur.
+
+⚠️ **Distinct de la divergence déjà écrite** à `groupement.ts:78-84` (`localeCompare(…, "fr")` ici
+contre la collation Postgres de `rayonsDuFoyer`) : celle-là porte sur la **méthode** de comparaison,
+celle-ci sur la **valeur** comparée. Les deux se referment par le même geste — trier sur la valeur
+normalisée.
+
+### 2. La divergence U+FE0F entre `/rayons` et `/courses` est passée de théorique à OBSERVABLE
+
+**Adressé à la story dédiée U+FE0F** déjà créée par le report du 2026-08-07 (voir plus haut dans ce
+fichier). ⚠️ **Le correctif reste hors périmètre** ; ce qui est neuf ici, c'est le fait, et il n'est
+écrit nulle part.
+
+**Mesuré.** `/courses` est le **premier écran du produit à monter `CarteRayon`** — `app/globals.css`
+l'annonçait : « son composant existe mais aucun écran ne le monte encore — la story 4.2 sera le
+premier ». C'est donc le premier endroit où `iconeDeRayon` s'exécute réellement. Or
+`app/rayons/ListeRayons.tsx:933` rend l'icône **brute** : `{rayon.icone ?? ""}`.
+
+⛔ **À partir de cette story, la même icône de rayon peut s'afficher différemment sur deux écrans du
+produit** — VS16 retiré et réduction au premier grapheme sur `/courses`, valeur brute sur `/rayons`.
+Le semis (11 icônes à un point de code) reste hors d'atteinte, mesuré ; le déclencheur est une icône
+écrite par autre chose que le formulaire `/rayons`.
+
+Le report d'origine notait « à refermer par un test qui mesure que les deux surfaces s'accordent » :
+ce test n'existe toujours pas, et il a maintenant deux surfaces réelles à comparer.
+
+### 3. La quantité est le seul chiffre de l'écran sans jumeau `sr-only`
+
+**Adressé à la story 4.13** (plancher d'accessibilité de la liste), avec le report déjà daté sur
+l'annonce de début et de fin de lecture — même écran, même famille, même story.
+
+`app/courses/ListeCourses.tsx:302-305` rend `2 cs`, `1 cc`, `500 g` tels quels. Un lecteur d'écran
+annonce « deux c s », « un c c ». Le compteur (`:242`) et le ratio de la carte-rayon ont chacun leur
+jumeau `.sr-only`, **tous deux ajoutés après un défaut mesuré** ; la quantité n'en a pas. C'est la
+classe que `review-accessibility.md:65` compte en défaut pour « 3/4 » sans label.
+
+⚠️ La 4.13 posera de toute façon « ligne entière = la cible, avec son `aria-label` » : le remède y
+est structurel plutôt qu'additif, ce qui est la raison du report.
+
+### 4. Le garde `Children.count(children) > 0` de la 2.4 est neutralisé par l'enveloppe `<ul>` de la 4.2
+
+**Adressé à la story 4.17** (« À classer » toujours visible), qui est celle qui construira des
+groupes vides.
+
+`app/courses/ListeCourses.tsx:185` passe à `CarteRayon` un **élément unique** — le `<ul>` qui
+enveloppe les lignes — donc `Children.count(children)` vaut invariablement **1** face à
+`app/_lib/CarteRayon.tsx:202`. Le garde ne se déclenche jamais depuis cet appelant : un groupe vide
+rendrait le `<div class="mt-2">` (8 px de marge) sous un `<ul>` vide, ce que le correctif de la 2.4
+existe précisément pour empêcher.
+
+⚠️ **Inatteignable aujourd'hui** — `grouperParRayon` ne produit pas de groupe vide (mesuré par
+`groupement.test.ts`). Mais `GroupeDeRayon` est un type **exporté**, et l'en-tête de la story 4.2
+affirme le contraire de ce que son code fait : « C'est exactement l'idiome de la Task 2. »
+
+⚠️ **Se referme avec le correctif P2-5 de la seconde passe**, qui porte le même cas vide côté tri
+(`comparerGroupes` non exportée, donc l'`ordre` du groupe n'est mesuré par rien). Les deux ont le
+même déclencheur et la même story propriétaire.
+
+### 5. Deux portes sur `formaterQuantite`, et rien d'automatique ne défend la bonne
+
+**Sans story assignée** — se referme le jour où le dernier appelant historique migre.
+
+Conséquence **assumée** de la décision D-5 (Florian, 2026-08-07), qui a déplacé `formaterQuantite`
+vers `lib/quantite.ts` avec ré-export depuis `lib/recettes/lecture.ts:27`. Le ré-export est bien
+fondé et ne casse rien — **mesuré** : `app/recettes/[id]/page.tsx:9` importe encore par l'ancienne
+porte, et `typecheck` / `lint` passent.
+
+Ce qui manque est la garde : le docblock règle le problème par une **consigne** — « les nouveaux
+l'importent depuis `@/lib/quantite` » — que ni `tsc --noEmit`, ni `eslint --max-warnings 0`, ni le
+typage ne défendent. C'est exactement la forme de garantie que `lib/rayons/carte.ts` a déjà appris à
+ne pas tenir pour acquise : « rien d'automatique ne défendra cet invariant ».

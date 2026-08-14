@@ -41,7 +41,59 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
-last_updated: 2026-08-07  # 2026-08-07 (2ᵉ passe) — Story 2.4 REVUE UNE SECONDE FOIS, sur sa propre
+last_updated: 2026-08-12  # 2026-08-12 — Story 4.2 : SECONDE PASSE DE REVUE, portant sur la passe
+                          # de correction du 2026-08-07 (règle §6 — « et la passe de correction
+                          # doit être revue à son tour »). Statut ramené à `in-progress`.
+                          # 27 constats retenus : 3 décisions, 20 correctifs APPLIQUÉS, 7 reports.
+                          # ✅ Le CODE tient — les 3 AC, les 13 correctifs de la 1re passe, et rien
+                          # à redire sur le regroupement, les nullités PostgREST, les tokens ni
+                          # l'isolation. ⛔ Ce qui ne tenait pas était la REDDITION DE COMPTES :
+                          # trois familles de chiffres périmés (dont ceux consignés ICI), une File
+                          # List amputée de six fichiers, un token `--text-counter` déclaré livré
+                          # et inexistant, une décision marquée « correctif » sans correctif, et
+                          # une route d'échafaudage `app/zz-controle/` expédiée dans le build —
+                          # elle se construisait en `○` et servait un faux « Ma liste » à tout
+                          # membre connecté. Aucune porte automatique ne voyait l'un de ces six
+                          # points : règle §7, cinquième fois sur ce projet.
+                          # ⛔ D-4 MESURÉE (elle ne l'avait jamais été) : en thème sombre,
+                          # bordure/carte 1,352–1,360:1, carte/gouttière 1,138:1 — AUCUNE grandeur
+                          # n'atteint les 3:1 de WCAG 1.4.11, et les chiffres du report d'origine
+                          # étaient faux dans le sens sévère. La pile serrée a changé le coupable :
+                          # le séparateur réel de deux cartes n'est pas la bordure, c'est la
+                          # gouttière de 14 px. Correctif reporté (R2-6) — il touche DESIGN.md et
+                          # toute carte du produit, donc à trancher avant la story 4.3.
+                          # PORTES REJOUÉES : npm test 247/247 · isolation 98 (97 pass, 0 fail,
+                          # 1 skipped) · typecheck · lint · check:migrations 16/14/2/0 · build
+                          # 14 routes · sonde CSS 21/21 avec 5 contrôles négatifs à 0 · banc de
+                          # mutations 5/5 tuées, dont celle qui SURVIVAIT avant cette passe.
+                          # ⚠️ RESTE DÛ AVANT FUSION, et aucune porte ne le voit : le PARCOURS À
+                          # L'ÉCRAN, à refaire — la seconde passe a modifié le rendu en trois
+                          # endroits visibles (ombre du squelette en thème clair, 24 px retirés
+                          # au-dessus du compteur, « 2 pièces » au lieu de « 2 pièce »). Et avec
+                          # lui le jugement d'œil que le calcul ne rend pas : la séparation des
+                          # cartes se voit-elle en sombre sur la pile serrée ?
+                          #
+                          # 2026-08-07 — Story 4.2 IMPLÉMENTÉE (statut `review`). **Le premier
+                          # écran du produit qui lit depuis le NAVIGATEUR** (AC1/AD-13) : les 20
+                          # appels du client navigateur étaient jusqu'ici tous des écritures.
+                          # D3/D4/D5 tranchées par Florian sur leurs défauts prescrits — lecture
+                          # tout-client, « Ma liste » sur `/courses`, gros compteur livré ici.
+                          # ⚠️ Le regroupement se fait par CLÉ, jamais par lignes consécutives :
+                          # deux rayons ex æquo intercalent leurs articles, et le banc des
+                          # mutations tue les 5 mutants dont celui-là. ✅ Parcours à l'œil fait
+                          # aux deux réglages système, thème remis. NFR-3 mesuré à 390/360/320px,
+                          # nom de 200 caractères insécable compris : aucun débordement.
+                          # ⛔ DÉFAUT MAJEUR TROUVÉ EN CHEMIN, HORS PÉRIMÈTRE ET CONSIGNÉ :
+                          # `generate_grocery_list_from_menu` fait SEGFAUTER PostgreSQL (un crash
+                          # par appel, mesuré sur le stack local), et le test censé la garder passe
+                          # pour la MAUVAISE RAISON — il observait l'erreur du crash, pas un refus
+                          # de permission. La suite le cachait : ce test était le dernier du
+                          # fichier, donc le crash tombait après sa dernière assertion.
+                          # → `deferred-work.md`, adressé à la story 4.7.
+                          # Portes : npm test 227/227 (+7), isolation 98/98 (+3), typecheck, lint,
+                          # migrations 16/14/2/0 INCHANGÉ (aucune migration), build.
+                          #
+                          # 2026-08-07 (2ᵉ passe) — Story 2.4 REVUE UNE SECONDE FOIS, sur sa propre
                           # passe de correction (règle §6). Reste `done` : 3 décisions tranchées,
                           # 15 correctifs APPLIQUÉS, 7 reportés, 6 écartés. ✅ La 1ʳᵉ passe tient —
                           # 16 des 19 correctifs réellement fermés, six portes reproduites au
@@ -760,7 +812,7 @@ development_status:
   # ⚠️ Passe de validation en contexte neuf : elle a trouvé UN TROU (la story ne disait pas ce
   # qu'une ligne d'article affiche — sans l'unité, AD-7 rend deux « Lait » inexplicables) et
   # QUATRE affirmations fausses, toutes corrigées.
-  4-2-lecture-client-direct-de-la-liste-groupee-par-rayon: ready-for-dev
+  4-2-lecture-client-direct-de-la-liste-groupee-par-rayon: in-progress
   4-3-cocher-et-decocher-idempotent-et-reversible: backlog
   4-4-ajouter-un-article-avec-agregation-et-unites-fermees: backlog
   4-5-supprimer-archiver-les-achetes-vider-la-liste: backlog
