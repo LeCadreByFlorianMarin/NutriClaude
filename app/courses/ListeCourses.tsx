@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { CarteRayon } from "@/app/_lib/CarteRayon";
 import { Notice } from "@/app/_lib/Notice";
 import { createNavigateurClient } from "@/lib/supabase/client";
@@ -45,12 +45,44 @@ export function ListeCourses() {
    * réutilisant un état qui AFFIRME UN FAIT déplaçait le mensonge, il ne le
    * retirait pas.
    *
-   * `groupes` reste donc `null` en cas d'échec, et c'est `echec` qui distingue
+   * `articles` reste donc `null` en cas d'échec, et c'est `echec` qui distingue
    * « je charge » de « je n'ai pas pu ». **Un état vide se mérite** : il faut
    * avoir lu pour avoir le droit de dire qu'il n'y a rien.
+   *
+   * ⛔ **L'ÉTAT GARDE LA LISTE À PLAT, DANS L'ORDRE DE LA BASE — ET C'EST UN
+   * CORRECTIF DU PARCOURS À L'ÉCRAN DU 2026-08-13.** Il gardait `GroupeDeRayon[]`,
+   * donc déjà trié pour l'affichage (les achetés en bas). Une bascule reconstruisait
+   * la liste à plat depuis ces groupes, puis la regroupait : l'ordre alphabétique
+   * **à l'intérieur du panier** était alors celui de l'affichage précédent, plus
+   * celui de la base.
+   *
+   * **Mesuré à l'écran** : après avoir coché « Lait », la Crèmerie rendait
+   * `Lait, Beurre` sous le séparateur ; après rechargement, `Beurre, Lait`. **Le
+   * même état affiché de deux façons selon qu'on venait de cocher ou non** —
+   * exactement l'« écran qui bouge tout seul » que le tri secondaire de
+   * `comparerGroupes` existe pour empêcher, un niveau plus bas.
+   *
+   * ⚠️ **Re-trier par nom à l'affichage aurait été le mauvais correctif** : c'est
+   * la collation Postgres qu'il aurait fallu réimplémenter côté client, ce que
+   * l'AC3 interdit. Garder l'ordre reçu est la seule réponse qui n'arbitre rien.
    */
-  const [groupes, setGroupes] = useState<GroupeDeRayon[] | null>(null);
+  const [articles, setArticles] = useState<ArticleDeListe[] | null>(null);
   const [echec, setEchec] = useState(false);
+
+  /*
+   * Le regroupement est DÉRIVÉ, jamais stocké : une seule source de vérité, et
+   * la même règle appliquée au chargement comme après une bascule.
+   *
+   * ⚠️ **Il n'est JAMAIS nul, et c'est délibéré.** Une seule valeur porte
+   * l'absence — `articles` — et c'est elle que les branches de rendu testent.
+   * Rendre `groupes` nullable aussi obligerait à le re-tester au rendu alors
+   * que TypeScript ne peut pas relier les deux, et le `!` que cela réclamerait
+   * est refusé par le dépôt. Un tableau vide se regroupe en tableau vide.
+   */
+  const groupes: GroupeDeRayon[] = useMemo(
+    () => grouperParRayon(articles ?? []),
+    [articles]
+  );
 
   useEffect(() => {
     /*
@@ -80,9 +112,9 @@ export function ListeCourses() {
          * quand la configuration manque, et l'appel doit donc être sous le
          * `try` pour que l'échec devienne un message plutôt qu'un écran mort.
          */
-        const articles = await articlesDuFoyer(createNavigateurClient());
+        const recus = await articlesDuFoyer(createNavigateurClient());
         if (annule) return;
-        setGroupes(grouperParRayon(articles));
+        setArticles(recus);
       } catch (erreur) {
         if (annule) return;
         /*
@@ -130,21 +162,18 @@ export function ListeCourses() {
     const precedent = article.statut;
 
     /*
-     * ⚠️ **`grouperParRayon` est rejoué sur la liste à plat**, plutôt que de
-     * modifier le groupe en place : c'est ce qui fait redescendre l'article sous
-     * le séparateur « Dans le panier » dans le même rendu que la coche. Le
-     * regroupement reste la seule règle qui décide de la position, ici comme au
-     * chargement — deux chemins qui divergeraient seraient un défaut de plus.
+     * ⚠️ **On ne touche QUE le statut, et l'ordre de la base est préservé.** Le
+     * regroupement est dérivé : l'article redescend sous le séparateur « Dans le
+     * panier » dans le même rendu que la coche, par la seule règle de
+     * `grouperParRayon` — la même qu'au chargement. Deux chemins qui
+     * divergeraient seraient un défaut de plus, et c'en était un jusqu'au
+     * 2026-08-13 (voir l'encadré de l'état).
      */
     const reposer = (statut: StatutArticle) =>
-      setGroupes((actuels) =>
+      setArticles((actuels) =>
         actuels === null
           ? actuels
-          : grouperParRayon(
-              actuels
-                .flatMap((g) => g.articles)
-                .map((a) => (a.id === article.id ? { ...a, statut } : a))
-            )
+          : actuels.map((a) => (a.id === article.id ? { ...a, statut } : a))
       );
 
     reposer(vise);
@@ -165,7 +194,6 @@ export function ListeCourses() {
     }
   }
 
-  const articles = groupes?.flatMap((g) => g.articles) ?? [];
   /*
    * ⛔ **LE COMPTEUR COMPTE LES `pending`, PAS LA LONGUEUR DU TABLEAU.** Depuis
    * que la vue rend aussi les articles achetés (migration du 2026-08-13),
@@ -173,7 +201,7 @@ export function ListeCourses() {
    * ferait annoncer « 12 à prendre » au-dessus de douze lignes dont dix sont
    * barrées, **et aucune porte automatique ne le verrait**.
    */
-  const aPrendre = articles.filter((a) => a.statut === "pending").length;
+  const aPrendre = (articles ?? []).filter((a) => a.statut === "pending").length;
 
   return (
     <>
@@ -206,13 +234,17 @@ export function ListeCourses() {
       <Notice>{echec ? "On n'a pas réussi à ouvrir ta liste." : null}</Notice>
 
       {/*
-       * ⚠️ **Les trois états se testent DANS CET ORDRE, et `groupes === null`
+       * ⚠️ **Les trois états se testent DANS CET ORDRE, et `articles === null`
        * s'écrit en clair plutôt que derrière un booléen nommé.** Une variable
-       * `enChargement = groupes === null && !echec` se lisait mieux, mais elle
-       * privait TypeScript du rétrécissement : il ne voyait plus que `groupes`
+       * `enChargement = articles === null && !echec` se lisait mieux, mais elle
+       * privait TypeScript du rétrécissement : il ne voyait plus qu'`articles`
        * est non nul dans la dernière branche, et il a raison de le demander.
+       *
+       * ⚠️ **Le test porte sur `articles`, pas sur `groupes`** : les deux sont
+       * nuls ensemble (le second est dérivé du premier), mais seul le premier
+       * apprend quelque chose à TypeScript.
        */}
-      {echec ? null : groupes === null ? (
+      {echec ? null : articles === null ? (
         <SqueletteDeRayons />
       ) : articles.length === 0 ? (
         /*
