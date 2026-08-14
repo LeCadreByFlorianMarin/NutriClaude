@@ -149,6 +149,25 @@
   --spacing-item: 46px; /* hauteur de ligne-article, téléphone */
 
   /*
+   * La coche (`DESIGN.md:131`, story 4.3). **Ce n'est PAS la cible tactile** :
+   * celle-ci est la ligne entière (`--spacing-item`, 46px ≥ 44px). Une case de
+   * 25px qu'il faudrait viser au doigt, dans un magasin, d'une seule main,
+   * serait exactement le défaut qu'UX-DR5 interdit.
+   *
+   * ⚠ **Nommé `--checkbox-size` et NON `--spacing-checkbox`, délibérément.**
+   * `--spacing-*` est un espace de noms Tailwind : l'y ranger aurait généré
+   * `w-checkbox`, `h-checkbox`, `p-checkbox`… écrivables partout, pour un token
+   * qui n'a qu'un seul consommateur — la classe `.coche`. C'est la leçon de
+   * `--text-counter`, où publier le rôle rendait la moitié du rôle et échouait
+   * en silence.
+   *
+   * **Mesuré le 2026-08-13**, sonde sur la feuille compilée : `w-checkbox-size`
+   * et `h-checkbox-size` → **0 occurrence**, et `--checkbox-size:25px` est bien
+   * émise. Aucun utilitaire n'est généré, la variable est disponible.
+   */
+  --checkbox-size: 25px;
+
+  /*
    * Échelle typographique de DESIGN.md. **Un rôle ne se pose qu'avec le
    * composant qui l'emploie** — un token publié devient écrivable comme
    * utilitaire, donc une surface d'erreur de plus.
@@ -443,6 +462,132 @@ body::before {
      texte et sa graisse. */
   .notice {
     @apply min-h-6 text-base font-medium text-text;
+  }
+
+  /*
+   * ═══ L'ÉCRAN LISTE — coche, panier, article acheté (story 4.3) ═══
+   *
+   * ⚠️ **L'abricot est LÉGITIME ici, et c'est une exception écrite.** UX-DR2
+   * réserve l'accent à l'action courses et **énumère la coche** parmi ses
+   * emplois. Partout ailleurs l'interdit tient : pas d'abricot sur le
+   * séparateur, ni sur un libellé barré, ni sur un nom de rayon.
+   */
+
+  /*
+   * La coche — un VRAI `<input type="checkbox">`, restylé.
+   *
+   * ⛔ **`appearance: none` et pas un `<span>`.** `EXPERIENCE.md:151` l'impose :
+   * un contrôle doit annoncer son état ET son changement d'état. Un `<span>`
+   * avec `role="checkbox"` obligerait à réimplémenter à la main la barre
+   * d'espace, `aria-checked`, et le rattachement au label — trois choses que le
+   * natif rend gratuitement et sans défaut.
+   *
+   * ⚠️ **La taille vient de `DESIGN.md:131`** (`checkbox-size: 25px`). Elle
+   * n'est PAS la cible tactile : celle-ci est la ligne entière (≥44px), posée
+   * par `.ligne-article`. Confondre les deux donne une case de 25px qu'il faut
+   * viser au doigt, dans un magasin, d'une seule main.
+   *
+   * ⚠️ **Le contour fait 2px, jamais 1px.** `DESIGN.md` : « contour ≥2px + léger
+   * fond interne », mesuré à 3,64:1 sur carte blanche et 4,77:1 sur verre — le
+   * seuil non-textuel de WCAG 1.4.11 est 3:1, et un contour de 1px ne le tient
+   * pas visuellement même à ratio égal.
+   */
+  .coche {
+    appearance: none;
+    flex-shrink: 0;
+    width: var(--checkbox-size);
+    height: var(--checkbox-size);
+    border-radius: var(--radius-sm);
+    border: 2px solid var(--checkbox-empty);
+    background-color: var(--checkbox-empty-fill);
+    display: grid;
+    place-content: center;
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease;
+  }
+
+  /*
+   * Cochée : aplat accent + trait encre. `accent-fill` bascule avec le thème
+   * (`accent-strong` en clair, `accent` en sombre) — c'est pour ça qu'on ne
+   * touche jamais aux valeurs brutes.
+   */
+  .coche:checked {
+    background-color: var(--accent-fill);
+    border-color: var(--accent-fill);
+  }
+
+  /*
+   * Le trait de la coche, en `::after` plutôt qu'en image de fond : il hérite
+   * ainsi de `currentColor` et reste net à tout facteur de zoom.
+   *
+   * ⛔ **`content` est posé en permanence, seule l'ÉCHELLE change.** Créer le
+   * pseudo-élément au moment du `:checked` empêcherait toute transition et
+   * ferait apparaître le trait d'un coup — or `DESIGN.md` dit que « la
+   * transition est le retour visuel du geste principal ».
+   */
+  .coche::after {
+    content: "";
+    width: 0.6em;
+    height: 0.35em;
+    border-left: 2.5px solid var(--accent-ink);
+    border-bottom: 2.5px solid var(--accent-ink);
+    transform: rotate(-45deg) scale(0);
+    transform-origin: center;
+    transition: transform 120ms ease;
+  }
+
+  .coche:checked::after {
+    transform: rotate(-45deg) scale(1);
+  }
+
+  /*
+   * La ligne-article — **un seul hit-target, toute la ligne** (UX-DR5,
+   * `EXPERIENCE.md:104` : « tap n'importe où sur la ligne = bascule »).
+   *
+   * ⚠️ **C'est un `<label>`**, donc le clic n'importe où bascule la case native
+   * sans un seul gestionnaire d'événement sur la ligne. Poser un `onClick` sur
+   * un `<li>` aurait rendu la ligne inatteignable au clavier et aurait exigé un
+   * `role`/`tabIndex` à la main.
+   *
+   * ⚠️ `min-height` ≥ 44px vient de `--spacing-item` (46px mesuré), pas d'une
+   * valeur écrite ici.
+   */
+  .ligne-article {
+    @apply flex min-h-item items-center gap-3;
+    cursor: pointer;
+  }
+
+  /*
+   * L'article ACHETÉ — barré + `muted`, jamais la seule couleur.
+   *
+   * ⛔ **`muted` et PAS `muted-2`.** `DESIGN.md:161` a explicitement corrigé ce
+   * point (« était muted-2 ~2:1 sur clair ») : le libellé barré **doit rester
+   * lisible**, sinon on ne peut plus récupérer l'article — ce que FR-3 exige.
+   * `muted-2` n'est admis que sur la quantité, devenue redondante.
+   *
+   * ⚠️ **Le barré + la coche pleine sont les signaux PRIMAIRES.** La couleur
+   * seule ne porte jamais l'état (UX-DR3) : un daltonien, ou un écran en plein
+   * soleil, doit voir la différence.
+   */
+  .article-achete {
+    text-decoration: line-through;
+    @apply text-muted;
+  }
+
+  /*
+   * Le séparateur « Dans le panier » — eyebrow discret À L'INTÉRIEUR du rayon.
+   *
+   * ⛔ **Ce n'est PAS un écran, ni un onglet, ni une section de page.**
+   * `DESIGN.md:283` et `EXPERIENCE.md:107` : il sépare, dans une carte-rayon,
+   * les articles à prendre (en haut) des articles cochés (repoussés en bas).
+   *
+   * ⚠️ **`muted`, jamais `muted-2`** : c'est un repère de lecture porteur, donc
+   * il tient AA. Et aucun abricot — il ne nomme pas une action.
+   */
+  .separateur-panier {
+    @apply mt-2 pt-2 text-xs font-semibold uppercase text-muted;
+    letter-spacing: 0.06em;
+    border-top: 1px solid var(--card-border);
   }
 
   /*

@@ -41,7 +41,53 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
-last_updated: 2026-08-12  # 2026-08-12 — Story 4.2 : SECONDE PASSE DE REVUE, portant sur la passe
+last_updated: 2026-08-13  # 2026-08-13 — Story 4.3 IMPLÉMENTÉE (statut `review`). Les QUATRE
+                          # décisions prises sur leur défaut prescrit, faute d'arbitrage : vue
+                          # élargie · vraie coche ici · `intent_at` écrit · optimiste + rollback.
+                          # ⛔ UNE MIGRATION, et c'est elle qui rend la story possible : la vue
+                          # filtrait `status = 'pending'`, donc cocher faisait DISPARAÎTRE
+                          # l'article et l'AC1 comme l'AC3 étaient inatteignables. Changement
+                          # additif, `order by` inchangé (le tri du panier est un choix
+                          # d'affichage, pas de contrat — l'Epic 5 et l'Epic 7 liront cette vue).
+                          # ⚠️ `status` a dû être ajouté à la chaîne `.select()` : élargir la vue
+                          # ne suffisait pas, l'oubli aurait rendu `statut` undefined EN SILENCE.
+                          # ⚠️ `types.ts` NON régénéré, mesuré : le bloc de type de la vue est
+                          # identique (des lignes de plus, pas des colonnes).
+                          # ⛔ UN ÉTAT NEUF EST NÉ SANS COPIE ÉCRITE — « tout est pris » : des
+                          # articles, aucun en pending. Réutiliser « Ta liste est vide. » y aurait
+                          # été faux. Rédigé « Tout est dans le panier. », chaîne INVENTÉE par le
+                          # dev agent et non reprise d'EXPERIENCE.md — à valider en revue.
+                          # ✅ La note laissée par la 4.2 à la story 4.5 tombe d'elle-même : le
+                          # dénominateur du ratio ne décroît plus (1/4 → 2/4, pas 0/4 → 0/3).
+                          # Portes : npm test 257/257 (+8) · isolation 103, 102 pass, 0 fail,
+                          # 1 skipped (+5) · typecheck · lint · check:migrations 17/15/2/0 ·
+                          # build 14 routes · sonde CSS 4 classes neuves, 6 contrôles négatifs à 0
+                          # · contraste de la coche MESURÉ (3,638:1 clair, 4,359-4,768:1 sombre,
+                          # seuil 3:1 tenu partout).
+                          # ⛔ RESTE DÛ, et aucune porte ne le voit (§7) : LE PARCOURS À L'ÉCRAN,
+                          # laissé non coché avec sa raison. Celui de la 4.2 l'est aussi — les
+                          # deux peuvent se faire d'un seul passage.
+                          #
+                          # 2026-08-12 (2) — Story 4.3 CONTEXTUALISÉE (`ready-for-dev`), sur
+                          # `5b43c77`. Seize mesures exécutées sur le stack local, dont une qui
+                          # change la FORME de la story : ⛔ M3 — cocher un article le fait
+                          # DISPARAÎTRE de la vue (`where status = 'pending'`), donc l'AC1
+                          # (« dans les deux sens ») et l'AC3 (« reste consultable ») sont
+                          # inatteignables sans élargir la lecture. On ne décoche pas ce qu'on ne
+                          # voit plus. ⚠️ Et le « panier » n'est PAS un écran : DESIGN.md:283 et
+                          # EXPERIENCE.md:107 en font un SÉPARATEUR à l'intérieur de la carte-rayon.
+                          # Quatre décisions ouvertes avec leur défaut prescrit : D1 visibilité des
+                          # cochés (migration additive sur la vue) · D2 qui possède la coche, 4.3
+                          # ou 4.13 (même forme que la D1 de la 4.2 : 2.4 construisait, 4.2
+                          # consommait) · D3 `intent_at` écrit dès maintenant — M4bis mesuré : un
+                          # UPDATE de `status` laisse l'arbitre du LWW PÉRIMÉ, et la 4.10 en dépend
+                          # · D4 mise à jour optimiste avec rollback.
+                          # ✅ Rien à migrer pour la colonne ni la RLS : `status` (initial_schema)
+                          # et `grocery_update` existent, les tokens de coche vide sont posés.
+                          # ⚠️ État NEUF sans copie écrite : « tout est pris » — des articles, aucun
+                          # en pending. Réutiliser « Ta liste est vide. » y serait faux.
+                          #
+                          # 2026-08-12 — Story 4.2 : SECONDE PASSE DE REVUE, portant sur la passe
                           # de correction du 2026-08-07 (règle §6 — « et la passe de correction
                           # doit être revue à son tour »). Statut ramené à `in-progress`.
                           # 27 constats retenus : 3 décisions, 20 correctifs APPLIQUÉS, 7 reports.
@@ -813,7 +859,7 @@ development_status:
   # qu'une ligne d'article affiche — sans l'unité, AD-7 rend deux « Lait » inexplicables) et
   # QUATRE affirmations fausses, toutes corrigées.
   4-2-lecture-client-direct-de-la-liste-groupee-par-rayon: in-progress
-  4-3-cocher-et-decocher-idempotent-et-reversible: backlog
+  4-3-cocher-et-decocher-idempotent-et-reversible: review
   4-4-ajouter-un-article-avec-agregation-et-unites-fermees: backlog
   4-5-supprimer-archiver-les-achetes-vider-la-liste: backlog
   4-6-provenance-de-chaque-article: backlog

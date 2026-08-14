@@ -10,6 +10,7 @@ import { stackLocal } from "./stack-local.ts";
  * `articlesDuFoyer` prend son client en paramètre précisément pour ça.
  */
 import { articlesDuFoyer } from "../../lib/liste/liste.ts";
+import { basculerStatut } from "../../lib/liste/basculer.ts";
 
 /**
  * NFR-5 — l'isolation entre foyers, prouvée par exécution.
@@ -1736,6 +1737,36 @@ async function articleDeA(nom: string, rayonId: string | null) {
   assert.equal(error, null, `l'article « ${nom} » n'a pas pu être posé`);
 }
 
+/**
+ * Les trois lectures dont les tests de bascule ont besoin.
+ *
+ * ⚠️ **Elles passent par `a.client`, jamais par `admin`** (AD-17) : un test
+ * d'isolation qui lirait en contournant la RLS ne prouverait rien de l'isolation.
+ * ⚠️ Et elles lisent `error` autant que `data` — zéro ligne est un succès
+ * PostgREST, donc l'absence de ligne doit se distinguer d'un échec de lecture.
+ */
+async function ligneDe(nom: string) {
+  const { data, error } = await a.client
+    .from("grocery_list_items")
+    .select("id, status, intent_at")
+    .eq("name", nom);
+  assert.equal(error, null, `la lecture de « ${nom} » a échoué`);
+  assert.equal(data?.length, 1, `« ${nom} » introuvable, ou en double`);
+  return data![0];
+}
+
+async function idDe(nom: string): Promise<string> {
+  return (await ligneDe(nom)).id as string;
+}
+
+async function statutDe(nom: string): Promise<string> {
+  return (await ligneDe(nom)).status as string;
+}
+
+async function intentDe(nom: string): Promise<string> {
+  return (await ligneDe(nom)).intent_at as string;
+}
+
 test("la vue rend l'ordre du parcours, et DEUX RAYONS EX ÆQUO INTERCALENT leurs articles", async () => {
   /*
    * ⛔ **LE TEST QUI JUSTIFIE `grouperParRayon`.** `aisles.sort_order` n'a
@@ -1896,6 +1927,120 @@ test("supprimer un rayon bascule ses articles en « À classer », il ne les dé
     "l'article n'a pas basculé en « À classer »",
   );
   assert.equal(data![0].aisle_name, null);
+});
+
+/* ═══ Story 4.3 — cocher et décocher ═══════════════════════════════════════
+ *
+ * ⚠️ **PLACÉS AVANT le test de génération**, comme ceux de la 4.2 : celui-ci fait
+ * segfauter PostgreSQL (mesuré le 2026-08-07) et il est `test.skip` depuis. La
+ * garde CI ne tolère qu'UN saut, nommé en dur — un `test.skip` neuf fait rougir
+ * le job.
+ *
+ * ⚠️ **Préfixe UNIQUE par test** (`zzbasc-`, `zzidem-`, `zziso-`) : le préfixe
+ * partagé `zz-` a coûté un défaut en revue de la 4.2, où le premier test comparait
+ * à un tableau exact que les suivants polluaient.
+ * ═════════════════════════════════════════════════════════════════════════ */
+
+test("un article COCHÉ reste dans la vue — sinon on ne pourrait plus le décocher", async () => {
+  /*
+   * ⛔ **LE TEST QUI JUSTIFIE LA MIGRATION DU 2026-08-13.** La vue portait
+   * `where g.status = 'pending'` : cocher un article le faisait DISPARAÎTRE de la
+   * seule surface de lecture du produit. L'AC1 (« dans les deux sens ») et l'AC3
+   * (« reste consultable et récupérable », FR-3) étaient tous deux inatteignables
+   * — on ne décoche pas ce qu'on ne voit plus.
+   *
+   * ⚠️ Ce test échouerait si quelqu'un rétablissait le filtre « pour ne montrer
+   * que ce qui reste à prendre » — c'est exactement ce qu'il existe pour empêcher.
+   */
+  await articleDeA("zzbasc-pomme", null);
+
+  await basculerStatut(a.client, await idDe("zzbasc-pomme"), "bought");
+
+  const { data, error } = await a.client
+    .from("grocery_list_by_aisle")
+    .select("name, status")
+    .eq("name", "zzbasc-pomme");
+  assert.equal(error, null, "la relecture après cochage a échoué");
+  assert.equal(data?.length, 1, "l'article coché a DISPARU de la vue");
+  assert.equal(data![0].status, "bought");
+});
+
+test("cocher puis décocher fonctionne DANS LES DEUX SENS (AC1)", async () => {
+  /*
+   * ⛔ **C'est le bug littéral du produit d'origine**, tracé au PRD : « Cocher /
+   * décocher : Cassé — case codée en dur, un article acheté ne peut pas revenir ».
+   * Le sens retour est donc un critère à part entière, pas la symétrie évidente
+   * de l'aller.
+   */
+  await articleDeA("zzbasc-lait", null);
+  const id = await idDe("zzbasc-lait");
+
+  await basculerStatut(a.client, id, "bought");
+  assert.equal(await statutDe("zzbasc-lait"), "bought", "l'aller a échoué");
+
+  await basculerStatut(a.client, id, "pending");
+  assert.equal(await statutDe("zzbasc-lait"), "pending", "le RETOUR a échoué");
+});
+
+test("recocher un article DÉJÀ coché est idempotent, sans erreur (AC2)", async () => {
+  /*
+   * ⛔ **L'idempotence vient de la VALEUR POSÉE, pas d'une garde** (AD-4). Deux
+   * surfaces qui posent `bought` convergent ; deux surfaces qui basculeraient
+   * `!status` s'annuleraient. C'est ce que NFR-2 exige : « cocher un article déjà
+   * coché ailleurs n'est pas une erreur ».
+   */
+  await articleDeA("zzidem-oeufs", null);
+  const id = await idDe("zzidem-oeufs");
+
+  await basculerStatut(a.client, id, "bought");
+  await basculerStatut(a.client, id, "bought");
+  await basculerStatut(a.client, id, "bought");
+
+  assert.equal(await statutDe("zzidem-oeufs"), "bought");
+});
+
+test("la bascule fait AVANCER `intent_at`, l'arbitre du LWW (AD-3)", async () => {
+  /*
+   * ⛔ **MESURÉ LE 2026-08-12, ET C'EST LA RAISON D'ÊTRE DE LA DÉCISION D3.** Un
+   * `UPDATE` de `status` fait bouger `updated_at` (le trigger du volet 5 tire)
+   * mais laisse `intent_at` à sa valeur d'insertion — un `default` ne s'applique
+   * pas à un `UPDATE`. Sans l'écriture explicite de `basculerStatut`, toute coche
+   * porterait un arbitre PÉRIMÉ, et la story 4.10 n'aurait rien pour trancher.
+   *
+   * ⚠️ **Le défaut ne se voit sur aucun écran et n'est vu par aucune porte.** Ce
+   * test est la seule chose qui l'empêche de revenir.
+   */
+  await articleDeA("zzbasc-beurre", null);
+  const id = await idDe("zzbasc-beurre");
+
+  const avant = await intentDe("zzbasc-beurre");
+  await new Promise((r) => setTimeout(r, 20));
+  await basculerStatut(a.client, id, "bought");
+  const apres = await intentDe("zzbasc-beurre");
+
+  assert.ok(
+    new Date(apres).getTime() > new Date(avant).getTime(),
+    `intent_at n'a pas avancé : ${avant} → ${apres}`,
+  );
+});
+
+test("B ne peut PAS cocher un article du foyer de A (NFR-5)", async () => {
+  /*
+   * ⚠️ **La RLS est seule garante.** `grocery_update` est ancrée sur
+   * `current_household_id()` en `using` ET en `with check`. ⛔ **Un UPDATE refusé
+   * par la RLS rend `error: null` et zéro ligne touchée** — c'est pour ça que
+   * l'assertion porte sur l'ÉTAT de la ligne, jamais sur l'absence d'erreur.
+   */
+  await articleDeA("zziso-secret", null);
+  const id = await idDe("zziso-secret");
+
+  await basculerStatut(b.client, id, "bought");
+
+  assert.equal(
+    await statutDe("zziso-secret"),
+    "pending",
+    "B a réussi à cocher un article du foyer de A",
+  );
 });
 
 /* ⛔ ────────────────────────────────────────────────────────────────────────
