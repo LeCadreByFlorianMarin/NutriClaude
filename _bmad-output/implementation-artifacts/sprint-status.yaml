@@ -41,7 +41,56 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
-last_updated: 2026-08-13  # 2026-08-13 — Story 4.3 IMPLÉMENTÉE (statut `review`). Les QUATRE
+last_updated: 2026-08-16  # 2026-08-16 (2) — Story 4.4 IMPLÉMENTÉE (statut `review`), sur une
+                          # branche `feat/4-4`. Quatre décisions prises sur leur défaut prescrit.
+                          # ✅ L'agrégation est MESURÉE de bout en bout : deux ajouts du même
+                          # article → 1 ligne quantité 3 · casse/accents/espaces plient · unité
+                          # différente → 2 lignes · réajout sur un TOMBSTONE ACHETÉ → 1 ligne,
+                          # `pending`, tombstone levé (le cas qui rendait 23505 à un INSERT).
+                          # ⛔ DEUX DÉFAUTS INTRODUITS PUIS CORRIGÉS, consignés :
+                          #  1. la signature de `resolve_aisle_id` était SUPPOSÉE (4 arguments,
+                          #     pas 2) — et la requête de contrôle n°2 de l'en-tête existait pour
+                          #     ça, non exécutée avant d'écrire ;
+                          #  2. la contrainte `deleted_at >= created_at` a CASSÉ un test
+                          #     préexistant, et la cause est LE MÊME DÉFAUT D'HORLOGE QUE LA 4.3 :
+                          #     created_at serveur, deleted_at client, +0,740 s d'écart. Une borne
+                          #     stricte aurait empêché tout membre au téléphone qui retarde de
+                          #     supprimer. Corrigée avec la tolérance d'un jour, reprise de
+                          #     grocery_list_items_intention_bornee.
+                          # ⚠️ D1(a) referme le défaut `intent_at` hérité de la 4.3 pour les
+                          # écritures de CETTE story : now() en SQL est l'horloge serveur.
+                          # ⚠️ L'arrondi de l'AC3 n'est PAS implémenté : FR-52 le rattache à
+                          # FR-16, donc à la story 4.7. Écrit plutôt qu'esquivé.
+                          # Portes : npm test 266/266 (+8) · isolation 111, 110 pass, 0 fail,
+                          # 1 skipped (+8) · typecheck · lint · check:migrations 18/16/2/0 ·
+                          # build 14 routes · sonde CSS 4 classes neuves, 3 contrôles négatifs à 0.
+                          # ⛔ RESTE DÛ : le parcours à l'écran — celui des stories 4.2 et 4.3 est
+                          # dû aussi ; les trois se font d'un seul passage.
+                          #
+                          # 2026-08-16 — Story 4.4 CONTEXTUALISÉE (`ready-for-dev`), sur
+                          # `4e65beb`. Douze mesures exécutées en `begin … rollback`.
+                          # ⛔ LE FAIT CENTRAL, mesuré trois fois : l'index unique canonique est
+                          # TOTAL — un article ACHETÉ comme un TOMBSTONE occupent la clé et font
+                          # rendre 23505 à un INSERT, alors que la vue ne les montre pas.
+                          # RÈGLE POUR TOUTES LES SURFACES : lire la TABLE, jamais la vue, avant
+                          # tout ajout. Et « ajouter » est un UPDATE dès que la clé est occupée,
+                          # quel que soit le status (AD-6 : jamais un INSERT nu).
+                          # ✅ AD-6 tranche le fond (agrégation autoritaire côté serveur), et une
+                          # contrainte technique élimine la voie client : PostgREST ne sait pas
+                          # INCRÉMENTER en upsert, son on_conflict écrase. D'où D1 : une fonction
+                          # SQL `security invoker` — jamais `definer`, c'est le trou de
+                          # seed_default_aisles.
+                          # ⚠️ DEUX FENÊTRES BON MARCHÉ SE REFERMENT ICI, la table étant encore
+                          # vide en production : `quantity >= 0` (mesuré : -5 est accepté
+                          # aujourd'hui) et `deleted_at >= created_at` (adressée à la 4.5).
+                          # ⚠️ L'arrondi de l'AC3 n'appartient probablement pas à cette story :
+                          # FR-52 le rattache à FR-16, la génération — donc la 4.7.
+                          # ⛔ DÉFAUT OUVERT HÉRITÉ, et il la concerne : `intent_at` mélange
+                          # horloge client (4.3) et horloge serveur (insertion) — écart mesuré de
+                          # +0,740 s entre le conteneur Postgres et l'hôte. Une fonction SQL le
+                          # résout gratuitement : argument de plus pour D1(a).
+                          #
+                          # 2026-08-13 — Story 4.3 IMPLÉMENTÉE (statut `review`). Les QUATRE
                           # décisions prises sur leur défaut prescrit, faute d'arbitrage : vue
                           # élargie · vraie coche ici · `intent_at` écrit · optimiste + rollback.
                           # ⛔ UNE MIGRATION, et c'est elle qui rend la story possible : la vue
@@ -860,7 +909,7 @@ development_status:
   # QUATRE affirmations fausses, toutes corrigées.
   4-2-lecture-client-direct-de-la-liste-groupee-par-rayon: in-progress
   4-3-cocher-et-decocher-idempotent-et-reversible: review
-  4-4-ajouter-un-article-avec-agregation-et-unites-fermees: backlog
+  4-4-ajouter-un-article-avec-agregation-et-unites-fermees: review
   4-5-supprimer-archiver-les-achetes-vider-la-liste: backlog
   4-6-provenance-de-chaque-article: backlog
   4-7-generer-la-liste-depuis-le-menu-sans-rien-ecraser: backlog

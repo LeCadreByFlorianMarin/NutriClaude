@@ -12,6 +12,7 @@ import {
 import { grouperParRayon, type GroupeDeRayon } from "@/lib/liste/groupement";
 import { basculerStatut, statutApresGeste } from "@/lib/liste/basculer";
 import { formaterQuantiteEtUnite } from "@/lib/quantite";
+import { AjouterArticle } from "./AjouterArticle";
 
 /**
  * La liste de courses, **lue depuis le navigateur** (AC1, AD-13).
@@ -83,6 +84,32 @@ export function ListeCourses() {
     () => grouperParRayon(articles ?? []),
     [articles]
   );
+
+  /*
+   * ⛔ **LA LECTURE EST EXTRAITE POUR ÊTRE REJOUABLE — story 4.4.** Elle ne servait
+   * qu'au montage ; l'ajout d'un article a besoin de la rejouer, parce qu'on ne
+   * peut PAS deviner son résultat : on ignore si l'ajout a créé une ligne ou
+   * incrémenté une existante, quel rayon le serveur a résolu, et si un tombstone
+   * vient d'être rouvert.
+   *
+   * ⚠️ **Ce n'est pas le « reload manuel » qu'AD-8 proscrit** : c'est la
+   * conséquence d'une écriture, pas un bouton de rafraîchissement ni du polling.
+   * La propagation entre surfaces reste la story 4.11.
+   *
+   * ⚠️ **Elle ne porte PAS le drapeau d'annulation.** Celui-ci appartient à
+   * l'effet, dont il ferme le cycle de vie ; un rechargement déclenché par un
+   * geste n'a pas de démontage à craindre entre l'appel et sa résolution.
+   */
+  async function relire() {
+    try {
+      const recus = await articlesDuFoyer(createNavigateurClient());
+      setArticles(recus);
+      setEchec(false);
+    } catch (erreur) {
+      console.error("[courses] Relecture de la liste :", erreur);
+      setEchec(true);
+    }
+  }
 
   useEffect(() => {
     /*
@@ -294,6 +321,14 @@ export function ListeCourses() {
            * ferait croire que cet écran exige un traitement que les sept autres
            * `<ul>` du dépôt n'ont pas. Retiré le 2026-08-12.
            */}
+          {/*
+           * ⚠️ **Le formulaire est SOUS le compteur et AU-DESSUS de la liste.**
+           * `EXPERIENCE.md` place l'ajout sur l'écran liste ; le mettre en bas
+           * l'enterrerait sous une liste qui peut faire trente lignes, sur un
+           * écran tenu à une main dans un magasin.
+           */}
+          <AjouterArticle onAjout={relire} />
+
           <ul className="mt-6 flex flex-col gap-gutter">
             {groupes.map((groupe) => (
               <li key={groupe.rayonId ?? "a-classer"}>

@@ -2,6 +2,7 @@ import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "../../lib/supabase/types.ts";
 import { stackLocal } from "./stack-local.ts";
 /*
  * ⚠️ **La fonction que l'ÉCRAN exécute, importée telle quelle.** Le test d'ordre
@@ -1738,6 +1739,50 @@ async function articleDeA(nom: string, rayonId: string | null) {
 }
 
 /**
+ * L'ajout tel que l'ÉCRAN l'exécute — la fonction du dépôt, pas une requête recopiée.
+ *
+ * ⚠️ Elle prend son client en paramètre, donc elle s'exerce ici contre une vraie base,
+ * avec la RLS de l'appelant. C'est le seul endroit où l'agrégation, la RLS et la
+ * normalisation serveur se mesurent ensemble.
+ */
+async function ajouterArticle(
+  client: SupabaseClient<Database>,
+  nom: string,
+  quantite?: number,
+  unite?: string,
+) {
+  /*
+   * ⚠️ **`undefined` et non `null`, et ce n'est pas un détail de typage.** Les deux
+   * paramètres portent un DÉFAUT SQL, donc les types générés les rendent optionnels :
+   * les OMETTRE laisse Postgres appliquer son défaut (`null`), ce qui est exactement
+   * l'intention. Passer `null` explicitement dirait la même chose à la base, mais
+   * ferait mentir la signature générée.
+   */
+  const { error } = await client.rpc("ajouter_article", {
+    p_nom: nom,
+    p_quantite: quantite,
+    p_unite: unite,
+  });
+  assert.equal(error, null, `l'ajout de « ${nom} » a échoué : ${error?.message}`);
+}
+
+/**
+ * Les lignes de A portant ce nom, lues dans la TABLE et non dans la vue.
+ *
+ * ⛔ **La table, jamais la vue** : un tombstone ou un article acheté occupent la clé
+ * canonique sans y être visibles. C'est toute la difficulté de la story 4.4, et un
+ * helper qui lirait la vue rendrait les tests aveugles au cas qui compte.
+ */
+async function lignesNommees(nom: string) {
+  const { data, error } = await a.client
+    .from("grocery_list_items")
+    .select("name, quantity, unit, status, deleted_at, intent_at, aisle_id")
+    .eq("name", nom);
+  assert.equal(error, null, `la lecture de « ${nom} » a échoué`);
+  return data ?? [];
+}
+
+/**
  * Les trois lectures dont les tests de bascule ont besoin.
  *
  * ⚠️ **Elles passent par `a.client`, jamais par `admin`** (AD-17) : un test
@@ -1927,6 +1972,150 @@ test("supprimer un rayon bascule ses articles en « À classer », il ne les dé
     "l'article n'a pas basculé en « À classer »",
   );
   assert.equal(data![0].aisle_name, null);
+});
+
+/* ═══ Story 4.4 — ajouter avec agrégation ══════════════════════════════════
+ *
+ * ⚠️ **Ces tests appellent `ajouterArticle`, la fonction que l'écran exécute** — pas
+ * une requête recopiée. La leçon est celle de la revue du 2026-08-12 : un test qui
+ * réécrit la requête mesure l'accord de la base avec sa propre copie.
+ *
+ * ⚠️ **Préfixe UNIQUE par test** (`zzagg-`, `zzuni-`, `zztomb-`, `zziso4-`) : le
+ * préfixe partagé a coûté un défaut en revue de la 4.2.
+ * ═════════════════════════════════════════════════════════════════════════ */
+
+test("deux ajouts du MÊME article ADDITIONNENT les quantités (AC1, FR-5)", async () => {
+  /*
+   * ⛔ **LE TEST QUI JUSTIFIE LA FONCTION SQL.** AD-6 : « ajouter n'est jamais un
+   * INSERT nu ». PostgREST ne sachant pas incrémenter en upsert, l'addition ne peut
+   * venir que du serveur — et c'est ce que ce test mesure contre une vraie base.
+   */
+  await ajouterArticle(a.client, "zzagg-lait", 1, "L");
+  await ajouterArticle(a.client, "zzagg-lait", 2, "L");
+
+  const lignes = await lignesNommees("zzagg-lait");
+  assert.equal(lignes.length, 1, "l'ajout a créé un DOUBLON au lieu d'agréger");
+  assert.equal(Number(lignes[0].quantity), 3, "les quantités n'ont pas été additionnées");
+});
+
+test("la casse, les ACCENTS et les espaces plient sur la clé canonique", async () => {
+  /*
+   * ⚠️ La normalisation vit dans l'EXPRESSION de l'index, côté serveur — quatre
+   * opérations non commutatives. Ce test mesure qu'elle s'applique bien à l'ajout,
+   * sans qu'aucun miroir applicatif n'ait été écrit (AD-1/AD-6).
+   * ⛔ **Le nom STOCKÉ garde sa forme d'origine** : on ne réécrit jamais ce que le
+   * membre a tapé.
+   */
+  await ajouterArticle(a.client, "zzagg-creme", 1, "g");
+  await ajouterArticle(a.client, "  ZZAGG-CRÈME ", 2, "g");
+
+  const lignes = await lignesNommees("zzagg-creme");
+  assert.equal(lignes.length, 1, "« ZZAGG-CRÈME » et « zzagg-creme » ont fait deux lignes");
+  assert.equal(Number(lignes[0].quantity), 3);
+  assert.equal(lignes[0].name, "zzagg-creme", "le nom d'origine a été écrasé");
+});
+
+test("deux UNITÉS différentes ne fusionnent JAMAIS (AC2, AD-7)", async () => {
+  // AD-7 : deux unités ne sont ni additionnées ni converties. « lait / L » et
+  // « lait / pièce » sont deux lignes légitimes du même rayon.
+  await ajouterArticle(a.client, "zzuni-lait", 1, "L");
+  await ajouterArticle(a.client, "zzuni-lait", 2, "pièce");
+
+  const lignes = await lignesNommees("zzuni-lait");
+  assert.equal(lignes.length, 2, "deux unités ont été fusionnées");
+  assert.deepEqual(
+    lignes.map((l) => Number(l.quantity)).sort((x, y) => x - y),
+    [1, 2],
+    "les quantités ont été mélangées entre les deux unités",
+  );
+});
+
+test("réajouter un article TOMBSTONÉ le rouvre, il ne rend pas 23505", async () => {
+  /*
+   * ⛔ **LE CAS QUE LA VUE NE MONTRE PAS.** L'index unique est TOTAL : un tombstone
+   * occupe la clé. Mesuré le 2026-08-16 : un `INSERT` y rend `23505` — sur un geste
+   * parfaitement légitime, et en désignant un article que la lecture affirme absent.
+   * La migration de la 4.1 l'écrivait déjà : « rajouter un article supprimé est un
+   * UPDATE, jamais un INSERT ».
+   */
+  await ajouterArticle(a.client, "zztomb-riz", 1, "kg");
+  const { error: eSupp } = await a.client
+    .from("grocery_list_items")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("name", "zztomb-riz");
+  assert.equal(eSupp, null, "le tombstone n'a pas pu être posé");
+
+  await ajouterArticle(a.client, "zztomb-riz", 2, "kg");
+
+  const lignes = await lignesNommees("zztomb-riz");
+  assert.equal(lignes.length, 1);
+  assert.equal(lignes[0].deleted_at, null, "le tombstone n'a pas été levé");
+  assert.equal(Number(lignes[0].quantity), 3, "la quantité n'a pas été additionnée");
+});
+
+test("réajouter un article ACHETÉ le ramène à prendre", async () => {
+  /*
+   * ⚠️ Même famille que le tombstone : un article `bought` occupe la clé et reste
+   * invisible dans la vue tant qu'on ne l'élargit pas. **Ajouter, c'est vouloir
+   * acheter** — la fonction le ramène donc à `pending`.
+   */
+  await ajouterArticle(a.client, "zztomb-beurre", 1, "g");
+  await a.client.from("grocery_list_items").update({ status: "bought" }).eq("name", "zztomb-beurre");
+
+  await ajouterArticle(a.client, "zztomb-beurre", 2, "g");
+
+  const lignes = await lignesNommees("zztomb-beurre");
+  assert.equal(lignes.length, 1);
+  assert.equal(lignes[0].status, "pending", "l'article acheté n'est pas revenu à prendre");
+  assert.equal(Number(lignes[0].quantity), 3);
+});
+
+test("la fonction fait AVANCER `intent_at`, sans mélanger les horloges (AD-3)", async () => {
+  /*
+   * ⛔ **CE TEST EXISTE À CAUSE D'UN DÉFAUT MESURÉ SUR LA STORY 4.3.** Elle écrit
+   * `intent_at` depuis l'horloge du CLIENT, alors que l'insertion le pose depuis
+   * celle du SERVEUR. Mesuré le 2026-08-16 : le conteneur Postgres est **+0,740 s en
+   * avance** sur l'hôte, donc une bascule y écrit un horodatage ANTÉRIEUR à
+   * l'insertion et l'arbitre du LWW recule.
+   *
+   * ⚠️ **Une fonction SQL n'a pas ce problème** : `now()` y est la même horloge à
+   * l'insertion comme à la mise à jour. Ce test le fige.
+   */
+  await ajouterArticle(a.client, "zzagg-horloge", 1, "g");
+  const avant = (await lignesNommees("zzagg-horloge"))[0].intent_at as string;
+
+  await new Promise((r) => setTimeout(r, 20));
+  await ajouterArticle(a.client, "zzagg-horloge", 1, "g");
+  const apres = (await lignesNommees("zzagg-horloge"))[0].intent_at as string;
+
+  assert.ok(
+    new Date(apres).getTime() > new Date(avant).getTime(),
+    `intent_at n'a pas avancé : ${avant} → ${apres}`,
+  );
+});
+
+test("une quantité NÉGATIVE est refusée par la base (23514)", async () => {
+  /*
+   * ⚠️ La contrainte arrive avec cette story : l'agrégation est ce qui consomme la
+   * quantité par un CALCUL, et une négative y rendrait une somme fausse SANS erreur.
+   * Mesuré avant la migration : `quantity = -5` était accepté.
+   */
+  const { error } = await a.client
+    .from("grocery_list_items")
+    .insert({ household_id: a.foyerId, name: "zzagg-negatif", quantity: -5 });
+  assert.equal(error?.code, "23514", "une quantité négative a été acceptée");
+});
+
+test("B ne peut PAS ajouter dans le foyer de A (NFR-5)", async () => {
+  /*
+   * ⛔ **La fonction est `security invoker` : c'est la RLS qui refuse, pas elle.**
+   * `current_household_id()` rend le foyer de B, donc l'article part chez B — il ne
+   * peut pas atterrir chez A. Ce test mesure que la fonction n'a ouvert aucun chemin.
+   */
+  await ajouterArticle(b.client, "zziso4-intrus", 1, "g");
+
+  const lignes = await lignesNommees("zziso4-intrus");
+  assert.equal(lignes.length, 0, "B a écrit un article visible dans le foyer de A");
 });
 
 /* ═══ Story 4.3 — cocher et décocher ═══════════════════════════════════════
