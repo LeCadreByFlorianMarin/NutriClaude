@@ -33,7 +33,7 @@ baseline_commit: 4e65beb
 
 # Story 4.4: Ajouter un article avec agrégation et unités fermées
 
-Status: review
+Status: done
 
 <!-- ✅ **LES QUATRE DÉCISIONS PRISES SUR LEUR DÉFAUT PRESCRIT** le 2026-08-16, faute d'arbitrage
      au lancement de `dev-story` : D1(a) fonction SQL `security invoker` · D2(a) `quantity >= 0`
