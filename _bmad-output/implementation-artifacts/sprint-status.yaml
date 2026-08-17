@@ -41,7 +41,23 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
-last_updated: 2026-08-17  # 2026-08-17 — PARCOURS À L'ÉCRAN DES TROIS STORIES, enfin fait, et
+last_updated: 2026-08-17  # 2026-08-17 (2) — Story 4.4 FUSIONNÉE (PR #29). Les stories 4.1 à 4.4
+                          # sont `done` et dans `main` ; aucune PR ouverte, aucune branche de
+                          # travail restante.
+                          # ⛔ UNE DÉCISION RESTE OUVERTE, ET ELLE EST DANS `main` : `intent_at`
+                          # mélange l'horloge du CLIENT (bascule de la 4.3) et celle du SERVEUR
+                          # (insertion, et fonction SQL de la 4.4). Écart mesuré : +0,740 s entre
+                          # le conteneur Postgres et l'hôte, donc une coche peut écrire un
+                          # horodatage ANTÉRIEUR à l'insertion et l'arbitre du LWW recule.
+                          # Invisible en CI (pas de décalage sur un runner), réel entre deux
+                          # téléphones. Elle touche AD-3, la 4.9 (horloge du geste, outbox) et la
+                          # 4.10 (arbitrage). À trancher AVANT la 4.10, qui en dépend entièrement.
+                          # ⚠️ Deux autres reports à traiter en chemin : R2-6 (contraste des
+                          # cartes en sombre — jugé lisible à l'œil, mesure toujours sous 3:1, à
+                          # trancher dans DESIGN.md avant la 4.13) et l'arrondi des quantités
+                          # mises à l'échelle (FR-52 → FR-16, donc story 4.7).
+                          #
+                          # 2026-08-17 — PARCOURS À L'ÉCRAN DES TROIS STORIES, enfin fait, et
                           # les 4.2 / 4.3 passent à `done` (PR #27 et #28 fusionnées).
                           # ⛔ IL A FALLU UNE CONSTRUCTION DE PRODUCTION : quatre tentatives sur
                           # le serveur de DÉVELOPPEMENT échouaient toutes de la même façon — page
@@ -934,7 +950,7 @@ development_status:
   # QUATRE affirmations fausses, toutes corrigées.
   4-2-lecture-client-direct-de-la-liste-groupee-par-rayon: done
   4-3-cocher-et-decocher-idempotent-et-reversible: done
-  4-4-ajouter-un-article-avec-agregation-et-unites-fermees: review
+  4-4-ajouter-un-article-avec-agregation-et-unites-fermees: done
   4-5-supprimer-archiver-les-achetes-vider-la-liste: backlog
   4-6-provenance-de-chaque-article: backlog
   4-7-generer-la-liste-depuis-le-menu-sans-rien-ecraser: backlog
