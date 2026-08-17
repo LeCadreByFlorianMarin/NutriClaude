@@ -7,6 +7,31 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       aisles: {
@@ -617,6 +642,10 @@ export type Database = {
       }
     }
     Functions: {
+      ajouter_article: {
+        Args: { p_nom: string; p_quantite?: number; p_unite?: string }
+        Returns: string
+      }
       create_household_with_profile: {
         Args: { p_display_name: string; p_household_name: string }
         Returns: string
@@ -778,6 +807,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

@@ -139,3 +139,129 @@ export function formaterQuantiteEtUnite(
   const accorde = estUniteConnue(unite) && ACCORDE_EN_NOMBRE[unite] && quantite >= 2;
   return `${rendu} ${accorde ? `${unite}s` : unite}`;
 }
+
+/* ═══ La SAISIE d'une quantité — déplacée depuis `lib/recettes/saisie.ts` ═══
+ *
+ * ⚠️ **Même raison que `formaterQuantite` le 2026-08-07, et c'est la seconde fois.**
+ * La story 4.4 ajoute un article de COURSES : elle doit lire une quantité tapée.
+ * L'importer depuis `@/lib/recettes/saisie` rendrait faux l'en-tête de ce module —
+ * « le pur de la saisie d'une RECETTE » — et enverrait le serveur MCP (Epic 7) et le
+ * dashboard (Epic 5) chercher une règle de quantité dans un module de recettes.
+ *
+ * ⚠️ **`lib/recettes/saisie.ts` les RÉ-EXPORTE**, donc aucun appelant n'est cassé.
+ * C'est le même geste que D-5 de la revue de la 4.2, et `lib/personnes.ts` porte déjà
+ * le même raisonnement pour `normaliserEntier`.
+ *
+ * ⛔ **Les bornes restent celles de `numeric(8,2)`**, la colonne étant identique sur
+ * `recipe_ingredients` et `grocery_list_items`. Ce n'est pas une coïncidence à
+ * exploiter : si l'une changeait, ce bloc devrait se scinder.
+ */
+
+/**
+ * Bornes de `recipe_ingredients.quantity`, qui est un `numeric(8,2)` : huit
+ * chiffres significatifs dont deux décimales.
+ */
+export const QUANTITE_MAX = 999999.99;
+
+/**
+ * La plus petite quantité que la colonne sache retenir.
+ *
+ * ⚠️ **Sous ce seuil, Postgres arrondit à `0.00` — donc la quantité DISPARAÎT.**
+ * Mesuré : `0,001` traversait `normaliserQuantite`, passait la garde du négatif,
+ * passait `quantity >= 0`, et se relisait « 0 g ». Une réduction reste une
+ * réduction ; une réduction **à zéro** est une perte, et l'Epic 4 lira ce zéro
+ * comme délibéré (`coalesce(ri.quantity, 0)`). Revue adversariale du 2026-08-03.
+ *
+ * ⚠️ **Zéro reste une valeur légitime** — « 0 » veut dire « aucune », et la
+ * contrainte en base l'autorise (`quantity >= 0`, malgré son nom
+ * `..._quantite_positive`). Le refus ne porte que sur l'intervalle ouvert entre
+ * les deux.
+ */
+export const QUANTITE_MIN_NON_NULLE = 0.01;
+
+/**
+ * La valeur d'un champ de quantité, en nombre décimal ou `null`.
+ *
+ * ⚠️ **Distincte de `normaliserEntier`, et pas par commodité.** « 0,5 cuillère »
+ * et « 1.5 kg » sont des quantités légitimes ; le prédicat entier `/^-?\d+$/` les
+ * refuserait toutes les deux.
+ *
+ * ⚠️ **La virgule française est acceptée.** Un clavier français produit une
+ * virgule, et `Number("0,5")` vaut `NaN` — donc, sans cette conversion, une
+ * saisie parfaitement normale serait refusée.
+ *
+ * ⚠️ **N'ARRONDIT PAS, et c'est une correction.** La première rédaction arrondissait
+ * à deux décimales « pour que le client et la base s'accordent ». Mesuré le
+ * 2026-08-02, elle les faisait **diverger** : sur un demi exact, Postgres arrondit
+ * au plus loin de zéro (`1.005::numeric(8,2)` → **1.01**, `2.675` → **2.68**),
+ * là où `Number("1.005").toFixed(2)` rend **1.00** — le flottant valant en réalité
+ * 1.00499…. Répliquer l'arithmétique décimale de Postgres en virgule flottante,
+ * c'est affirmer un invariant entre deux endroits au lieu de le mesurer ; le
+ * projet a déjà payé ça trois fois.
+ *
+ * La parade est de **n'avoir qu'un seul arrondisseur** : la colonne. `0,333`
+ * part tel quel, Postgres stocke `0.33`, et l'écran le relit — la réduction est
+ * donc visible, ce qui est le seul point qui comptait vraiment.
+ *
+ * ⚠️ **Au-delà de `numeric(8,2)`, on refuse** plutôt que de laisser Postgres
+ * rendre `22003` — un code que rien ne traduit, donc « Réessaie » en boucle sur
+ * une saisie que retenter à l'identique ne corrigera jamais.
+ *
+ * **Le négatif est RENDU, pas refusé.** « Ce n'est pas un nombre » est une règle
+ * de forme ; « une quantité négative n'a pas de sens » est une règle métier, et
+ * elle vit dans `recipe_ingredients_quantite_positive`. Même partage que pour
+ * `normaliserEntier` et le zéro.
+ *
+ * `\d` reste ASCII même sous le drapeau `u` : `Number("٤")` vaut 4, et accepter
+ * en silence une forme qu'aucun clavier du produit n'émet ouvrirait un chemin que
+ * rien n'éprouve.
+ */
+export function normaliserQuantite(saisie: string): number | null {
+  const net = saisie.trim().replace(",", ".");
+  // Une partie entière et/ou une partie décimale, l'une des deux au moins.
+  if (!/^-?(\d+(\.\d*)?|\.\d+)$/.test(net)) return null;
+
+  const valeur = Number(net);
+  if (!Number.isFinite(valeur)) return null;
+  if (valeur > QUANTITE_MAX || valeur < -QUANTITE_MAX) return null;
+
+  return valeur;
+}
+
+/**
+ * Ce que vaut une saisie de quantité NON VIDE, ou **pourquoi** elle est refusée.
+ *
+ * ⚠️ **Séparée de `normaliserQuantite`, et c'est tout le point.** Celle-ci rend
+ * `null` aussi bien pour « deux » que pour « 1000000 » — deux situations que
+ * l'écran confondait, en répondant « Une quantité s'écrit en chiffres. » à
+ * quelqu'un qui venait précisément d'en écrire une. Un conseil qui ne peut pas
+ * fonctionner enferme l'utilisateur dans une boucle, ce que `project-context.md`
+ * interdit nommément. Revue adversariale du 2026-08-03, décision de Florian.
+ *
+ * `normaliserQuantite` est CONSERVÉE telle quelle : elle a d'autres appelants et
+ * son contrat — « rends un nombre ou rien » — reste juste. Celle-ci dit *pourquoi*.
+ *
+ * ⚠️ **La frontière reste APPLICATIVE, et c'est un écart assumé à AD-1/AD-2.**
+ * Aucune contrainte en base ne porte ces bornes : `quantity >= 0` est tout ce que
+ * `recipe_ingredients_quantite_positive` dit. Un appel REST direct pose donc
+ * toujours ce qu'il veut. Poser la contrainte demanderait une migration sur une
+ * table de production ; ce n'est pas ce qui a été décidé le 2026-08-03 — c'est
+ * consigné dans `deferred-work.md` avec les autres champs non bornés.
+ */
+export type QuantiteAnalysee =
+  | { valeur: number }
+  | { faute: "illisible" | "hors-bornes" | "trop-petite" | "negative" };
+
+export function analyserQuantite(brut: string): QuantiteAnalysee {
+  const net = brut.trim().replace(",", ".");
+  if (!/^-?(\d+(\.\d*)?|\.\d+)$/.test(net)) return { faute: "illisible" };
+
+  const valeur = Number(net);
+  if (!Number.isFinite(valeur)) return { faute: "illisible" };
+  if (valeur < 0) return { faute: "negative" };
+  if (valeur > QUANTITE_MAX) return { faute: "hors-bornes" };
+  if (valeur !== 0 && valeur < QUANTITE_MIN_NON_NULLE) {
+    return { faute: "trop-petite" };
+  }
+  return { valeur };
+}

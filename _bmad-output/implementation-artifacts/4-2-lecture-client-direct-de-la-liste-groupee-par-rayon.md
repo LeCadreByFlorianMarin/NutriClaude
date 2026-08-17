@@ -38,7 +38,7 @@ baseline_commit: 69a34fa
 
 # Story 4.2: Lecture client-direct de la liste groupée par rayon
 
-Status: in-progress
+Status: done
 
 <!-- ⚠️ **PAS `done`, ET LA RAISON EST ÉCRITE PLUTÔT QU'EFFACÉE** (§6 bis : une story se ferme en
      DATANT ce qui reste ouvert). Au 2026-08-12, les 3 décisions sont tranchées, les 20 correctifs
@@ -1274,6 +1274,55 @@ nullités PostgREST, tokens, isolation) la revue n'a rien trouvé. Ce qui ne tie
 token déclaré livré qui n'existe pas, une décision marquée « correctif » sans correctif, quinze cases
 indistinctement ouvertes, et une route d'échafaudage expédiée dans le build. **Aucune porte
 automatique ne voit l'un de ces six points** — règle §7, pour la cinquième fois sur ce projet.
+
+---
+
+## Parcours à l'écran — 2026-08-17
+
+⛔ **FAIT SUR UNE CONSTRUCTION DE PRODUCTION (`next build` + `next start`), pas sur le serveur de
+développement.** Les quatre tentatives précédentes échouaient toutes de la même façon : la page
+restait sur son squelette, JS chargé mais effet jamais exécuté. Passer en production a réglé le
+problème d'un coup — **c'était l'outillage de développement, pas l'application**. C'est la
+troisième famille de la règle §7, « l'outillage de test lui-même », et elle a coûté quatre
+diagnostics.
+
+⚠️ **Serveur DÉDIÉ pointé sur le stack local** : `.env.local` du dépôt pointe la production, et ces
+stories écrivent. Compte et 11 articles semés par `node supabase/seed-local.mjs`, puis supprimés.
+Thème piloté au **réglage système** (`osascript`), remis au clair à la fin.
+
+### Ce qui a été vu, dans les DEUX thèmes
+
+| Vérifié | Résultat |
+|---|---|
+| Squelette au chargement | ✅ cartes avec leur ombre `--card-shadow` (le correctif de la 2ᵉ passe de la 4.2) |
+| Accord de l'unité | ✅ « 6 pièces », « 10 pièces » — jamais « 6 pièce » |
+| Séparateur « DANS LE PANIER » | ✅ présent quand il sépare, **absent** quand le rayon est entièrement acheté |
+| Article acheté | ✅ barré + coche pleine, libellé **resté lisible** ; quantité en `muted-2` |
+| **Hit-target de la ligne** | ✅ un clic à **389 px de la case** bascule — ligne mesurée à **46 px** (plancher 44) |
+| Compteur et ratio | ✅ 6 → 5 à la coche, ratio 1/3 → 2/3 |
+| **Correctif du panier (4.3)** | ✅ **vérifié** : le panier rend `Carottes, Salade` — l'ordre de la BASE, pas celui de l'affichage |
+| **Agrégation (4.4)** | ✅ « Pommes 6 pièces » + 4 → **« Pommes 10 pièces »**, UNE ligne, champs vidés, liste relue |
+| Refus de quantité | ✅ « deux » → « Une quantité s'écrit en chiffres. », et **le bouton ne bouge pas** (`reserve` tient) |
+| Vocabulaire d'unités | ✅ les 8 jetons dans le `<select>`, plus l'option vide |
+| Bouton `btn-action` | ✅ abricot lisible dans les deux thèmes, hauteur **44 px** |
+| **NFR-3** | ✅ **0 débordement** à 390 / 360 / 320 px ; le champ « Quoi » passe de 182 à 112 px |
+
+⚠️ **Une réserve sur NFR-3, dite plutôt qu'esquivée** : la fenêtre Chrome a refusé de se
+redimensionner (`innerWidth` bloqué à 1502). La mesure a donc été faite **en contraignant le
+conteneur**, ce qui est un proxy — les media queries ne s'y déclenchent pas. Cet écran n'en emploie
+aucune sur la largeur, mais la nuance est réelle.
+
+⚠️ **Ma première sonde annonçait 9 débordements à toutes les largeurs.** Vérification faite,
+c'étaient les 9 `<option>` du `<select>`, jamais rendues dans le flux — un faux positif de la
+sonde, pas un défaut. Consigné parce qu'une sonde qui crie au loup coûte autant qu'une sonde muette.
+
+### R2-6 — le jugement d'œil sur la pile sombre
+
+✅ **La séparation des cartes se lit.** Ce qui la porte n'est pas la bordure (mesurée 1,352:1) mais
+le **remplissage de carte plus clair que le fond**, plus la pastille d'emoji qui ancre chaque
+en-tête. ⚠️ **La mesure reste vraie** — rien n'atteint les 3:1 de WCAG 1.4.11 — et la marge est
+mince sur un écran de magasin en plein soleil. **Non bloquant pour ces trois stories ; à trancher
+dans `DESIGN.md` avant la 4.13**, qui possède le plancher d'accessibilité.
 
 ---
 

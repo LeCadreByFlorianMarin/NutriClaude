@@ -445,6 +445,46 @@ body::before {
     @apply block text-sm font-medium text-muted;
   }
 
+  /*
+   * Le bouton d'ACTION — « Ajouter un truc » (`bouton-action`, DESIGN.md:200).
+   *
+   * ⚠️ **Le seul bouton abricot du produit, et l'exception est écrite.** UX-DR2
+   * réserve l'accent à l'action courses et l'énumère nommément : « compteur,
+   * coche, provenance, tuile Courses, pastille pending, **bouton d'ajout** ».
+   * Partout ailleurs l'interdit tient — un bouton d'un écran de configuration
+   * reste `btn` ou `btn-primaire`.
+   *
+   * ⚠️ **`accent-fill` et `accent-ink`, jamais `--accent` ni `--accent-strong`.**
+   * Les valeurs brutes ne basculent pas avec le thème ; `accent-fill` rend
+   * `accent-strong` en clair et `accent` en sombre, ce que DESIGN.md prescrit.
+   * `accent-ink` est l'encre foncée POSÉE SUR l'aplat — mesurée 6,56:1 en clair
+   * et 8,07:1 en sombre.
+   *
+   * ⚠️ **`min-h-touch` (44px), pas la hauteur d'un bouton de formulaire.** C'est
+   * le plancher tactile de NFR/a11y, et cet écran se tient à une main dans un
+   * magasin.
+   */
+  .btn-action {
+    @apply min-h-touch rounded-md px-4 py-2 text-base font-semibold;
+    background-color: var(--accent-fill);
+    color: var(--accent-ink);
+  }
+  .btn-action:hover:not(:disabled) {
+    filter: brightness(0.95);
+  }
+  .btn-action:active:not(:disabled) {
+    filter: brightness(0.9);
+  }
+  /*
+   * ⚠️ Désactivé : on retire l'abricot plutôt que de l'atténuer. Un aplat accent
+   * translucide dirait « action courses » sur un bouton qui n'agit pas, et
+   * l'opacité ferait tomber le contraste de l'encre sous le seuil.
+   */
+  .btn-action:disabled {
+    background-color: var(--muted);
+    color: var(--surface-card);
+  }
+
   .card {
     @apply rounded-lg border border-card-border bg-surface-card p-4;
     box-shadow: var(--card-shadow);
