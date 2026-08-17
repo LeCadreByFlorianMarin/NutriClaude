@@ -41,7 +41,32 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
-last_updated: 2026-08-16  # 2026-08-16 (2) — Story 4.4 IMPLÉMENTÉE (statut `review`), sur une
+last_updated: 2026-08-17  # 2026-08-17 — PARCOURS À L'ÉCRAN DES TROIS STORIES, enfin fait, et
+                          # les 4.2 / 4.3 passent à `done` (PR #27 et #28 fusionnées).
+                          # ⛔ IL A FALLU UNE CONSTRUCTION DE PRODUCTION : quatre tentatives sur
+                          # le serveur de DÉVELOPPEMENT échouaient toutes de la même façon — page
+                          # bloquée sur son squelette, JS chargé mais effet jamais exécuté.
+                          # `next build` + `next start` a réglé le problème d'un coup. C'ÉTAIT
+                          # L'OUTILLAGE, PAS L'APPLICATION — la troisième famille de la règle §7,
+                          # « l'outillage de test lui-même », et elle a coûté quatre diagnostics.
+                          # ✅ VU DANS LES DEUX THÈMES : ombre du squelette · accord « 10 pièces » ·
+                          # séparateur présent quand il sépare et absent quand tout est acheté ·
+                          # barré lisible · hit-target à 389 px de la case, ligne de 46 px ·
+                          # compteur 6→5 et ratio 1/3→2/3 · LE CORRECTIF DU PANIER DE LA 4.3
+                          # VÉRIFIÉ (ordre de la base) · L'AGRÉGATION DE LA 4.4 VÉRIFIÉE
+                          # (« Pommes 6 pièces » + 4 → « 10 pièces », UNE ligne) · refus de
+                          # quantité nommant sa cause, bouton qui ne saute pas (`reserve`) ·
+                          # bouton abricot 44 px · 0 débordement à 390/360/320 px.
+                          # ⚠️ RÉSERVE : la fenêtre a refusé de se redimensionner, NFR-3 est
+                          # mesuré en contraignant le conteneur — un proxy, pas un viewport.
+                          # ✅ R2-6 TRANCHÉ À L'ŒIL : la pile sombre se lit, portée par le
+                          # remplissage de carte plus clair que le fond, pas par la bordure. La
+                          # mesure reste vraie (rien n'atteint 3:1) — à trancher dans DESIGN.md
+                          # avant la 4.13, non bloquant ici.
+                          # ⛔ TOUJOURS OUVERT : la décision `intent_at` (horloge client vs
+                          # serveur, +0,740 s mesuré) — elle touche AD-3, la 4.9 et la 4.10.
+                          #
+                          # 2026-08-16 (2) — Story 4.4 IMPLÉMENTÉE (statut `review`), sur une
                           # branche `feat/4-4`. Quatre décisions prises sur leur défaut prescrit.
                           # ✅ L'agrégation est MESURÉE de bout en bout : deux ajouts du même
                           # article → 1 ligne quantité 3 · casse/accents/espaces plient · unité
@@ -907,8 +932,8 @@ development_status:
   # ⚠️ Passe de validation en contexte neuf : elle a trouvé UN TROU (la story ne disait pas ce
   # qu'une ligne d'article affiche — sans l'unité, AD-7 rend deux « Lait » inexplicables) et
   # QUATRE affirmations fausses, toutes corrigées.
-  4-2-lecture-client-direct-de-la-liste-groupee-par-rayon: in-progress
-  4-3-cocher-et-decocher-idempotent-et-reversible: review
+  4-2-lecture-client-direct-de-la-liste-groupee-par-rayon: done
+  4-3-cocher-et-decocher-idempotent-et-reversible: done
   4-4-ajouter-un-article-avec-agregation-et-unites-fermees: review
   4-5-supprimer-archiver-les-achetes-vider-la-liste: backlog
   4-6-provenance-de-chaque-article: backlog
