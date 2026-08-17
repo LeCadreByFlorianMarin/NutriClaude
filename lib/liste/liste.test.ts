@@ -28,6 +28,7 @@ function ligne(surcharge: Partial<Parameters<typeof versArticle>[0]> = {}) {
     name: "Lait",
     quantity: 1.5,
     unit: "L",
+    status: "pending",
     aisle_id: "rayon-1",
     aisle_name: "Crèmerie",
     aisle_icon: "🧀",
@@ -38,10 +39,14 @@ function ligne(surcharge: Partial<Parameters<typeof versArticle>[0]> = {}) {
 
 test("chaque colonne atterrit dans le CHAMP qui lui correspond", () => {
   /*
-   * ⛔ **Le test qui justifie ce fichier.** Huit colonnes, huit champs, et huit
+   * ⛔ **Le test qui justifie ce fichier.** NEUF colonnes, neuf champs, et neuf
    * valeurs toutes DISTINCTES — c'est ce qui le rend capable de voir une
    * permutation. Avec deux `null` au même endroit ou deux nombres égaux, un
    * mapping croisé passerait.
+   *
+   * ⚠️ **`deepEqual` sur l'objet ENTIER, jamais champ par champ** : c'est ce qui
+   * fait échouer ce test quand un champ NAÎT sans être mappé. La story 4.3 l'a
+   * vérifié en ajoutant `statut` — le test est tombé avant que le code ne bouge.
    */
   const [article] = versArticle(ligne());
 
@@ -50,6 +55,7 @@ test("chaque colonne atterrit dans le CHAMP qui lui correspond", () => {
     nom: "Lait",
     quantite: 1.5,
     unite: "L",
+    statut: "pending",
     rayonId: "rayon-1",
     rayonNom: "Crèmerie",
     rayonIcone: "🧀",
@@ -143,4 +149,35 @@ test("une ligne valide rend EXACTEMENT un élément", () => {
    * article de la liste, et le compteur « n à prendre » compterait double.
    */
   assert.equal(versArticle(ligne()).length, 1);
+});
+
+/* ── `statut` — story 4.3 ─────────────────────────────────────────────────── */
+
+test("le STATUT remonte au client, sans quoi la coche ne peut rien afficher", () => {
+  /*
+   * ⛔ **La colonne ne remontait pas AVANT la story 4.3**, et pour deux raisons
+   * cumulées : la vue filtrait `status = 'pending'` (donc un article coché
+   * n'existait pas côté client), et la chaîne `.select()` d'`articlesDuFoyer`
+   * énumère ses colonnes une par une — élargir la vue sans l'y ajouter aurait
+   * rendu `statut` silencieusement `undefined`, jamais une erreur.
+   */
+  assert.equal(versArticle(ligne({ status: "pending" }))[0]?.statut, "pending");
+  assert.equal(versArticle(ligne({ status: "bought" }))[0]?.statut, "bought");
+});
+
+test("un statut INCONNU écarte la ligne, il ne la déforme pas", () => {
+  /*
+   * ⚠️ Même garde que `id` et `name` : le type de la vue rend toutes ses colonnes
+   * `| null` (M9 de la 4.2), et la contrainte `check (status in ('pending',
+   * 'bought'))` vit en base — pas dans les types générés. Une valeur hors
+   * vocabulaire signifierait que la base a changé sans que le client le sache :
+   * l'écarter est plus honnête que de la traiter comme « à prendre ».
+   *
+   * ⛔ **Et l'écart LAISSE UNE TRACE** — même raison que la garde `id`/`name` :
+   * une ligne qui disparaît en silence fait sous-compter le compteur sans qu'aucun
+   * signal n'existe.
+   */
+  assert.deepEqual(versArticle(ligne({ status: null })), []);
+  assert.deepEqual(versArticle(ligne({ status: "archived" })), []);
+  assert.deepEqual(versArticle(ligne({ status: "" })), []);
 });

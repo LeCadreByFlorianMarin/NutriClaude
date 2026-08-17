@@ -81,11 +81,50 @@ export function grouperParRayon(
   }
 
   /*
-   * ⚠️ **L'ordre des ARTICLES dans un groupe reste celui reçu** (par `name`,
-   * posé par la requête) : `push` préserve l'ordre d'arrivée, et retrier ici
-   * serait précisément l'arbitrage que l'AC3 interdit.
+   * ⚠️ **L'ordre alphabétique des ARTICLES reste celui reçu** (par `name`, posé
+   * par la requête) : `push` préserve l'ordre d'arrivée, et le retrier par nom
+   * ici serait précisément l'arbitrage que l'AC3 interdit.
+   *
+   * ⛔ **MAIS les articles ACHETÉS descendent, et ce n'est PAS le même geste.**
+   * Ce n'est pas un ordre alphabétique concurrent : c'est la matérialisation du
+   * `separateur-panier` (story 4.3, `DESIGN.md:283`, `EXPERIENCE.md:107`) — « les
+   * articles à prendre en haut, les cochés repoussés en bas ». La base n'a AUCUN
+   * avis là-dessus, et c'est délibéré : la migration du 2026-08-13 a laissé
+   * l'`ORDER BY` de la vue intact pour ne pas imposer ce choix d'affichage au
+   * dashboard (Epic 5) ni au serveur MCP (Epic 7).
    */
+  for (const groupe of par.values()) {
+    groupe.articles = trierPanierEnBas(groupe.articles);
+  }
+
   return [...par.values()].sort(comparerGroupes);
+}
+
+/**
+ * Les articles à prendre d'abord, les achetés ensuite — **à ordre alphabétique
+ * préservé de part et d'autre**.
+ *
+ * ⛔ **`sort` de JavaScript est STABLE depuis ES2019**, et c'est la seule raison
+ * pour laquelle une comparaison à deux valeurs suffit ici : l'ordre par `name`
+ * que la requête a posé survit **à l'intérieur** de chaque moitié. Écrire un tri
+ * à deux critères (statut puis nom) rendrait le même résultat aujourd'hui et
+ * **réimplémenterait la collation de Postgres à la main** — ce que l'AC3
+ * interdit, et ce que `comparerGroupes` documente déjà comme un piège pour les
+ * noms accentués.
+ *
+ * ⚠️ **Rend un TABLEAU NEUF plutôt que de trier sur place.** `grouperParRayon`
+ * s'en sert sur ses propres tableaux, mais cette fonction est exportée : la 4.17
+ * et le dashboard l'appelleront sur des tableaux qu'ils ne possèdent pas.
+ *
+ * ⚠️ **Exportée POUR ÊTRE MESURÉE** — la leçon de `comparerGroupes`, dont la
+ * mutation survivait tant qu'elle n'était atteignable que par `grouperParRayon`.
+ */
+export function trierPanierEnBas(
+  articles: ReadonlyArray<ArticleDeListe>
+): ArticleDeListe[] {
+  return [...articles].sort(
+    (a, b) => Number(a.statut === "bought") - Number(b.statut === "bought")
+  );
 }
 
 /**

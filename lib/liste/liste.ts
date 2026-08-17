@@ -10,12 +10,40 @@ import type { Database } from "../supabase/types";
  * omettre rendrait deux « Lait » identiques que rien n'expliquerait, et le
  * membre en conclurait que l'agrégation est cassée.
  */
+/**
+ * Les deux états d'un article, tels que la base les contraint.
+ *
+ * ⚠️ **Le vocabulaire est CLOS en base** — `check (status in ('pending','bought'))`,
+ * posé par `initial_schema:204`. Ce n'est donc pas une énumération qui court après
+ * une catégorie (règle §3) : c'est la reprise d'un ensemble contrôlé.
+ *
+ * ⛔ **`bought` n'est PAS « supprimé ».** AD-3 distingue le tombstone (`deleted_at`,
+ * story 4.5) de l'état d'achat. Un article acheté reste dans la liste vivante, il
+ * est seulement repoussé « dans le panier » — c'est FR-3, et c'est tout l'objet de
+ * la story 4.3.
+ */
+export type StatutArticle = "pending" | "bought";
+
+/** Vrai si la chaîne est **exactement** l'un des deux états connus. */
+export function estStatutConnu(valeur: string | null): valeur is StatutArticle {
+  return valeur === "pending" || valeur === "bought";
+}
+
 export type ArticleDeListe = {
   id: string;
   /** `name`, tel que le membre l'a tapé. Jusqu'à 200 caractères (mesuré). */
   nom: string;
   quantite: number | null;
   unite: string | null;
+  /**
+   * `status` — **à prendre** ou **dans le panier** (story 4.3, FR-3).
+   *
+   * ⚠️ **Il commande trois choses à l'écran**, et les confondre est le piège n°10
+   * de la story : le compteur « n à prendre » (qui compte les `pending`, PAS la
+   * longueur du tableau), le ratio `pris/total` de la carte-rayon, et la position
+   * de la ligne dans son rayon (les achetés sont repoussés sous le séparateur).
+   */
+  statut: StatutArticle;
   /** `aisle_id` — **la CLÉ de groupement**, `null` étant une clé de plein droit. */
   rayonId: string | null;
   rayonNom: string | null;
@@ -60,7 +88,14 @@ export async function articlesDuFoyer(
 ): Promise<ArticleDeListe[]> {
   const { data, error } = await supabase
     .from("grocery_list_by_aisle")
-    .select("id, name, quantity, unit, aisle_id, aisle_name, aisle_icon, aisle_sort")
+    /*
+     * ⛔ **`status` A DÛ ÊTRE AJOUTÉ ICI, ET ÉLARGIR LA VUE NE SUFFISAIT PAS.**
+     * Cette chaîne énumère ses colonnes une par une : la migration du 2026-08-13
+     * a rendu les articles achetés visibles, mais sans cette ligne `statut`
+     * serait arrivé `undefined` au client — **silencieusement, jamais en
+     * erreur**. C'est la forme de défaut que la story 4.3 nomme en Task 1.
+     */
+    .select("id, name, quantity, unit, status, aisle_id, aisle_name, aisle_icon, aisle_sort")
     .order("aisle_sort")
     .order("name");
 
@@ -109,11 +144,30 @@ export function versArticle(ligne: {
   name: string | null;
   quantity: number | null;
   unit: string | null;
+  status: string | null;
   aisle_id: string | null;
   aisle_name: string | null;
   aisle_icon: string | null;
   aisle_sort: number | null;
 }): ArticleDeListe[] {
+  /*
+   * ⚠️ **Le statut se garde comme `id` et `name`, et pour la même raison.** La
+   * contrainte `check (status in ('pending','bought'))` vit en BASE ; les types
+   * générés, eux, rendent la colonne `string | null` (M9 : Postgres ne propage
+   * pas la non-nullité à travers une vue). Une valeur hors vocabulaire voudrait
+   * dire que la base a changé sans que le client le sache — la traiter comme
+   * « à prendre » inventerait un état, et la traiter comme « acheté » en
+   * cacherait un.
+   */
+  if (!estStatutConnu(ligne.status)) {
+    console.warn(
+      "[courses] Ligne de liste écartée : statut inconnu.",
+      ligne.status,
+      ligne
+    );
+    return [];
+  }
+
   if (ligne.id === null || ligne.name === null) {
     /*
      * ⛔ **UN ÉCART SILENCIEUX EST UN SOUS-COMPTAGE INVISIBLE, et c'est une
@@ -139,6 +193,7 @@ export function versArticle(ligne: {
       nom: ligne.name,
       quantite: ligne.quantity,
       unite: ligne.unit,
+      statut: ligne.status,
       rayonId: ligne.aisle_id,
       rayonNom: ligne.aisle_name,
       rayonIcone: ligne.aisle_icon,

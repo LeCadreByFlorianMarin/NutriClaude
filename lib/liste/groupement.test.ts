@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { comparerGroupes, grouperParRayon, type GroupeDeRayon } from "./groupement.ts";
+import {
+  comparerGroupes,
+  grouperParRayon,
+  trierPanierEnBas,
+  type GroupeDeRayon,
+} from "./groupement.ts";
 import type { ArticleDeListe } from "./liste.ts";
 
 /**
@@ -33,6 +38,7 @@ function article(
     nom,
     quantite: null,
     unite: null,
+    statut: "pending" as const,
     rayonId: rayon.id,
     rayonNom: rayon.nom,
     rayonIcone: null,
@@ -247,5 +253,159 @@ test("deux groupes EX ÆQUO se départagent par le nom du RAYON", () => {
   assert.deepEqual(
     [zebre, abricot].sort(comparerGroupes).map((g) => g.rayonId),
     ["a", "z"]
+  );
+});
+
+/* ── Le panier en bas du rayon — story 4.3 ────────────────────────────────── */
+
+/** Un article avec son statut, pour les tests de panier. */
+function articleAvecStatut(
+  nom: string,
+  statut: "pending" | "bought",
+  rayon = ALPHA
+): ArticleDeListe {
+  return { ...article(nom, rayon), statut };
+}
+
+test("les articles ACHETÉS sont repoussés en bas de leur rayon", () => {
+  /*
+   * ⛔ **C'est le `separateur-panier` de `DESIGN.md:283`, matérialisé.** Les
+   * articles à prendre en haut, les cochés en bas — DANS le rayon, jamais dans un
+   * écran séparé. Sans ce tri, un article coché resterait au milieu de la liste et
+   * le séparateur n'aurait rien à séparer.
+   */
+  const groupes = grouperParRayon([
+    articleAvecStatut("abricot", "bought"),
+    articleAvecStatut("banane", "pending"),
+    articleAvecStatut("cerise", "bought"),
+    articleAvecStatut("datte", "pending"),
+  ]);
+
+  assert.deepEqual(
+    groupes[0]?.articles.map((a) => a.nom),
+    ["banane", "datte", "abricot", "cerise"]
+  );
+});
+
+test("l'ordre ALPHABÉTIQUE survit de part et d'autre du séparateur", () => {
+  /*
+   * ⛔ **LE TEST QUI JUSTIFIE `trierPanierEnBas`, et il mesure la STABILITÉ.**
+   * `Array.prototype.sort` est stable depuis ES2019 : c'est ce qui permet à une
+   * comparaison à deux valeurs de préserver l'ordre par `name` posé par la
+   * requête. Un tri à deux critères (statut PUIS nom) passerait ce test-ci mais
+   * réimplémenterait la collation de Postgres côté client — ce que l'AC3
+   * interdit, et ce qui diverge sur les noms accentués.
+   */
+  const groupes = grouperParRayon([
+    articleAvecStatut("ail", "pending"),
+    articleAvecStatut("banane", "bought"),
+    articleAvecStatut("cerise", "pending"),
+    articleAvecStatut("datte", "bought"),
+    articleAvecStatut("endive", "pending"),
+  ]);
+
+  assert.deepEqual(
+    groupes[0]?.articles.map((a) => a.nom),
+    ["ail", "cerise", "endive", "banane", "datte"],
+    "l'ordre reçu doit survivre à l'intérieur de chaque moitié"
+  );
+});
+
+test("un rayon dont TOUT est acheté ne perd aucun article", () => {
+  // Le cas « tout est pris », qui n'existait pas avant la 4.3.
+  const groupes = grouperParRayon([
+    articleAvecStatut("ail", "bought"),
+    articleAvecStatut("banane", "bought"),
+  ]);
+
+  assert.deepEqual(groupes[0]?.articles.map((a) => a.nom), ["ail", "banane"]);
+  assert.equal(groupes[0]?.articles.length, 2);
+});
+
+test("`trierPanierEnBas` rend un tableau NEUF, sans muter l'entrée", () => {
+  /*
+   * ⚠️ La fonction est exportée : la story 4.17 et le dashboard l'appelleront sur
+   * des tableaux qu'ils ne possèdent pas. Trier sur place y provoquerait un effet
+   * de bord invisible à la lecture du site d'appel.
+   */
+  const entree = [
+    articleAvecStatut("abricot", "bought"),
+    articleAvecStatut("banane", "pending"),
+  ];
+  const sortie = trierPanierEnBas(entree);
+
+  assert.notEqual(sortie, entree, "un tableau NEUF, pas le même");
+  assert.deepEqual(
+    entree.map((a) => a.nom),
+    ["abricot", "banane"],
+    "l'entrée ne doit pas avoir bougé"
+  );
+  assert.deepEqual(sortie.map((a) => a.nom), ["banane", "abricot"]);
+});
+
+test("le tri du panier n'écrase PAS l'ordre des groupes entre eux", () => {
+  // Deux règles distinctes : le panier trie DANS un rayon, comparerGroupes trie
+  // les rayons entre eux. Les confondre remonterait un rayon parce qu'il est
+  // entièrement acheté.
+  const groupes = grouperParRayon([
+    articleAvecStatut("tardif", "pending", { id: "t", nom: "Tardif", ordre: 90 }),
+    articleAvecStatut("precoce", "bought", { id: "p", nom: "Precoce", ordre: 5 }),
+  ]);
+
+  assert.deepEqual(
+    groupes.map((g) => g.rayonId),
+    ["p", "t"],
+    "un rayon entièrement acheté garde sa place dans le parcours"
+  );
+});
+
+test("REGROUPER UN GROUPEMENT est IDEMPOTENT — le panier ne se réordonne pas tout seul", () => {
+  /*
+   * ⛔ **DÉFAUT TROUVÉ AU PARCOURS À L'ÉCRAN DU 2026-08-13, ET IL SE VOYAIT.**
+   * `ListeCourses` gardait `GroupeDeRayon[]` en état, donc DÉJÀ trié pour
+   * l'affichage. Une bascule reconstruisait la liste à plat depuis ces groupes
+   * puis la regroupait — l'ordre alphabétique à l'intérieur du panier devenait
+   * alors celui de l'affichage précédent, plus celui de la base.
+   *
+   * **Mesuré à l'écran** : après avoir coché « Lait », la Crèmerie rendait
+   * `Lait, Beurre` sous le séparateur ; après rechargement, `Beurre, Lait`. Le
+   * même état, affiché de deux façons selon qu'on venait de cocher ou non.
+   *
+   * ⛔ **CE QUE CE TEST NE GARDE PAS, ET IL FAUT LE DIRE.** Le correctif vit dans
+   * le COMPOSANT — l'état garde la liste à plat dans l'ordre reçu, et le
+   * regroupement est dérivé. Rien ici n'empêche quelqu'un d'y rétablir un état
+   * déjà groupé : NFR-10 interdit un harnais de composants, donc ce chemin-là
+   * n'est couvert par **aucun test**, seulement par le parcours à l'écran.
+   *
+   * ⚠️ **Ce que le test fixe réellement**, et c'est la propriété sur laquelle
+   * l'écran s'appuie : `grouperParRayon` est **idempotente** (la regrouper depuis
+   * sa propre sortie aplatie rend le même ordre), et une bascule appliquée à
+   * l'ordre de la BASE rend l'ordre de la base. Si l'une des deux cassait, le
+   * correctif du composant deviendrait faux sans que rien ne le dise.
+   */
+  const recuDeLaBase = [
+    articleAvecStatut("Beurre", "bought"),
+    articleAvecStatut("Lait", "pending"),
+    articleAvecStatut("Yaourt", "pending"),
+  ];
+
+  const premier = grouperParRayon(recuDeLaBase);
+  const aPlat = premier.flatMap((g) => g.articles);
+  const second = grouperParRayon(aPlat);
+
+  assert.deepEqual(
+    second[0]?.articles.map((a) => a.nom),
+    premier[0]?.articles.map((a) => a.nom),
+    "regrouper une sortie de regroupement doit être neutre",
+  );
+
+  // Et la bascule d'un article ne doit pas davantage réordonner ses voisins.
+  const apresBascule = grouperParRayon(
+    recuDeLaBase.map((a) => (a.nom === "Lait" ? { ...a, statut: "bought" as const } : a)),
+  );
+  assert.deepEqual(
+    apresBascule[0]?.articles.map((a) => a.nom),
+    ["Yaourt", "Beurre", "Lait"],
+    "le panier garde l'ordre de la BASE (Beurre avant Lait), pas celui de l'affichage",
   );
 });
