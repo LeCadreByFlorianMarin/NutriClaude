@@ -11,8 +11,16 @@ import {
 } from "@/lib/liste/liste";
 import { grouperParRayon, type GroupeDeRayon } from "@/lib/liste/groupement";
 import { basculerStatut, statutApresGeste } from "@/lib/liste/basculer";
+import {
+  supprimerArticle,
+  archiverLesAchetes,
+  viderLaListe,
+  compteRenduArchivage,
+  compteRenduVidage,
+} from "@/lib/liste/suppression";
 import { formaterQuantiteEtUnite } from "@/lib/quantite";
 import { AjouterArticle } from "./AjouterArticle";
+import { GestesDeListe } from "./GestesDeListe";
 
 /**
  * La liste de courses, **lue depuis le navigateur** (AC1, AD-13).
@@ -222,6 +230,96 @@ export function ListeCourses() {
   }
 
   /*
+   * ⛔ **LES TROIS RETRAITS SONT OPTIMISTES, ET LEUR ROLLBACK RÉTABLIT LE TABLEAU
+   * ENTIER.** C'est le motif de `basculer` (4.3), à une différence près qui compte :
+   * une bascule ne touche qu'un champ d'un article, un retrait fait DISPARAÎTRE des
+   * lignes. On garde donc la liste précédente en entier — reconstruire « ce qui a
+   * été enlevé » depuis un prédicat rejouerait la règle deux fois, et les deux
+   * pourraient diverger.
+   *
+   * ⛔ **ET SURTOUT : LE COMPTE AFFICHÉ VIENT DU SERVEUR, PAS DE L'OPTIMISME.** La
+   * fonction SQL rend le nombre de lignes réellement touchées. Si l'autre membre du
+   * foyer vient d'archiver, elle rend moins que ce que l'écran a retiré — et c'est
+   * ce chiffre-là qui est vrai. Annoncer notre estimation ferait dire à l'écran
+   * quelque chose que la base n'a pas fait.
+   *
+   * ⚠️ **`echec` n'est PAS réutilisé pour ces gestes.** Il porte « je n'ai pas pu
+   * LIRE la liste » et commande le squelette : le poser sur une écriture ratée
+   * ferait disparaître une liste parfaitement affichée. Chaque zone d'action porte
+   * donc son propre message — c'est la règle du dépôt, payée deux fois sur
+   * `/rayons` (« une région de statut par formulaire »).
+   */
+  const [messageGeste, setMessageGeste] = useState<string | null>(null);
+  const [occupe, setOccupe] = useState(false);
+
+  /**
+   * Applique un retrait : on enlève d'abord, on écrit ensuite, on rétablit si ça
+   * casse. `ecrire` rend le compte réel, `garder` dit ce qui survit à l'écran.
+   */
+  async function retirer(
+    garder: (a: ArticleDeListe) => boolean,
+    ecrire: () => Promise<number>,
+    phrase: (compte: number) => string | null,
+    quoi: string
+  ) {
+    const precedent = articles;
+    setOccupe(true);
+    setMessageGeste(null);
+    setArticles((actuels) => (actuels === null ? actuels : actuels.filter(garder)));
+
+    try {
+      setMessageGeste(phrase(await ecrire()));
+    } catch (erreur) {
+      /*
+       * ⚠️ **Le membre voit une phrase, le développeur voit la cause** — la règle
+       * posée par le `catch` de la lecture le 2026-08-07, et que `versArticle` a
+       * reprise. Sans liaison, un refus de la base et un réseau coupé deviennent
+       * indiscernables.
+       */
+      console.error(`[courses] ${quoi} :`, erreur);
+      setArticles(precedent);
+      /*
+       * ⚠️ **Aucun « Réessaie »** : `project-context.md` l'interdit sur une
+       * condition non transitoire, et ce `catch` attrape aussi la configuration
+       * absente. La phrase constate, elle ne promet pas.
+       */
+      setMessageGeste("Ça n'a pas marché. Rien n'a été retiré.");
+    } finally {
+      setOccupe(false);
+    }
+  }
+
+  const supprimer = (article: ArticleDeListe) =>
+    retirer(
+      (a) => a.id !== article.id,
+      async () => supprimerArticle(createNavigateurClient(), article.id),
+      /*
+       * ⚠️ **Le retrait d'UN article ne s'annonce pas par un compte.** « 1 article
+       * retiré. » sous une ligne qui vient de disparaître sous les yeux du membre
+       * est du bruit : la disparition EST le retour visuel. On ne parle que du cas
+       * où rien n'a bougé — l'autre membre l'avait déjà retiré.
+       */
+      (compte) => (compte === 0 ? "Cet article n'était déjà plus dans ta liste." : null),
+      "Suppression d'un article"
+    );
+
+  const archiver = () =>
+    retirer(
+      (a) => a.statut !== "bought",
+      async () => archiverLesAchetes(createNavigateurClient()),
+      compteRenduArchivage,
+      "Archivage des articles pris"
+    );
+
+  const vider = () =>
+    retirer(
+      () => false,
+      async () => viderLaListe(createNavigateurClient()),
+      compteRenduVidage,
+      "Vidage de la liste"
+    );
+
+  /*
    * ⛔ **LE COMPTEUR COMPTE LES `pending`, PAS LA LONGUEUR DU TABLEAU.** Depuis
    * que la vue rend aussi les articles achetés (migration du 2026-08-13),
    * `articles.length` vaut « tout ce qu'il y a dans la liste » — le laisser ici
@@ -273,22 +371,42 @@ export function ListeCourses() {
        */}
       {echec ? null : articles === null ? (
         <SqueletteDeRayons />
-      ) : articles.length === 0 ? (
-        /*
-         * ⚠️ **ÉCART ASSUMÉ à `EXPERIENCE.md`**, qui prescrit aussi « sur
-         * téléphone, lien vers l'ajout ». Ce lien n'existera qu'à la story 4.4 :
-         * le poser maintenant mènerait nulle part, et un conseil qui ne peut pas
-         * fonctionner enferme l'utilisateur dans une boucle. Écrit ici plutôt
-         * qu'esquivé.
-         *
-         * ⛔ **CETTE BRANCHE N'EST PLUS ATTEIGNABLE EN CAS D'ÉCHEC**, et c'est
-         * tout l'objet du troisième état plus haut : « Ta liste est vide. » est
-         * une AFFIRMATION, elle ne se dit qu'après avoir lu.
-         */
-        <p className="hint mt-6">Ta liste est vide.</p>
       ) : (
         <>
           {/*
+           * ⛔ **L'ÉTAT VIDE N'EST PLUS UN CUL-DE-SAC, ET C'EST UN DÉFAUT TROUVÉ AU
+           * PARCOURS À L'ÉCRAN DU 2026-08-17 (story 4.5).** Le formulaire d'ajout et
+           * la zone de compte-rendu vivaient TOUS DEUX dans la branche « liste non
+           * vide ». Conséquences mesurées à l'écran, l'une après l'autre :
+           *
+           * 1. **On ne pouvait plus rien ajouter** après avoir vidé sa liste — le
+           *    seul chemin de sortie était de recharger une page qui n'offrait rien.
+           * 2. **Le compte rendu du vidage disparaissait avec la liste** : « 11
+           *    articles retirés. » s'affichait puis était démonté dans le même rendu.
+           *
+           * ⚠️ **Le défaut n°1 est ANTÉRIEUR à cette story** — il date de la 4.4, qui
+           * a monté le formulaire dans la branche non vide. Il était DORMANT parce
+           * qu'aucun geste ne menait à l'état vide : seul un foyer neuf y arrivait, et
+           * il n'avait rien à retirer. ⛔ **« Tout enlever » le rend atteignable d'un
+           * clic**, donc cette story doit le fermer : une story laisse le système
+           * entier en état de marche, pas seulement ses propres critères.
+           *
+           * ✅ **Et ça referme l'écart que la 4.2 avait DATÉ**, en écrivant :
+           * « ÉCART ASSUMÉ à EXPERIENCE.md, qui prescrit aussi *sur téléphone, lien
+           * vers l'ajout*. Ce lien n'existera qu'à la story 4.4. » Il n'y existait
+           * pas ; il existe ici.
+           *
+           * ⛔ **CETTE BRANCHE N'EST PLUS ATTEIGNABLE EN CAS D'ÉCHEC**, et c'est
+           * tout l'objet du troisième état plus haut : « Ta liste est vide. » est
+           * une AFFIRMATION, elle ne se dit qu'après avoir lu.
+           */}
+          {articles.length === 0 ? (
+            <p className="hint mt-6">Ta liste est vide.</p>
+          ) : null}
+
+          {articles.length > 0 ? (
+            <>
+              {/*
            * ⛔ **TROIS ÉTATS DE CONTENU DEPUIS LA 4.3, PAS DEUX.** Avant elle, la
            * vue filtrait les achetés : « aucun article » et « rien à prendre »
            * étaient le même état, et `articles.length === 0` suffisait. Ce n'est
@@ -305,30 +423,27 @@ export function ListeCourses() {
            * mise en page au dernier article coché, et priverait le lecteur d'écran
            * de l'annonce du passage à zéro.
            */}
-          <CompteurAPrendre nombre={aPrendre} />
+              <CompteurAPrendre nombre={aPrendre} />
 
-          {aPrendre === 0 ? (
-            <p className="hint mt-2">Tout est dans le panier.</p>
+              {aPrendre === 0 ? (
+                <p className="hint mt-2">Tout est dans le panier.</p>
+              ) : null}
+            </>
           ) : null}
 
-          {/*
-           * `gap-gutter` (14px) : l'espace inter-cartes du système, pas une
-           * valeur inventée ici.
-           */}
-          {/*
-           * Ni `list-none` ni `p-0` : le preflight de Tailwind pose déjà
-           * `list-style: none` sur `ul` et `padding: 0` sur `*`. Les écrire
-           * ferait croire que cet écran exige un traitement que les sept autres
-           * `<ul>` du dépôt n'ont pas. Retiré le 2026-08-12.
-           */}
           {/*
            * ⚠️ **Le formulaire est SOUS le compteur et AU-DESSUS de la liste.**
            * `EXPERIENCE.md` place l'ajout sur l'écran liste ; le mettre en bas
            * l'enterrerait sous une liste qui peut faire trente lignes, sur un
            * écran tenu à une main dans un magasin.
+           *
+           * ⛔ **IL EST HORS DU CONDITIONNEL DEPUIS LE 2026-08-17**, et c'est le
+           * correctif du cul-de-sac : sur une liste vide, il est la SEULE chose à
+           * faire, donc c'est là qu'il compte le plus.
            */}
           <AjouterArticle onAjout={relire} />
 
+          {articles.length > 0 ? (
           <ul className="mt-6 flex flex-col gap-gutter">
             {groupes.map((groupe) => (
               <li key={groupe.rayonId ?? "a-classer"}>
@@ -380,7 +495,12 @@ export function ListeCourses() {
                             Dans le panier
                           </li>
                         ) : null}
-                        <LigneArticle article={article} onBasculer={basculer} />
+                        <LigneArticle
+                          article={article}
+                          onBasculer={basculer}
+                          onSupprimer={supprimer}
+                          occupe={occupe}
+                        />
                       </Fragment>
                     ))}
                   </ul>
@@ -388,6 +508,27 @@ export function ListeCourses() {
               </li>
             ))}
           </ul>
+          ) : null}
+
+          {/*
+           * ⚠️ **`aDesArticlesPris` se calcule sur les articles, pas sur les
+           * groupes** — même raison que le compteur juste au-dessus : la longueur
+           * du tableau ne dit plus rien depuis que la vue rend aussi les achetés.
+           *
+           * ⚠️ **Il reste monté sur une liste vide**, sans quoi le compte rendu du
+           * vidage (« 11 articles retirés. ») serait démonté dans le rendu même qui
+           * l'écrit. C'est le composant qui décide de ne rendre que sa zone de
+           * message quand il n'a plus de cible.
+           */}
+          <GestesDeListe
+            aDesArticles={articles.length > 0}
+            aDesArticlesPris={articles.some((a) => a.statut === "bought")}
+            occupe={occupe}
+            message={messageGeste}
+            onArchiver={archiver}
+            onVider={vider}
+            onOublierMessage={() => setMessageGeste(null)}
+          />
         </>
       )}
     </>
@@ -496,21 +637,35 @@ function CompteurAPrendre({ nombre }: { nombre: number }) {
 function LigneArticle({
   article,
   onBasculer,
+  onSupprimer,
+  occupe,
 }: {
   article: ArticleDeListe;
   onBasculer: (article: ArticleDeListe, versAchete: boolean) => void;
+  onSupprimer: (article: ArticleDeListe) => void;
+  occupe: boolean;
 }) {
   const quantite = formaterQuantiteEtUnite(article.quantite, article.unite);
   const achete = article.statut === "bought";
 
+  /*
+   * ⚠️ **La confirmation est un état LOCAL à la ligne**, et c'est ce qui la rend
+   * sûre : elle meurt avec la ligne. Une confirmation portée par l'écran devrait
+   * désigner l'article par son `id`, et survivrait donc à sa disparition — le
+   * défaut exact que `ListeRayons` a corrigé en remettant `aConfirmer` à `null`
+   * dans quatre chemins différents.
+   */
+  const [confirme, setConfirme] = useState(false);
+
   return (
-    <li>
+    <li className="ligne-article">
       {/*
-       * ⚠️ **`<label>` et non `<li>` porteur du style** : c'est le label qui doit
-       * couvrir toute la ligne pour que le tap y bascule la case. Le `<li>` reste
-       * nu, il ne sert qu'à la sémantique de liste.
+       * ⛔ **LE BOUTON EST LE FRÈRE DU `<label>`, JAMAIS SON ENFANT.** Un
+       * `<button>` placé dans le label verrait chacun de ses clics basculer AUSSI
+       * la case — le label capture tout ce qu'il contient. C'est le piège n°4 de
+       * la story, et il ne se voit sur aucune porte automatique.
        */}
-      <label className="ligne-article">
+      <label className="ligne-bascule">
         {/*
          * ⛔ **UN VRAI `<input type="checkbox">`.** `EXPERIENCE.md:151` :
          * « chaque élément interactif est un vrai contrôle, pas un `<span>`
@@ -576,6 +731,62 @@ function LigneArticle({
           </span>
         ) : null}
       </label>
+
+      {/*
+       * ⛔ **CONFIRMATION EN DEUX TEMPS, SUR PLACE — jamais `window.confirm`**
+       * (hors thème, hors ton, et il bloque toute vérification pilotée par
+       * navigateur). Motif d'`InviteCard` et de `ListeRayons`.
+       *
+       * ⚠️ **Elle REMPLACE le bouton, elle n'ouvre pas un panneau.** Un panneau
+       * qui pousse ferait sauter les trente lignes en dessous, sur l'écran qu'on
+       * lit à une main dans un magasin.
+       *
+       * ⚠️ **Pourquoi une confirmation alors que FR-6 n'en demande pas** : il n'y
+       * a **aucune annulation** au périmètre, et le tombstone n'en est pas une —
+       * réajouter l'article le fait revenir, mais rien à l'écran ne le propose. La
+       * confirmation est donc le seul filet contre un doigt qui rate la bascule.
+       */}
+      {confirme ? (
+        <>
+          <button
+            type="button"
+            className="btn-ligne"
+            disabled={occupe}
+            aria-label={`Confirmer le retrait de ${article.nom}`}
+            onClick={() => {
+              setConfirme(false);
+              onSupprimer(article);
+            }}
+          >
+            Confirmer
+          </button>
+          <button
+            type="button"
+            className="btn-ligne"
+            disabled={occupe}
+            aria-label={`Garder ${article.nom} dans la liste`}
+            onClick={() => setConfirme(false)}
+          >
+            Non
+          </button>
+        </>
+      ) : (
+        /*
+         * ⚠️ **`aria-label` nomme L'ARTICLE**, sinon trente boutons « Retirer »
+         * sont indiscernables au lecteur d'écran. ⚠️ Il CONTIENT le libellé
+         * visible (« Retirer »), ce qu'exige WCAG 2.5.3 « Label in Name » : un
+         * utilisateur de commande vocale dit « Retirer » et doit être compris.
+         */
+        <button
+          type="button"
+          className="btn-ligne"
+          disabled={occupe}
+          aria-label={`Retirer ${article.nom}`}
+          onClick={() => setConfirme(true)}
+        >
+          Retirer
+        </button>
+      )}
     </li>
   );
 }
