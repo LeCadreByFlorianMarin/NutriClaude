@@ -41,7 +41,108 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
-last_updated: 2026-08-17  # 2026-08-17 (2) — Story 4.4 FUSIONNÉE (PR #29). Les stories 4.1 à 4.4
+last_updated: 2026-08-17  # 2026-08-17 (4) — Story 4.5 IMPLÉMENTÉE (statut `review`). D1 tranchée
+                          # par Florian (option a) ; D2 à D5 sur leur défaut prescrit.
+                          # ⛔ LE FAIT CENTRAL EST DÉSORMAIS FIGÉ PAR UN TEST : `.delete()` rend
+                          # `DELETE 0` SANS ERREUR sur grocery_list_items. Toute surface future
+                          # (dashboard E5, MCP E7, pont E6) doit passer par le tombstone.
+                          # ⛔ LE DÉFAUT « 14 POMMES » EST FERMÉ À LA SOURCE : la quantité d'une
+                          # ligne tombstonée ne s'additionne plus au réajout — et SEULEMENT là,
+                          # un acheté encore vivant continue de s'additionner (borné par un test).
+                          # ⚠️ CONSÉQUENCE POUR LA 4.7 : elle ressuscite des lignes tombstonées,
+                          # donc elle hérite de cette règle.
+                          # ⛔ UN TEST PRÉEXISTANT DE LA 4.4 A CHANGÉ D'ASSERTION (3 → 2), mis à
+                          # jour avec sa raison datée plutôt qu'effacé.
+                          # ⛔ UN REPORT EST RÉSOLU PAR UNE DÉCISION, PAS UNE CONTRAINTE :
+                          # `(status, deleted_at)` reste non contraint — `bought` + tombstone EST
+                          # l'archivage, et le contraindre casserait l'AC2.
+                          # ⛔ TROIS DÉFAUTS INTRODUITS PUIS CORRIGÉS, consignés : `String.replace`
+                          # a mangé les `$$` de la fonction SQL (voisin du piège `\uXXXX` de la
+                          # 4.4) · deux tests d'isolation supposaient être seuls au monde — LE
+                          # PRÉFIXE UNIQUE ISOLE LES NOMS, PAS LES COMPTEURS DE FOYER · la première
+                          # sonde CSS lisait un fichier VIDE et rendait 0 par absence de données.
+                          # ⛔ LE PARCOURS À L'ŒIL A TROUVÉ DEUX DÉFAUTS QUE 271 TESTS ET SIX
+                          # PORTES NE VOYAIENT PAS : le compte rendu du vidage était démonté dans
+                          # le rendu qui l'écrivait, et L'ÉTAT VIDE ÉTAIT UN CUL-DE-SAC (plus de
+                          # formulaire d'ajout après avoir vidé sa liste). Le second est ANTÉRIEUR
+                          # à cette story — dormant jusqu'à ce que « Tout enlever » le rende
+                          # atteignable — et sa correction referme l'écart que la 4.2 avait daté
+                          # à l'intention de la 4.4 (« lien vers l'ajout sur l'état vide »).
+                          # Portes : npm test 271/271 (+5) · isolation 121, 120 pass, 0 fail,
+                          # 1 skipped (+10) · typecheck · lint · check:migrations 19/17/2/0 ·
+                          # build 14 routes · sonde CSS 3 classes, 5 contrôles négatifs à 0 et
+                          # 4 TÉMOINS POSITIFS · banc de mutations 3/3 tués.
+                          # ⚠️ types.ts régénéré : le diff N'EST PAS purement additif — il retire
+                          # `graphql_public`, que deferred-work.md signalait comme entré dans le
+                          # contrat PostgREST sans qu'aucune story l'ait décidé. Aucun fichier
+                          # applicatif ne le référence (mesuré).
+                          # ✅ PARCOURS À L'ÉCRAN COMPLET, aux DEUX thèmes, thème remis, après que
+                          # Florian a coupé le serveur du port 3333. Les trois correctifs sont
+                          # REVÉRIFIÉS à l'œil, dont D3 : « Pommes » vidé puis réajouté à 4 rend
+                          # « 4 pièces », pas 10. NFR-3 : 0 débordement à 390/360/320 px, PIRE CAS
+                          # compris (confirmation armée + nom de 200 caractères insécables).
+                          # Contraste de la classe neuve `.btn-ligne` : 5,713:1 clair · 8,059:1
+                          # sombre · cible tactile 44 px · anneau de focus global non annulé.
+                          # ⚠️ MA PREMIÈRE MESURE SOMBRE ÉTAIT FAUSSE (2,03:1) : elle ignorait
+                          # l'alpha du fond de carte. Recomposée couche par couche, elle retombe
+                          # sur rgb(38,29,35) = #261d23, le « verre » que DESIGN.md nomme.
+                          # ⚠️ NOTE D'OUTILLAGE QUI RESSERVIRA, et qui CORRIGE le diagnostic de la
+                          # 4.4 : les cookies ne distinguent pas les PORTS. Un second serveur du
+                          # projet connecté à la PRODUCTION partage sa session avec le serveur de
+                          # parcours, et une session de production laisse le rendu serveur suspendu
+                          # sur requireProfile() — page bloquée sur son loading.tsx, React jamais
+                          # hydraté, PAS UNE SEULE ERREUR EN CONSOLE. La 4.4 avait conclu « c'était
+                          # le serveur de développement » : passer en production avait marché parce
+                          # que ça changeait le PORT, donc la collision. ⚠️ 127.0.0.1 ne suffit pas,
+                          # la redirection d'authentification ramène sur localhost.
+                          # ⚠️ AUCUNE ÉCRITURE N'A ATTEINT LA PRODUCTION : bundle client construit
+                          # sur l'URL locale (vérifié dans les fragments), et chaque geste
+                          # recontrôlé en psql sur la base locale.
+                          # ⛔ TOUJOURS OUVERT, INCHANGÉ : la décision `intent_at` — D2(a) l'a
+                          # ÉVITÉE pour cette story, elle ne l'a pas refermée. À trancher AVANT
+                          # la 4.10.
+                          #
+                          # 2026-08-17 (3) — Story 4.5 CONTEXTUALISÉE (`backlog` → `ready-for-dev`),
+                          # sur `452f308`. Dix mesures exécutées sur le stack local, en
+                          # `begin … rollback`.
+                          # ⛔ LE FAIT CENTRAL : `.delete()` NE RATE PAS, IL MENT. Le privilège
+                          # de table DELETE est accordé à `authenticated` (M2) mais AUCUNE
+                          # politique RLS ne l'autorise (M1) — un DELETE rend donc `DELETE 0`
+                          # SANS ERREUR et la ligne survit (M3). PostgREST rendrait `error: null` :
+                          # un écran optimiste montrerait l'article disparu, et il reviendrait au
+                          # chargement suivant sans qu'aucune porte ne le dise. Supprimer est un
+                          # `UPDATE deleted_at`, jamais un DELETE.
+                          # ⛔ UN SECOND DÉFAUT, MESURÉ, QUE CETTE STORY CRÉE SI ELLE NE LE FERME
+                          # PAS : 10 articles achetés → archivés → réajoutés à 4 donnent **14**
+                          # (M7). `ajouter_article` additionne sur la quantité d'une vie
+                          # précédente, l'index canonique étant TOTAL. La 4.5 est la première
+                          # story à écrire des tombstones, donc la première à rendre ce chemin
+                          # atteignable — d'où D3.
+                          # ⚠️ CINQ DÉCISIONS OUVERTES, chacune avec son défaut prescrit. D1 est
+                          # la plus structurante et elle est POSÉE NOMMÉMENT dans le code :
+                          # `ListeCourses.tsx:480-482` dit « la suppression est la story 4.5, et
+                          # elle devra trancher ce point plutôt que le contourner » —
+                          # `EXPERIENCE.md:104` impose un seul hit-target par ligne, et la
+                          # maquette ne tranche pas (ses deux seuls `×` sont des quantités).
+                          # D2 : fonctions SQL `security invoker`, pour ne PAS élargir le défaut
+                          # `intent_at` à un troisième chemin d'écriture — et sur `deleted_at`,
+                          # c'est-à-dire le champ même que la 4.10 arbitre.
+                          # D4 : borne haute de `deleted_at` (M5 : `now() + 100 ans` accepté),
+                          # report daté de la 4.1 et adressé nommément à cette story.
+                          # ⛔ UN REPORT EST RÉSOLU PAR UNE DÉCISION, PAS PAR UNE CONTRAINTE :
+                          # `(status, deleted_at)` reste délibérément non contraint, parce que
+                          # `bought` + tombstone EST l'archivage (M6) — le contraindre casserait
+                          # l'AC2. Écrit dans la migration pour qu'une revue ne le « répare » pas.
+                          # ⚠️ D5 : « Vider le panier » (source verbatim) et « Vider la liste »
+                          # sont trop voisins pour deux portées différentes ; la seconde chaîne
+                          # est INVENTÉE et signalée comme telle, comme la 4.3 l'avait fait.
+                          # Portes au départ : npm test 266/266 · isolation 111, 110 pass, 0 fail,
+                          # 1 skipped · check:migrations 18/16/2/0.
+                          # ⛔ TOUJOURS OUVERT, INCHANGÉ : la décision `intent_at` (horloge client
+                          # vs serveur, +0,740 s mesuré) — à trancher AVANT la 4.10. D2 l'évite
+                          # pour cette story, elle ne la referme pas.
+                          #
+                          # 2026-08-17 (2) — Story 4.4 FUSIONNÉE (PR #29). Les stories 4.1 à 4.4
                           # sont `done` et dans `main` ; aucune PR ouverte, aucune branche de
                           # travail restante.
                           # ⛔ UNE DÉCISION RESTE OUVERTE, ET ELLE EST DANS `main` : `intent_at`
@@ -951,7 +1052,7 @@ development_status:
   4-2-lecture-client-direct-de-la-liste-groupee-par-rayon: done
   4-3-cocher-et-decocher-idempotent-et-reversible: done
   4-4-ajouter-un-article-avec-agregation-et-unites-fermees: done
-  4-5-supprimer-archiver-les-achetes-vider-la-liste: backlog
+  4-5-supprimer-archiver-les-achetes-vider-la-liste: review
   4-6-provenance-de-chaque-article: backlog
   4-7-generer-la-liste-depuis-le-menu-sans-rien-ecraser: backlog
   4-8-consulter-la-liste-hors-ligne: backlog

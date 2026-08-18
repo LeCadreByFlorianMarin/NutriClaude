@@ -12,6 +12,11 @@ import { stackLocal } from "./stack-local.ts";
  */
 import { articlesDuFoyer } from "../../lib/liste/liste.ts";
 import { basculerStatut } from "../../lib/liste/basculer.ts";
+import {
+  supprimerArticle,
+  archiverLesAchetes,
+  viderLaListe,
+} from "../../lib/liste/suppression.ts";
 
 /**
  * NFR-5 — l'isolation entre foyers, prouvée par exécution.
@@ -2037,6 +2042,21 @@ test("réajouter un article TOMBSTONÉ le rouvre, il ne rend pas 23505", async (
    * parfaitement légitime, et en désignant un article que la lecture affirme absent.
    * La migration de la 4.1 l'écrivait déjà : « rajouter un article supprimé est un
    * UPDATE, jamais un INSERT ».
+   *
+   * ⛔ **CE TEST ATTENDAIT UNE QUANTITÉ DE 3 JUSQU'AU 2026-08-17, ET IL AVAIT RAISON
+   * DE LE FAIRE — c'est la story 4.5 qui a changé la règle, pas ce test qui était
+   * faux.** Il figeait le comportement de la 4.4 : la somme traversait le tombstone
+   * (1 + 2 = 3). La 4.5 est la première story à écrire des tombstones, et elle a
+   * mesuré ce que cela donne en vrai : 10 pommes achetées puis archivées, plus 4 la
+   * semaine suivante, annonçaient **14** au membre. Une quantité archivée appartient
+   * à une vie précédente. Le `case` du volet 3 de `20260817160000` la remet donc à
+   * celle de l'ajout, et l'assertion suit : **2, la quantité du réajout**.
+   *
+   * ⚠️ **Ce que le test mesure n'a PAS changé pour autant** : que le tombstone se
+   * rouvre, et qu'un réajout ne rende jamais `23505`. C'est sa raison d'être, et
+   * elle est intacte. ⚠️ **La borne est le test voisin** — « réajouter un article
+   * ACHETÉ le ramène à prendre » attend toujours 3, parce qu'un article acheté mais
+   * VIVANT est encore de cette liste-ci.
    */
   await ajouterArticle(a.client, "zztomb-riz", 1, "kg");
   const { error: eSupp } = await a.client
@@ -2050,7 +2070,11 @@ test("réajouter un article TOMBSTONÉ le rouvre, il ne rend pas 23505", async (
   const lignes = await lignesNommees("zztomb-riz");
   assert.equal(lignes.length, 1);
   assert.equal(lignes[0].deleted_at, null, "le tombstone n'a pas été levé");
-  assert.equal(Number(lignes[0].quantity), 3, "la quantité n'a pas été additionnée");
+  assert.equal(
+    Number(lignes[0].quantity),
+    2,
+    "la quantité ARCHIVÉE s'est additionnée à la neuve (story 4.5, D3)",
+  );
 });
 
 test("réajouter un article ACHETÉ le ramène à prendre", async () => {
@@ -2230,6 +2254,254 @@ test("B ne peut PAS cocher un article du foyer de A (NFR-5)", async () => {
     "pending",
     "B a réussi à cocher un article du foyer de A",
   );
+});
+
+/* ═══ Story 4.5 — supprimer, archiver, vider ═══════════════════════════════
+ *
+ * ⚠️ **Ces tests appellent les fonctions du dépôt** (`supprimerArticle`,
+ * `archiverLesAchetes`, `viderLaListe`), pas des requêtes recopiées : un test qui
+ * réécrit la requête mesure l'accord de la base avec sa propre copie.
+ *
+ * ⚠️ **PLACÉS AVANT le test de génération**, qui segfaute et reste `test.skip`.
+ *
+ * ⚠️ **Préfixe UNIQUE par test** (`zz45supp-`, `zz45idem-`, `zz45arch-`,
+ * `zz45vide-`, `zz45qte-`, `zz45iso-`) : le préfixe partagé a coûté un défaut en
+ * revue de la 4.2.
+ * ═════════════════════════════════════════════════════════════════════════ */
+
+test("supprimer pose un TOMBSTONE et ne touche pas `status` (AC1, FR-6)", async () => {
+  /*
+   * ⛔ **C'EST TOUT FR-6 : « supprimé de la liste, DISTINCTEMENT du fait de le
+   * cocher ».** Si la suppression écrivait aussi `status`, on ne pourrait plus
+   * distinguer un article retiré d'un article archivé après achat — et l'AC2
+   * (« tout en restant traçables ») perdrait son sens.
+   */
+  await articleDeA("zz45supp-cible", null);
+  const id = await idDe("zz45supp-cible");
+
+  const retirees = await supprimerArticle(a.client, id);
+  assert.equal(retirees, 1, "la suppression n'a touché aucune ligne");
+
+  const lignes = await lignesNommees("zz45supp-cible");
+  assert.equal(lignes.length, 1, "la ligne a été DÉTRUITE au lieu d'être tombstonée");
+  assert.notEqual(lignes[0].deleted_at, null, "aucun tombstone n'a été posé");
+  assert.equal(lignes[0].status, "pending", "la suppression a réécrit `status` — FR-6 confondu");
+});
+
+test("l'article supprimé sort de la VUE, mais reste dans la table (AC1)", async () => {
+  await articleDeA("zz45supp-vue", null);
+  await supprimerArticle(a.client, await idDe("zz45supp-vue"));
+
+  const { data, error } = await a.client
+    .from("grocery_list_by_aisle")
+    .select("name")
+    .eq("name", "zz45supp-vue");
+  assert.equal(error, null, "la lecture de la vue a échoué");
+  assert.equal(data?.length, 0, "un article supprimé est toujours dans la liste vivante");
+
+  assert.equal((await lignesNommees("zz45supp-vue")).length, 1, "la ligne a disparu de la TABLE");
+});
+
+test("⛔ un DELETE dur ne supprime RIEN, et ne rend AUCUNE erreur", async () => {
+  /*
+   * ⛔ **CE TEST FIGE LE FAIT LE PLUS DANGEREUX DE CETTE STORY.** Le privilège de
+   * table `DELETE` est accordé à `authenticated` (`20260729094500`), mais aucune
+   * politique RLS `for delete` n'existe — le volet 6 de `20260805092611` les a
+   * remplacées par select/insert/update. Postgres ne refuse donc pas : il ne VOIT
+   * aucune ligne à supprimer.
+   *
+   * **Conséquence côté client, et c'est elle qui coûte** : PostgREST rend
+   * `error: null`. Un écran optimiste qui emploierait `.delete()` montrerait
+   * l'article disparu, et il **reviendrait au chargement suivant**, sans qu'aucune
+   * porte, aucun journal ni aucun message ne dise pourquoi.
+   *
+   * ⚠️ **L'assertion porte sur l'ÉTAT de la ligne, jamais sur l'absence d'erreur** —
+   * même raison que le test de bascule inter-foyers juste au-dessus.
+   */
+  await articleDeA("zz45supp-dur", null);
+
+  const { error } = await a.client
+    .from("grocery_list_items")
+    .delete()
+    .eq("name", "zz45supp-dur");
+
+  assert.equal(error, null, "le DELETE a rendu une erreur — le comportement mesuré a changé");
+  assert.equal(
+    (await lignesNommees("zz45supp-dur")).length,
+    1,
+    "⛔ LE DELETE DUR A FONCTIONNÉ : une politique `for delete` a dû apparaître, et AD-3 est en danger",
+  );
+});
+
+test("supprimer DEUX FOIS est idempotent — 0 la seconde, jamais une erreur (NFR-2)", async () => {
+  /*
+   * ⚠️ `EXPERIENCE.md:122` : « supprimer un article coché ailleurs n'est jamais une
+   * erreur ni un arbitrage demandé ». Le second appel rend 0 parce que le `where`
+   * porte `deleted_at is null` — et il n'écrase pas l'intention du premier
+   * tombstone, que la story 4.10 arbitrera.
+   */
+  await articleDeA("zz45idem-double", null);
+  const id = await idDe("zz45idem-double");
+
+  assert.equal(await supprimerArticle(a.client, id), 1);
+  assert.equal(await supprimerArticle(a.client, id), 0, "la seconde suppression a re-touché la ligne");
+});
+
+test("archiver n'emporte QUE les achetés, et leur garde `status` (AC2, FR-8)", async () => {
+  /*
+   * ⛔ **L'ARCHIVÉ PORTE LES DEUX MARQUES** — `bought` ET tombstoné. C'est ce qui le
+   * rend « traçable » au sens de l'AC2, et ce qui le distingue d'une suppression
+   * pure (`pending` + tombstone). ⚠️ **Ne pas contraindre ce couple** :
+   * `deferred-work.md` le signalait comme un manque, c'en est le mécanisme.
+   */
+  await articleDeA("zz45arch-pris", null);
+  await articleDeA("zz45arch-restant", null);
+  await basculerStatut(a.client, await idDe("zz45arch-pris"), "bought");
+
+  /*
+   * ⚠️ **LE COMPTE ATTENDU SE MESURE, IL NE SE DEVINE PAS.** Le geste porte sur TOUT
+   * le foyer, et ce fichier partage le foyer A entre tous ses tests : les stories 4.2
+   * à 4.4 y ont laissé des articles cochés. Écrire `assert.equal(archives, 1)`
+   * revenait à supposer que ce test est seul au monde — il a rendu 4. ⛔ **Et c'est
+   * le défaut que le préfixe unique par test NE protège PAS** : il isole les noms,
+   * pas les compteurs de foyer.
+   */
+  const { data: avant, error: erreurAvant } = await a.client
+    .from("grocery_list_items")
+    .select("id")
+    .eq("status", "bought")
+    .is("deleted_at", null);
+  assert.equal(erreurAvant, null, "le dénombrement des articles pris a échoué");
+  const attendus = avant!.length;
+  assert.ok(attendus >= 1, "la fixture n'a pas produit d'article pris");
+
+  const archives = await archiverLesAchetes(a.client);
+  assert.equal(archives, attendus, "l'archivage n'a pas rendu le nombre d'articles pris");
+
+  const pris = (await lignesNommees("zz45arch-pris"))[0];
+  assert.notEqual(pris.deleted_at, null, "l'article pris n'a pas été archivé");
+  assert.equal(pris.status, "bought", "l'archivage a réécrit `status` — la trace est perdue");
+
+  const restant = (await lignesNommees("zz45arch-restant"))[0];
+  assert.equal(restant.deleted_at, null, "⛔ l'archivage a emporté un article NON acheté");
+});
+
+test("vider emporte les DEUX statuts, sans DELETE dur (AC3, FR-8)", async () => {
+  await articleDeA("zz45vide-a", null);
+  await articleDeA("zz45vide-b", null);
+  await basculerStatut(a.client, await idDe("zz45vide-b"), "bought");
+
+  const retires = await viderLaListe(a.client);
+  assert.ok(retires >= 2, `le vidage n'a retiré que ${retires} article(s)`);
+
+  for (const nom of ["zz45vide-a", "zz45vide-b"]) {
+    const lignes = await lignesNommees(nom);
+    assert.equal(lignes.length, 1, `« ${nom} » a été DÉTRUIT au lieu d'être tombstoné`);
+    assert.notEqual(lignes[0].deleted_at, null, `« ${nom} » n'a pas été retiré`);
+  }
+
+  const { data, error } = await a.client.from("grocery_list_by_aisle").select("name");
+  assert.equal(error, null, "la lecture de la vue a échoué");
+  assert.equal(data?.length, 0, "la liste vivante n'est pas vide après un vidage");
+});
+
+test("⛔ réajouter un article ARCHIVÉ repart de sa quantité, il ne l'ADDITIONNE pas", async () => {
+  /*
+   * ⛔ **LE DÉFAUT CENTRAL DE CETTE STORY, MESURÉ AVANT CORRECTIF À 14.** Archiver
+   * ne libère pas la clé canonique — l'index est TOTAL. La ligne archivée reste donc
+   * là avec sa quantité, et `ajouter_article` additionnait dessus : 10 pommes
+   * achetées puis archivées, plus 4 la semaine suivante, annonçaient **14**.
+   *
+   * ⚠️ **Ce test est le seul garde-fou du `case` du volet 3.** Le retirer ferait
+   * revenir un défaut que rien à l'écran n'explique et que le membre ne peut
+   * corriger qu'en supprimant la ligne.
+   */
+  await ajouterArticle(a.client, "zz45qte-pommes", 10, "pièce");
+  await basculerStatut(a.client, await idDe("zz45qte-pommes"), "bought");
+  await archiverLesAchetes(a.client);
+
+  await ajouterArticle(a.client, "zz45qte-pommes", 4, "pièce");
+
+  const lignes = await lignesNommees("zz45qte-pommes");
+  assert.equal(lignes.length, 1, "le réajout a créé un doublon au lieu de rouvrir la ligne");
+  assert.equal(
+    Number(lignes[0].quantity),
+    4,
+    "⛔ la quantité ARCHIVÉE s'est additionnée à la neuve (le défaut « 14 pommes »)",
+  );
+  assert.equal(lignes[0].status, "pending", "le réajout n'a pas ramené l'article à prendre");
+  assert.equal(lignes[0].deleted_at, null, "le tombstone n'a pas été levé");
+});
+
+test("un article acheté mais TOUJOURS DANS LA LISTE continue de s'additionner", async () => {
+  /*
+   * ⚠️ **LE PENDANT DU TEST PRÉCÉDENT, ET IL LE BORNE.** Le correctif ne devait
+   * toucher QUE le cas du tombstone : un article déjà pris mais encore dans la liste
+   * est encore de cette liste-ci — 6 dans le panier + 4 → 10. Sans ce test, une
+   * rédaction plus large (« repartir de zéro dès que l'article est acheté »)
+   * passerait, et casserait le comportement vérifié à l'écran le 2026-08-17.
+   */
+  await ajouterArticle(a.client, "zz45qte-vivant", 6, "pièce");
+  await basculerStatut(a.client, await idDe("zz45qte-vivant"), "bought");
+
+  await ajouterArticle(a.client, "zz45qte-vivant", 4, "pièce");
+
+  const lignes = await lignesNommees("zz45qte-vivant");
+  assert.equal(Number(lignes[0].quantity), 10, "l'agrégation normale a été cassée par le correctif");
+});
+
+test("la base refuse un tombstone daté dans le FUTUR (D4)", async () => {
+  /*
+   * ⚠️ **Report daté de la revue de la 4.1**, laissé ouvert par la 4.4 (« elle ne
+   * borne pas par le haut »). ⛔ Un tombstone de 2999 fait disparaître la ligne
+   * immédiatement ET gagnerait TOUT arbitrage LWW (AD-3) à jamais.
+   * ⚠️ La tolérance est d'UN JOUR, symétrique de la borne basse : un téléphone en
+   * avance de deux minutes doit pouvoir supprimer.
+   */
+  await articleDeA("zz45futur-cible", null);
+
+  const { error } = await a.client
+    .from("grocery_list_items")
+    .update({ deleted_at: new Date(Date.now() + 100 * 24 * 3600_000).toISOString() })
+    .eq("name", "zz45futur-cible");
+
+  assert.notEqual(error, null, "un tombstone dans 100 jours a été ACCEPTÉ");
+  assert.equal(error!.code, "23514", `refus attendu 23514, obtenu ${error!.code}`);
+});
+
+test("B ne peut ni supprimer, ni archiver, ni vider la liste de A (NFR-5)", async () => {
+  /*
+   * ⛔ **LES TROIS FONCTIONS SONT `security invoker` : c'est la RLS qui refuse.**
+   * Aucune ne porte de filtre `household_id` — l'écrire laisserait croire que c'est
+   * la fonction qui protège, ce qu'AD-1/AD-2 refusent. Ce test mesure qu'elles
+   * n'ont ouvert aucun chemin.
+   *
+   * ⚠️ **L'assertion porte sur l'ÉTAT des lignes de A**, jamais sur une erreur : un
+   * UPDATE que la RLS rend invisible ne lève pas, il touche zéro ligne.
+   *
+   * ⛔ **ET SURTOUT : PAS SUR LE COMPTE RENDU À B.** Première rédaction fautive —
+   * elle attendait 0 de `viderLaListe(b.client)`, et a obtenu **5**. C'est le bon
+   * comportement : B a vidé SA PROPRE liste, ce qui est parfaitement légitime. Le
+   * compte rendu à B parle du foyer de B ; il n'apprend rien sur l'isolation, et
+   * l'assertion faisait échouer un test sur un succès. Ce qui prouve l'isolation,
+   * c'est l'état des lignes de A — et rien d'autre.
+   */
+  await articleDeA("zz45iso-cible", null);
+  await basculerStatut(a.client, await idDe("zz45iso-cible"), "bought");
+  const id = await idDe("zz45iso-cible");
+
+  assert.equal(
+    await supprimerArticle(b.client, id),
+    0,
+    "B a supprimé un article de A en le désignant par son identifiant",
+  );
+  await archiverLesAchetes(b.client);
+  await viderLaListe(b.client);
+
+  const lignes = await lignesNommees("zz45iso-cible");
+  assert.equal(lignes.length, 1, "l'article de A a disparu");
+  assert.equal(lignes[0].deleted_at, null, "⛔ B a posé un tombstone dans le foyer de A");
+  assert.equal(lignes[0].status, "bought", "B a modifié l'état d'un article de A");
 });
 
 /* ⛔ ────────────────────────────────────────────────────────────────────────

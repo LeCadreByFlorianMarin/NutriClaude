@@ -581,20 +581,73 @@ body::before {
   }
 
   /*
-   * La ligne-article — **un seul hit-target, toute la ligne** (UX-DR5,
-   * `EXPERIENCE.md:104` : « tap n'importe où sur la ligne = bascule »).
+   * La ligne-article — le RANG, qui porte désormais DEUX contrôles.
    *
-   * ⚠️ **C'est un `<label>`**, donc le clic n'importe où bascule la case native
-   * sans un seul gestionnaire d'événement sur la ligne. Poser un `onClick` sur
-   * un `<li>` aurait rendu la ligne inatteignable au clavier et aurait exigé un
-   * `role`/`tabIndex` à la main.
+   * ⛔ **CE COMMENTAIRE DISAIT « un seul hit-target, toute la ligne » JUSQU'AU
+   * 2026-08-17, ET C'ÉTAIT VRAI.** `EXPERIENCE.md:104` l'écrit toujours. La story
+   * 4.5 le RÉÉCRIT sur décision de Florian (D1, option a), parce que FR-6 exige un
+   * geste de suppression distinct du cochage et qu'aucune autre place n'existait :
+   * un mode « Gérer » aurait fait diverger deux rendus de la même ligne, un
+   * balayage serait inatteignable au clavier et invisible à l'œil.
+   *
+   * ⚠️ **La règle devient : un hit-target de BASCULE (`.ligne-bascule`, tout ce
+   * qui reste de la ligne) + un contrôle EXPLICITE de retrait.** Ce qui est
+   * préservé, et qui était l'intention d'UX-DR5, c'est qu'on ne vise jamais une
+   * cible de 25px : la bascule reste la plus grande zone du rang, et le bouton
+   * tient ses 44px.
    *
    * ⚠️ `min-height` ≥ 44px vient de `--spacing-item` (46px mesuré), pas d'une
-   * valeur écrite ici.
+   * valeur écrite ici. `gap-2` et non `gap-3` : le rang doit rendre au nom la
+   * largeur que le bouton lui prend (NFR-3, mesuré à 320px).
    */
   .ligne-article {
-    @apply flex min-h-item items-center gap-3;
+    @apply flex min-h-item items-center gap-2;
+  }
+
+  /*
+   * La zone de BASCULE — l'ancien hit-target, qui garde tout sauf le bouton.
+   *
+   * ⚠️ **C'est le `<label>`**, donc le clic n'importe où dessus bascule la case
+   * native sans un seul gestionnaire d'événement. ⛔ **Le bouton de retrait ne
+   * peut PAS être son enfant** : un clic dessus basculerait AUSSI la case, le
+   * label capturant tout ce qu'il contient. Deux frères, jamais une imbrication.
+   *
+   * ⚠️ `min-w-0` est indispensable, pas décoratif : sans lui un nom de 200
+   * caractères élargit le conteneur flex et fait défiler l'écran horizontalement.
+   */
+  .ligne-bascule {
+    @apply flex min-h-item min-w-0 flex-1 items-center gap-3;
     cursor: pointer;
+  }
+
+  /*
+   * Le bouton de retrait d'une ligne — et les deux temps de sa confirmation.
+   *
+   * ⛔ **PAS `btn-action`, donc pas d'abricot.** UX-DR2 énumère les emplois
+   * légitimes de l'accent (compteur, coche cochée, tuile Courses, bouton d'ajout,
+   * anneau de focus…) et un geste destructif n'en est pas. « Une pastille abricot
+   * veut toujours dire *ça concerne tes courses*, jamais *attention* ».
+   *
+   * ⛔ **PAS `btn-quiet` non plus, et c'est mesuré à l'usage, pas supposé** :
+   * `btn-quiet` est souligné, et une liste de trente articles rendrait trente
+   * soulignés en concurrence directe avec le geste principal de l'écran. La
+   * hiérarchie d'`EXPERIENCE.md` est explicite — la bascule est « le geste
+   * unique, le plus gros de l'écran ».
+   *
+   * ⚠️ **`min-h-touch` (44px) est conservé** : discret ne veut pas dire petit. La
+   * cible tactile tient le plancher, c'est seulement l'encre qui recule.
+   * ⚠️ `text-muted` et jamais `muted-2` : ce libellé PORTE de l'information.
+   */
+  .btn-ligne {
+    @apply inline-flex min-h-touch shrink-0 cursor-pointer items-center
+           justify-center px-2 text-xs text-muted;
+  }
+  .btn-ligne:hover:not(:disabled) {
+    color: var(--text);
+  }
+  .btn-ligne:disabled {
+    @apply cursor-default;
+    filter: saturate(0.6);
   }
 
   /*
