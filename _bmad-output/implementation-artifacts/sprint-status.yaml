@@ -41,7 +41,31 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
-last_updated: 2026-08-17  # 2026-08-17 (4) — Story 4.5 IMPLÉMENTÉE (statut `review`). D1 tranchée
+last_updated: 2026-08-18  # 2026-08-18 — Story 4.5 FUSIONNÉE (PR #31, squash `fefa2ec`). Les
+                          # stories 4.1 à 4.5 sont dans `main` ; aucune PR ouverte, aucune branche
+                          # de travail restante. Les 4 contrôles de la PR étaient verts.
+                          # ⛔ LA REQUÊTE DE CONTRÔLE EN PRODUCTION N'A PAS ÉTÉ EXÉCUTÉE — décision
+                          # de Florian, consignée en commentaire de la PR plutôt qu'effacée. Ce qui
+                          # borne le risque EST mesuré, mais sur le CODE et non sur les données :
+                          # aucun chemin applicatif n'écrit `deleted_at` (git grep sur app/ et lib/
+                          # ne rend qu'un commentaire et les types générés), et la seule migration
+                          # qui le pose non nul est celle de cette story. Un tombstone en production
+                          # ne pourrait venir que d'un SQL manuel.
+                          # ⚠️ REQUÊTE À LANCER SI UN DÉPLOIEMENT ÉCHOUE (`violeraient` doit être 0) :
+                          #   select count(*) filter (where deleted_at > now() + interval '1 day')
+                          #     as violeraient from grocery_list_items;
+                          # ⛔ ANOMALIE OUVERTE, MESURÉE, ET SANS RAPPORT AVEC LE CODE : la fusion
+                          # (18:17:48Z) n'a déclenché NI la CI NI le déploiement Vercel. Constaté à
+                          # 21:23Z, soit 3 h après : 0 run pour `fefa2ec`, 0 run en file, workflow
+                          # `active`, Actions activées, GitHub « All Systems Operational », dernier
+                          # déploiement de PRODUCTION vieux d'un jour.
+                          # ⚠️ CONSÉQUENCE À CONNAÎTRE : la migration s'applique AU DÉPLOIEMENT.
+                          # Tant qu'aucun déploiement ne part, la production tourne sur l'ANCIEN
+                          # code ET l'ANCIEN schéma — état cohérent, pas cassé, mais la story n'est
+                          # PAS en production. Le premier déploiement qui partira appliquera la
+                          # migration.
+                          #
+                          # 2026-08-17 (4) — Story 4.5 IMPLÉMENTÉE (statut `review`). D1 tranchée
                           # par Florian (option a) ; D2 à D5 sur leur défaut prescrit.
                           # ⛔ LE FAIT CENTRAL EST DÉSORMAIS FIGÉ PAR UN TEST : `.delete()` rend
                           # `DELETE 0` SANS ERREUR sur grocery_list_items. Toute surface future
