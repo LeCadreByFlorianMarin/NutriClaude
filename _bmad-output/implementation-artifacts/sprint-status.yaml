@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
-last_updated: 2026-08-18  # 2026-08-18 — Story 4.5 FUSIONNÉE (PR #31, squash `fefa2ec`). Les
+last_updated: 2026-08-19  # 2026-08-19 — Story 4.5 FUSIONNÉE ET DÉPLOYÉE (PR #31, squash `fefa2ec`). Les
                           # stories 4.1 à 4.5 sont dans `main` ; aucune PR ouverte, aucune branche
                           # de travail restante. Les 4 contrôles de la PR étaient verts.
                           # ⛔ LA REQUÊTE DE CONTRÔLE EN PRODUCTION N'A PAS ÉTÉ EXÉCUTÉE — décision
@@ -54,16 +54,27 @@ last_updated: 2026-08-18  # 2026-08-18 — Story 4.5 FUSIONNÉE (PR #31, squash 
                           # ⚠️ REQUÊTE À LANCER SI UN DÉPLOIEMENT ÉCHOUE (`violeraient` doit être 0) :
                           #   select count(*) filter (where deleted_at > now() + interval '1 day')
                           #     as violeraient from grocery_list_items;
-                          # ⛔ ANOMALIE OUVERTE, MESURÉE, ET SANS RAPPORT AVEC LE CODE : la fusion
-                          # (18:17:48Z) n'a déclenché NI la CI NI le déploiement Vercel. Constaté à
-                          # 21:23Z, soit 3 h après : 0 run pour `fefa2ec`, 0 run en file, workflow
-                          # `active`, Actions activées, GitHub « All Systems Operational », dernier
-                          # déploiement de PRODUCTION vieux d'un jour.
-                          # ⚠️ CONSÉQUENCE À CONNAÎTRE : la migration s'applique AU DÉPLOIEMENT.
-                          # Tant qu'aucun déploiement ne part, la production tourne sur l'ANCIEN
-                          # code ET l'ANCIEN schéma — état cohérent, pas cassé, mais la story n'est
-                          # PAS en production. Le premier déploiement qui partira appliquera la
-                          # migration.
+                          # ✅ RÉSOLU LE 2026-08-19 — ET LA MIGRATION EST EN PRODUCTION.
+                          # L'anomalie : la fusion de la #31 (18:17:48Z) n'avait déclenché NI la CI
+                          # NI le déploiement. Mesuré 3 h après : 0 run pour `fefa2ec`, 0 en file,
+                          # workflow `active`, GitHub « All Systems Operational ».
+                          # La fusion SUIVANTE (#32, `e0ad6c5`, 05:41:31Z) a tout déclenché
+                          # normalement : CI verte sur `main`, déploiement de production `Ready`
+                          # en 32 s. ⚠️ LA CAUSE DU PREMIER RATÉ RESTE INCONNUE — écrit plutôt
+                          # qu'inventé. Ce qui est mesuré : l'événement `pull_request` fonctionnait
+                          # (les contrôles de la #32 sont partis normalement), seul le push de
+                          # fusion de la #31 n'a rien produit.
+                          # ✅ ET C'EST CE DÉPLOIEMENT QUI RÉPOND À LA REQUÊTE DE CONTRÔLE NON
+                          # EXÉCUTÉE. Journal de build, verbatim :
+                          #   [migrations] déploiement de production — application des migrations
+                          #   • 20260817160000_supprimer_archiver_vider_la_liste.sql
+                          #   Applying migration 20260817160000_...sql...
+                          #   [migrations] appliquées.
+                          # Le volet 1 pose une contrainte VALIDÉE contre les lignes existantes :
+                          # une seule ligne au `deleted_at` lointain aurait rendu 23514 et cassé le
+                          # build. Il est passé — donc `violeraient` valait bien 0 en production.
+                          # ⚠️ C'est une preuve PAR L'APPLICATION, obtenue après coup ; elle ne
+                          # remplace pas le contrôle AVANT fusion que le gabarit demande.
                           #
                           # 2026-08-17 (4) — Story 4.5 IMPLÉMENTÉE (statut `review`). D1 tranchée
                           # par Florian (option a) ; D2 à D5 sur leur défaut prescrit.
