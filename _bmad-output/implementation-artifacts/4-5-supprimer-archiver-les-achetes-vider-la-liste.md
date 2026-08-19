@@ -38,8 +38,11 @@ Status: review
 <!-- ✅ **FUSIONNÉE le 2026-08-18** (PR #31, squash `fefa2ec`), les 4 contrôles verts.
      ⛔ **La requête de contrôle en PRODUCTION n'a PAS été exécutée** — décision de Florian,
      consignée en commentaire de la PR. ⛔ **Et la fusion n'a déclenché NI la CI NI le
-     déploiement** : mesuré 3 h après, 0 run pour `fefa2ec`. La migration s'appliquant au
-     déploiement, la production tourne encore sur l'ancien code ET l'ancien schéma. -->
+     déploiement** : mesuré 3 h après, 0 run pour `fefa2ec`. ✅ **Résolu le 2026-08-19** — la
+     fusion suivante (#32) a tout déclenché, et **la migration est appliquée en production**
+     (journal de build : « [migrations] appliquées. »). ⚠️ La cause du premier raté reste
+     INCONNUE. ✅ Et le build ayant passé, le volet 1 s'est validé contre les vraies lignes :
+     `violeraient` valait bien 0 — preuve PAR L'APPLICATION, obtenue après coup. -->
 
 <!-- ✅ **LE PARCOURS À L'ÉCRAN EST FAIT, AUX DEUX THÈMES, THÈME REMIS** (2026-08-17, sur une
      construction de PRODUCTION). Il a trouvé **trois défauts qu'aucune des six portes ne voyait**
