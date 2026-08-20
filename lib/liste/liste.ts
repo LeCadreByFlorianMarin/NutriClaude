@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../supabase/types";
+import { estSurfaceConnue } from "./surfaces.ts";
 
 /**
  * Un article de la liste, tel que l'écran l'affiche.
@@ -50,6 +51,23 @@ export type ArticleDeListe = {
   rayonIcone: string | null;
   /** `aisle_sort` — l'ordre du parcours magasin. `null` passe en dernier. */
   rayonOrdre: number | null;
+  /**
+   * La provenance, **BRUTE** (story 4.6, FR-7).
+   *
+   * ⛔ **L'état garde ce que la base a rendu ; la présentation se dérive.** C'est le correctif
+   * du parcours du 2026-08-13, transposé : garder ici une icône déjà choisie ferait deux
+   * chemins de décision — celui du chargement et celui d'une mise à jour optimiste — qui
+   * finiraient par diverger. `provenanceDe` (`lib/liste/provenance.ts`) fait la traduction, à
+   * un seul endroit.
+   *
+   * ⚠️ **Trois champs FRANÇAIS comme les neuf autres — correctif de la revue du 2026-08-20.**
+   * Ils s'appelaient `actorKind`, `source`, `recipeId` : le nom de la colonne traversait la
+   * frontière sans être traduit, alors que `versArticle` existe précisément pour ça
+   * (`aisle_sort` → `rayonOrdre`, `status` → `statut`). NFR-8 vaut aussi pour les champs.
+   */
+  acteurType: string | null;
+  surface: string | null;
+  recetteId: string | null;
 };
 
 /**
@@ -95,7 +113,22 @@ export async function articlesDuFoyer(
      * serait arrivé `undefined` au client — **silencieusement, jamais en
      * erreur**. C'est la forme de défaut que la story 4.3 nomme en Task 1.
      */
-    .select("id, name, quantity, unit, status, aisle_id, aisle_name, aisle_icon, aisle_sort")
+    /*
+     * ⛔ **`actor_kind`, `source` ET `recipe_id` ONT DÛ ÊTRE AJOUTÉS ICI — story 4.6.**
+     * La vue les projetait DÉJÀ (mesuré) ; ça ne suffit pas. Cette chaîne énumère ses
+     * colonnes une par une : sans ces trois-là, la provenance serait arrivée `undefined`
+     * au client — **silencieusement, jamais en erreur**. C'est exactement le défaut que la
+     * story 4.3 a payé sur `status`, et qu'elle nomme en Task 1.
+     */
+    /*
+     * ⚠️ **UN SEUL LITTÉRAL, jamais une concaténation.** supabase-js infère le type des
+     * lignes depuis le TEXTE de cette chaîne : la couper en deux avec un `+` lui fait
+     * rendre `GenericStringError` et tout le typage s'effondre. Mesuré en écrivant cette
+     * story.
+     */
+    .select(
+      "id, name, quantity, unit, status, aisle_id, aisle_name, aisle_icon, aisle_sort, actor_kind, surface, recipe_id"
+    )
     .order("aisle_sort")
     .order("name");
 
@@ -116,7 +149,33 @@ export async function articlesDuFoyer(
     throw new Error(`Lecture de la liste impossible : ${error.message}`);
   }
 
-  return (data ?? []).flatMap(versArticle);
+  const articles = (data ?? []).flatMap(versArticle);
+
+  /*
+   * ⛔ **UN SEUL AVERTISSEMENT PAR LECTURE, PAS UN PAR ARTICLE — correctif de la revue du
+   * 2026-08-20.** Il vivait dans `versArticle`, donc s'exécutait par ligne : une dérive de
+   * schéma sur la surface produisait N objets complets en console à chaque chargement — dont
+   * l'identifiant du foyer — et noyait le seul message qui compte.
+   *
+   * ⚠️ **Et `versArticle` redevient une projection PURE.** Le comptage appartient à la
+   * frontière, pas au traducteur.
+   *
+   * ⚠️ **Une surface inconnue n'écarte PAS la ligne**, contrairement à un statut inconnu : un
+   * statut inconnu rend l'article inaffichable, une surface inconnue ne coûte que l'icône.
+   * Écarter la ligne ferait disparaître un article de la liste de courses pour une provenance.
+   */
+  const surfacesInconnues = articles
+    .map((a) => a.surface)
+    .filter((s) => s !== null && !estSurfaceConnue(s));
+
+  if (surfacesInconnues.length > 0) {
+    console.warn(
+      `[courses] ${surfacesInconnues.length} article(s) portent une surface inconnue, ` +
+        `provenance ignorée. Exemple : ${surfacesInconnues[0]}`
+    );
+  }
+
+  return articles;
 }
 
 /**
@@ -149,6 +208,9 @@ export function versArticle(ligne: {
   aisle_name: string | null;
   aisle_icon: string | null;
   aisle_sort: number | null;
+  actor_kind: string | null;
+  surface: string | null;
+  recipe_id: string | null;
 }): ArticleDeListe[] {
   /*
    * ⚠️ **Le statut se garde comme `id` et `name`, et pour la même raison.** La
@@ -187,6 +249,15 @@ export function versArticle(ligne: {
     return [];
   }
 
+  /*
+   * ⚠️ **UNE SURFACE INCONNUE S'ÉCARTE AVEC SA TRACE, MAIS N'ÉCARTE PAS LA LIGNE.**
+   * Le vocabulaire de `source` est clos en base (`grocery_list_items_source_fermee`) : une
+   * valeur hors contrat voudrait dire que la base a changé sans que le client le sache.
+   * ⛔ **Mais ce n'est PAS le même cas que `status`** : un statut inconnu rend l'article
+   * inaffichable — on ignore s'il est pris ou non — alors qu'une provenance inconnue ne coûte
+   * que la provenance. Écarter la ligne entière ferait disparaître un article de la liste de
+   * courses pour une icône. `provenanceDe` rendra `null`, et le membre voit son article.
+   */
   return [
     {
       id: ligne.id,
@@ -198,6 +269,9 @@ export function versArticle(ligne: {
       rayonNom: ligne.aisle_name,
       rayonIcone: ligne.aisle_icon,
       rayonOrdre: ligne.aisle_sort,
+      acteurType: ligne.actor_kind,
+      surface: ligne.surface,
+      recetteId: ligne.recipe_id,
     },
   ];
 }

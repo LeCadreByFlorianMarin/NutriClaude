@@ -61,6 +61,7 @@ export type Database = {
           recipe_id: string | null
           source_ref: string | null
           status: string
+          surface: string | null
           unit: string | null
           updated_at: string
         }
@@ -80,6 +81,7 @@ export type Database = {
           recipe_id?: string | null
           source_ref?: string | null
           status?: string
+          surface?: string | null
           unit?: string | null
           updated_at?: string
         }
@@ -99,6 +101,7 @@ export type Database = {
           recipe_id?: string | null
           source_ref?: string | null
           status?: string
+          surface?: string | null
           unit?: string | null
           updated_at?: string
         }
@@ -549,6 +552,7 @@ export type Database = {
           recipe_id: string | null
           source_ref: string | null
           status: string | null
+          surface: string | null
           unit: string | null
           updated_at: string | null
         }
@@ -618,7 +622,12 @@ export type Database = {
     }
     Functions: {
       ajouter_article: {
-        Args: { p_nom: string; p_quantite?: number; p_unite?: string }
+        Args: {
+          p_nom: string
+          p_quantite?: number
+          p_surface?: string
+          p_unite?: string
+        }
         Returns: string
       }
       archiver_les_achetes: { Args: never; Returns: number }

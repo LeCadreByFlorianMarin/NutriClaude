@@ -43,6 +43,9 @@ function article(
     rayonNom: rayon.nom,
     rayonIcone: null,
     rayonOrdre: rayon.ordre,
+    acteurType: null,
+    surface: null,
+    recetteId: null,
   };
 }
 

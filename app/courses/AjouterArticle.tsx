@@ -86,6 +86,12 @@ export function AjouterArticle({ onAjout }: { onAjout: () => Promise<void> }) {
       await ajouterArticle(
         createNavigateurClient(),
         nomPropre,
+        /*
+         * ⚠️ **La surface est déclarée ICI, par l'écran qui la connaît.** C'est le seul
+         * endroit du produit qui sache que cet ajout vient du web ; la porte ne peut pas
+         * le deviner, et la base ne doit pas l'inventer.
+         */
+        "web",
         valeur,
         /*
          * ⚠️ Le `<select>` ne peut pas produire autre chose que les huit jetons,

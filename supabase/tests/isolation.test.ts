@@ -12,6 +12,7 @@ import { stackLocal } from "./stack-local.ts";
  */
 import { articlesDuFoyer } from "../../lib/liste/liste.ts";
 import { basculerStatut } from "../../lib/liste/basculer.ts";
+import { ajouterArticle as ajouterArticleDuDepot } from "../../lib/liste/ajout.ts";
 import {
   supprimerArticle,
   archiverLesAchetes,
@@ -1755,6 +1756,7 @@ async function ajouterArticle(
   nom: string,
   quantite?: number,
   unite?: string,
+  surface: "web" | "dashboard" | "voix" | "dictee" | "pont" | "mcp" = "web",
 ) {
   /*
    * ⚠️ **`undefined` et non `null`, et ce n'est pas un détail de typage.** Les deux
@@ -1767,6 +1769,7 @@ async function ajouterArticle(
     p_nom: nom,
     p_quantite: quantite,
     p_unite: unite,
+    p_surface: surface,
   });
   assert.equal(error, null, `l'ajout de « ${nom} » a échoué : ${error?.message}`);
 }
@@ -1778,6 +1781,33 @@ async function ajouterArticle(
  * canonique sans y être visibles. C'est toute la difficulté de la story 4.4, et un
  * helper qui lirait la vue rendrait les tests aveugles au cas qui compte.
  */
+/**
+ * L'ajout tel que **le produit** l'exécute — la fonction de `lib/`, pas une requête recopiée.
+ *
+ * ⛔ **NÉ D'UN DÉFAUT DE LA REVUE DU 2026-08-20.** Les cinq tests de la 4.6 appelaient
+ * `client.rpc("ajouter_article", …)` en passant la surface à la main. Ils étaient donc verts
+ * alors que `ajouterArticle` — la seule porte du produit — n'en transmettait aucune. Un test
+ * qui recopie la requête mesure l'accord de la base avec sa propre copie.
+ */
+async function porteDuDepot(
+  client: SupabaseClient<Database>,
+  nom: string,
+  quantite: number,
+  unite: "g" | "kg" | "ml" | "L" | "pièce" | "cs" | "cc" | "pincée",
+  surface: "web" | "dashboard" | "voix" | "dictee" | "pont" | "mcp",
+) {
+  await ajouterArticleDuDepot(client, nom, surface, quantite, unite);
+}
+
+async function lignesProvenance(nom: string) {
+  const { data, error } = await a.client
+    .from("grocery_list_items")
+    .select("name, actor_kind, actor_id, surface, recipe_id")
+    .eq("name", nom);
+  assert.equal(error, null, `la lecture de « ${nom} » a échoué`);
+  return data ?? [];
+}
+
 async function lignesNommees(nom: string) {
   const { data, error } = await a.client
     .from("grocery_list_items")
@@ -2602,6 +2632,104 @@ test("B ne peut ni supprimer, ni archiver, ni vider la liste de A (NFR-5)", asyn
   assert.equal(lignes.length, 1, "l'article de A a disparu");
   assert.equal(lignes[0].deleted_at, null, "⛔ B a posé un tombstone dans le foyer de A");
   assert.equal(lignes[0].status, "bought", "B a modifié l'état d'un article de A");
+});
+
+/* ═══ Story 4.6 — la provenance ════════════════════════════════════════════
+ *
+ * ⚠️ **Préfixe UNIQUE par test** (`zz46est-`, `zz46usu-`, `zz46voc-`, `zz46lec-`).
+ * ⚠️ **PLACÉS AVANT le test de génération**, qui segfaute et reste `test.skip`.
+ * ═════════════════════════════════════════════════════════════════════════ */
+
+test("l'ajout ESTAMPILLE la provenance — l'appelant ne la déclare pas (AC1)", async () => {
+  /*
+   * ⛔ **LE TEST QUI JUSTIFIE LE VOLET 2 DE LA MIGRATION.** Avant elle, aucune surface
+   * n'écrivait la provenance et le client aurait dû la déclarer. `ajouter_article` étant
+   * l'unique chemin d'ajout (AD-6), c'est elle qui pose `auth.uid()` — mesuré côté serveur,
+   * donc inforgeable sur le chemin nominal.
+   */
+  /*
+   * ⛔ **CE TEST APPELAIT LE RPC EN DIRECT — correctif de la revue du 2026-08-20.** Il passait
+   * `p_source: "web"` à la main, donc il aurait été vert alors que `ajouterArticle`, la porte
+   * réelle du produit, ne transmettait AUCUNE surface : toute la story était inerte et aucun
+   * test ne le voyait. C'est le motif que l'en-tête de ce fichier dénonce lui-même — « un test
+   * qui réécrit la requête mesure l'accord de la base avec sa propre copie ».
+   */
+  await porteDuDepot(a.client, "zz46est-lait", 1, "L", "web");
+
+  const lignes = await lignesProvenance("zz46est-lait");
+  assert.equal(lignes.length, 1);
+  assert.equal(lignes[0].actor_kind, "profile", "l'acteur n'a pas été estampillé");
+  assert.equal(lignes[0].actor_id, a.id, "l'article n'est pas attribué à son auteur");
+  assert.equal(lignes[0].surface, "web", "la surface n'a pas été enregistrée");
+});
+
+test("⛔ A ne peut PAS attribuer un article à B (ceinture RLS)", async () => {
+  /*
+   * ⛔ **CE TEST FIGE UN TROU MESURÉ LE 2026-08-20**, reporté depuis la revue de la 4.1 :
+   * `insert … actor_kind='profile', actor_id='<id de B>'` était ACCEPTÉ. La provenance de
+   * FR-7 était donc auto-déclarée, sur une écriture client-direct (AD-13).
+   *
+   * ⚠️ **L'assertion porte sur l'ERREUR, et c'est légitime ici** — contrairement aux tests
+   * d'isolation entre foyers, où la RLS rend zéro ligne sans lever. Une politique `with check`
+   * violée lève bien `42501` : elle refuse l'écriture au lieu de la rendre invisible.
+   */
+  const { error } = await a.client.from("grocery_list_items").insert({
+    household_id: a.foyerId,
+    name: "zz46usu-forge",
+    actor_kind: "profile",
+    actor_id: b.id,
+  });
+
+  assert.notEqual(error, null, "A a pu attribuer un article à B");
+  assert.equal(error!.code, "42501", `refus attendu 42501, obtenu ${error!.code}`);
+  assert.equal((await lignesProvenance("zz46usu-forge")).length, 0, "la ligne a été écrite");
+});
+
+test("A peut s'attribuer SON propre article — la ceinture ne gêne pas le cas nominal", async () => {
+  /*
+   * ⚠️ **Le pendant du test précédent, et il le borne.** Une ceinture qui refuserait aussi
+   * l'insertion légitime casserait tout chemin d'écriture direct. Sans ce test, resserrer la
+   * politique en `actor_id is null` passerait sans un rouge.
+   */
+  const { error } = await a.client.from("grocery_list_items").insert({
+    household_id: a.foyerId,
+    name: "zz46usu-sien",
+    actor_kind: "profile",
+    actor_id: a.id,
+  });
+  assert.equal(error, null, `l'insertion légitime a été refusée : ${error?.message}`);
+});
+
+test("la base refuse une SURFACE hors vocabulaire (AC1)", async () => {
+  /*
+   * ⚠️ Le vocabulaire est clos par `grocery_list_items_source_fermee`, comme celui des unités
+   * (AD-7). ⛔ Il ne court pas après une catégorie (règle §3) : les surfaces sont un ensemble
+   * que NOUS écrivons, une par une.
+   */
+  const { error } = await a.client.from("grocery_list_items").insert({
+    household_id: a.foyerId,
+    name: "zz46voc-pigeon",
+    surface: "carrier-pigeon",
+  });
+  assert.notEqual(error, null, "une surface inventée a été acceptée");
+  assert.equal(error!.code, "23514", `refus attendu 23514, obtenu ${error!.code}`);
+});
+
+test("la LECTURE rend la provenance — la vue et la chaîne select suivent (AC2)", async () => {
+  /*
+   * ⛔ **LE TEST QUI FIGE LE PIÈGE DE LA 4.3.** Élargir la vue ne suffit pas : `articlesDuFoyer`
+   * énumère ses colonnes une par une, et l'oubli aurait rendu la provenance `undefined` **en
+   * silence**. ⚠️ Il fige aussi le volet 4 de la migration — ajouter une colonne à la TABLE ne
+   * l'ajoute pas à la VUE, qui énumère elle aussi depuis la 4.1.
+   */
+  await porteDuDepot(a.client, "zz46lec-pommes", 2, "pièce", "mcp");
+
+  const articles = await articlesDuFoyer(a.client);
+  const vu = articles.find((x) => x.nom === "zz46lec-pommes");
+  assert.notEqual(vu, undefined, "l'article n'est pas revenu de la lecture");
+  assert.equal(vu!.surface, "mcp", "la surface n'a pas traversé la lecture");
+  assert.equal(vu!.acteurType, "profile", "l'acteur n'a pas traversé la lecture");
+  assert.equal(vu!.recetteId, null, "une recette est apparue sans recette");
 });
 
 /* ⛔ ────────────────────────────────────────────────────────────────────────

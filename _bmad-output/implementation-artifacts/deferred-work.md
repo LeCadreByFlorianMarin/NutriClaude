@@ -1700,3 +1700,102 @@ RLS). ⚠️ Le garde-fou `P0001` tient pour `anon` (mesuré : « Aucun foyer »
 
 *Reporté* : pré-existant à cette story ; la **4.12** gèle le contrat et doit trancher quelles
 primitives y entrent.
+
+## Deferred from: story 4-6-provenance-de-chaque-article + sa revue (2026-08-20)
+
+*⛔ **Cette section existe parce qu'elle manquait.** La story 4.6 affirmait à TROIS endroits — dont
+deux commentaires dans la migration livrée — avoir reporté ici. Le fichier n'avait pas été touché.
+La revue adversariale du 2026-08-20 l'a mesuré (`git status` : 0 modification). C'est la règle §2
+appliquée à un registre : un commentaire qui décrit un état faux est pire que pas de commentaire,
+parce que c'est sur lui que la story suivante s'appuie.*
+
+### `added_by` : son retrait passe à la 4.7 — CLÔT le report de la 4.1
+
+La 4.1 écrivait « la story 4.6 tranchera son sort ». **Elle a tranché : conservation.**
+
+**Mesuré le 2026-08-20** : `added_by` est **nulle sur les 15 lignes** — rien à migrer. Son unique
+écrivain est `generate_grocery_list_from_menu` (`initial_schema:557`), c'est-à-dire la fonction qui
+segfaute. La retirer aurait demandé de toucher cette fonction, que la 4.6 ne touche pas.
+
+*Reporté* : la **4.7** réécrit la génération. C'est elle qui doit retirer la colonne, dans le même
+commit que la réécriture de son seul écrivain.
+
+### `recipe_id` quand une ligne vient de PLUSIEURS recettes — pour la 4.7
+
+**Mesuré** : `generate_grocery_list_from_menu` agrège `group by ri.name, ri.unit, ri.product_id,
+ri.aisle_keyword` **à travers toutes les recettes du menu**. Une ligne de liste vient donc de N
+recettes, pour un `recipe_id` qui est un `uuid` unique. « La recette d'origine » n'existe pas au
+singulier.
+
+⚠️ **La revue a corrigé l'argument de la 4.6 sur ce point** : le modèle porte parfaitement le cas
+**mono-recette** (`case when count(distinct r.id) = 1 then min(r.id) end`), qui est le cas courant
+et celui que l'AC1 vise (« `recipe_id` **s'il** vient d'une recette »). Ce n'est donc pas une
+impossibilité, c'est un **arbitrage** — la 4.6 le présentait comme une impossibilité, ce qui
+surdimensionnait sa justification. Le report reste fondé par la **propriété** : la fonction est
+cassée et appartient à la 4.7.
+
+*À trancher par la 4.7* : première recette, aucune, ou une table de liaison.
+
+### ⛔ La ceinture d'`actor_id` ne tient que sur `insert` — le fermer demande un TRIGGER
+
+La 4.1 écrivait « la story 4.6 tranchera ». **Elle a tranché : ceinture posée sur `insert` seul**
+(`grocery_insert`, migration `20260820140000`).
+
+**Mesuré en revue le 2026-08-20** : la ceinture est contournable en une requête de plus.
+
+    insert … actor_id=<autre membre>   →  42501, refusé          (la ceinture tient)
+    update … set actor_id=<autre>      →  UPDATE 1                (elle ne couvre pas)
+    insert … actor_kind='device',
+             actor_id=<uuid libre>     →  INSERT 0 1              (elle ne s'applique pas)
+
+**Pourquoi elle n'est PAS posée sur `update`, et c'est mécanique** : une politique `with check`
+juge la ligne **nouvelle**, et RLS **ne peut pas comparer l'ancienne à la nouvelle**. Or cocher,
+retirer ou archiver l'article d'un **co-membre** laisse `actor_id` à sa valeur d'origine, qui n'est
+pas `auth.uid()`. **Mesuré en revue** : la politique candidate posée sur `update` fait échouer
+`update … set status='bought'` de B sur l'article de A — elle casserait la story 4.3, sur une liste
+que le produit veut partagée (AD-16).
+
+*Reporté* : le seul outil qui voit `OLD` et `NEW` est un **trigger**. À poser par la story qui
+possédera l'arbitrage des champs — la **4.10** est la candidate naturelle, puisqu'elle traite déjà
+de ce qui a le droit d'écraser quoi.
+
+### ⛔ `actor_id` n'a AUCUNE clé étrangère — pour l'Epic 5
+
+**Mesuré** : `\d grocery_list_items` liste cinq FK (`added_by`, `aisle_id`, `household_id`,
+`product_id`, `recipe_id`) — **aucune sur `actor_id`**. `update … set actor_kind='device',
+actor_id='deadbeef-…'` → `UPDATE 1`.
+
+L'en-tête de `20260820140000` présente le trou comme circonscrit à `actor_kind = 'device'`, en
+attendant `device_credentials`. ⚠️ **C'est plus large que ça** : `actor_id` accepte n'importe quel
+`uuid` dans les deux cas, et `'device'` suffit à faire sauter la ceinture avec l'identifiant d'une
+**personne**.
+
+*Reporté* : l'**Epic 5** pose `device_credentials` (AD-9). Elle trouvera alors des lignes `profile`
+dont l'`actor_id` ne désigne aucun profil — c'est un resserrement de contrainte sur table peuplée,
+que `docs/migrations.md` range parmi les gestes « à traiter avec méthode ».
+
+### ⚠️ La course du cache de schéma PostgREST — pour qui touchera signature ou vue
+
+**Cause PROBABLE, déduite et non mesurée**, d'un test d'isolation rouge une fois puis jamais
+reproduit (4.6). Une migration qui change une **signature de fonction** ou les **colonnes d'une
+vue** invalide le cache de schéma de PostgREST ; le rechargement est **asynchrone**, déclenché par
+`NOTIFY` depuis `pgrst_ddl_watch` / `pgrst_drop_watch` (vérifié : les deux event triggers existent).
+La séquence prescrite par `docs/migrations.md` — `db reset` puis `npm run test:isolation` — court
+contre ce rechargement. Un cache périmé rend `PGRST202` sur le RPC, ou `column … does not exist` sur
+la lecture : un rouge unique, jamais reproductible.
+
+⚠️ **La même course existe en production**, où la migration s'applique quelques secondes avant la
+mise en ligne. Ni la migration ni `scripts/migrer-au-deploiement.mjs` n'émettent
+`notify pgrst, 'reload schema'` ni n'attendent le rechargement.
+
+*Reporté* : à instruire par la première story qui retouche une signature ou une vue. Piste : émettre
+le `notify` en fin de migration, ou faire attendre le script de déploiement.
+
+### ⚠️ Les six surfaces sont posées avant leurs stories
+
+`grocery_list_items_surface_fermee` énumère `web, dashboard, voix, dictee, pont, mcp`. **Trois
+appartiennent à des epics non commencés** (5 le dashboard, 6 le pont, 7 MCP), alors que l'en-tête de
+la migration défend le vocabulaire fermé en écrivant « **chacune arrive avec sa story** ».
+
+*Reporté, sans échéance* : sans conséquence tant qu'aucun jeton n'est mal choisi. ⚠️ Mais retirer un
+jeton plus tard suppose de resserrer un `check` sur une table peuplée. Le coût est payé d'avance.
