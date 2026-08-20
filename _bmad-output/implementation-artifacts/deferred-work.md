@@ -1640,3 +1640,63 @@ Ce qui manque est la garde : le docblock règle le problème par une **consigne*
 l'importent depuis `@/lib/quantite` » — que ni `tsc --noEmit`, ni `eslint --max-warnings 0`, ni le
 typage ne défendent. C'est exactement la forme de garantie que `lib/rayons/carte.ts` a déjà appris à
 ne pas tenir pour acquise : « rien d'automatique ne défendra cet invariant ».
+
+## Deferred from: code review of 4-5-supprimer-archiver-les-achetes-vider-la-liste (2026-08-19)
+
+*Revue adversariale à trois couches (Blind Hunter, Edge Case Hunter, Acceptance Auditor), lancées
+en parallèle sans contexte. ⚠️ Même modèle que l'implémentation — la règle §6 recommande un autre
+LLM ; les convergences entre couches indépendantes sont donc le signal le plus fiable de la passe.
+Les correctifs de la 4.5 elle-même sont dans son fichier, § Review Findings.*
+
+### `basculerStatut` n'exclut pas les lignes tombstonées — pour la 4.10
+
+**Mesuré le 2026-08-19** : sur une ligne tombstonée, `update … set status='bought'` rend `UPDATE 1`,
+`error: null`. `lib/liste/basculer.ts` ne filtre pas `deleted_at is null`.
+
+La 4.5 est la première story à écrire des tombstones : elle **rend ce chemin atteignable** sans
+l'avoir créé. Scénario : B archive ou vide pendant que l'écran de A, chargé avant (pas de temps réel
+avant la 4.11), affiche encore la ligne ; A tape la case. L'écran garde sa coche optimiste sur un
+article que la base a retiré, jusqu'au prochain montage — et l'`UPDATE` écrase `intent_at`,
+c'est-à-dire l'arbitre du LWW.
+
+*Reporté* : le correctif interagit avec l'arbitrage, que la **4.10** possède.
+
+### Le rollback d'un geste de masse écrase un ajout ou une coche concurrents — pour la 4.11
+
+`app/courses/ListeCourses.tsx:265` capture `const precedent = articles` **avant** l'attente réseau,
+et `:285` le rétablit en cas d'échec. Or `occupe` ne désactive ni la case à cocher ni le formulaire
+d'ajout. Ajouter « Lait » pendant un vidage qui échoue le fait **disparaître de l'écran** alors
+qu'il est en base ; cocher pendant ce temps perd la coche à l'écran alors qu'elle est persistée.
+
+*Reporté* : la réconciliation entre état local et serveur est la **4.11** (propagation temps réel).
+
+### Aucune relecture après un geste de masse — pour la 4.11
+
+Le filtre optimiste ne retire que ce que l'écran connaît ; la fonction agit sur tout le foyer. Si
+l'autre membre a coché depuis le chargement, `archiver_les_achetes()` rend **plus** que ce qui a
+disparu à l'écran, et des articles restent affichés « à prendre » alors qu'ils sont tombstonés. Le
+commentaire de `ListeCourses.tsx:238` n'envisage que le sens inverse.
+
+*Reporté* : **4.11**.
+
+### La borne haute laisse une fenêtre de 24 h — pour la 4.10
+
+`grocery_list_items_tombstone_borne_haute` refuse `now() + 25 h` (mesuré, `23514`) et **accepte**
+`now() + 23 h` (mesuré). Le raisonnement écrit dans la migration — « un tombstone fait disparaître
+la ligne immédiatement ET gagne tout arbitrage LWW » — reste entièrement vrai dans cette fenêtre.
+La symétrie avec la borne basse est argumentée ; la conséquence résiduelle ne l'est pas.
+
+*Reporté* : la **4.10** possède l'arbitrage.
+
+### `revoke all … from public` ne ferme rien — pré-existant, pour la 4.12
+
+**Mesuré** : `has_function_privilege('anon','public.vider_la_liste()','execute')` → `t`. Cause :
+`pg_default_acl` (posé par `20260729094500`) réaccorde `execute` **nominativement** à `anon`,
+`authenticated` et `service_role` ; `revoke … from public` ne retire que le pseudo-rôle PUBLIC.
+
+L'en-tête de `20260817160000` documente donc une garantie de privilège qui n'existe pas — et c'est
+le mécanisme qui rend possible la décision D-1 (fuite inter-foyers sous un rôle qui contourne la
+RLS). ⚠️ Le garde-fou `P0001` tient pour `anon` (mesuré : « Aucun foyer »), pas pour `service_role`.
+
+*Reporté* : pré-existant à cette story ; la **4.12** gèle le contrat et doit trancher quelles
+primitives y entrent.

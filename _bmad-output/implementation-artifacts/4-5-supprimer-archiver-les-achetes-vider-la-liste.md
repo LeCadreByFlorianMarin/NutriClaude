@@ -33,7 +33,13 @@ baseline_commit: 452f308
 
 # Story 4.5: Supprimer, archiver les achetés, vider la liste
 
-Status: review
+Status: done
+
+<!-- ✅ **FERMÉE LE 2026-08-20, après revue adversariale à trois couches.** 2 décisions tranchées
+     par Florian et 14 correctifs appliqués et vérifiés ; 5 constats reportés vers les stories qui
+     les possèdent (4.10, 4.11, 4.12), consignés dans `deferred-work.md`.
+     ⛔ **CE QUI RESTE OUVERT ET DATÉ** : la décision `intent_at` (horloge client vs serveur,
+     +0,740 s mesuré), à trancher AVANT la 4.10 — cette story l'a évitée, pas refermée. -->
 
 <!-- ✅ **FUSIONNÉE le 2026-08-18** (PR #31, squash `fefa2ec`), les 4 contrôles verts.
      ⛔ **La requête de contrôle en PRODUCTION n'a PAS été exécutée** — décision de Florian,
@@ -258,6 +264,87 @@ d'un profil réel. Commandes exécutées, pas déduites.*
   - [x] ⛔ **Parcours à l'œil, aux DEUX réglages système, thème remis après** — FAIT le 2026-08-17, sur une construction de PRODUCTION. Il a trouvé **deux défauts qu'aucune des six portes ne voyait** (plus un troisième, mineur), tous corrigés **puis revérifiés à l'œil**. NFR-3 mesuré à 390/360/320 px, confirmation armée et nom de 200 caractères compris. Détail à la section « Parcours à l'écran »
   - [x] Fermer le `Status` du fichier **et** `sprint-status.yaml` (§6 bis)
 
+### Review Findings — revue adversariale du 2026-08-19
+
+> Trois couches lancées en parallèle, sans contexte de conversation : Blind Hunter, Edge Case
+> Hunter, Acceptance Auditor. ⚠️ **Revue par le même modèle que l'implémentation** — la règle §6 du
+> dépôt recommande un autre LLM. Les convergences entre couches indépendantes sont donc le signal
+> le plus fiable de cette passe, et elles sont notées.
+
+#### Décisions à trancher
+
+- [x] **[Review][Decision] Les trois fonctions ne portent aucun filtre de foyer — un appelant dont la RLS est contournée balaie TOUTES les listes** — `20260817160000_….sql:157,184,212`. ⛔ **Trouvé indépendamment par deux couches, et reproduit une troisième fois pendant le triage.** Mesuré : en rôle `service_role` avec un JWT du foyer `989a39e5` (1 article), `vider_la_liste()` rend **11** et vide le foyer `fa5eac28`, qui n'est pas le sien. La seule garde est `current_household_id() is null → raise`, qui passe dès qu'un `sub` est connu, **quel que soit le rôle Postgres**. ⚠️ **Atteignabilité mesurée aujourd'hui : nulle** — `grep -rn "SERVICE_ROLE" app lib proxy.ts` ne rend rien, et AD-2 interdit la clé de service côté application. ⛔ **Mais c'est une mine posée** : le `comment on function` promet « du foyer courant » (faux sous un rôle qui contourne), et `lib/liste/suppression.ts:36` annonce ces fonctions comme « appelable telle quelle par le dashboard (Epic 5) et le serveur MCP (Epic 7) » — précisément les surfaces qui portent une clé de service. **Options** : (a) ajouter `and household_id = v_foyer` aux trois `where` — le foyer est déjà calculé, c'est du SQL serveur et non un contrôle applicatif, donc AD-1/AD-2 ne s'y opposent pas, contrairement à ce que l'en-tête de la migration affirme ; (b) `revoke execute … from service_role` ; (c) ne rien changer et écrire l'interdit dans `project-context.md`. ⚠️ Toute correction exige une **migration neuve** — une migration appliquée ne se retouche pas.
+- [x] **[Review][Decision] `lib/supabase/types.ts` est retouché à la main alors que la doc le dit généré** — `lib/supabase/types.ts:9,787`. Trouvé par les trois couches. Mesuré : `npx supabase gen types typescript --local` réémet le bloc `graphql_public` et son entrée `Constants` (28 lignes de diff), parce que `supabase/config.toml:13` expose toujours `["public","graphql_public"]`. Or `docs/configuration.md:193` écrit « généré […] et non plus écrit à la main ». **Options** : (a) restaurer le bloc et régénérer à la commande nue ; (b) retirer `graphql_public` de `config.toml` pour que la génération et le contrat s'accordent ; (c) poser un script `gen:types` portant la commande épinglée. *(C'est le point n°2 déjà signalé dans la PR #31.)*
+
+#### Correctifs
+
+- [x] [Review][Patch] La confirmation d'un geste global survit à la disparition de son bouton, et remonte **déjà armée** — un seul tap suffit alors [`app/courses/GestesDeListe.tsx:53,75`]
+- [x] [Review][Patch] Plusieurs lignes peuvent rester armées ; « Confirmer » occupe la position exacte de « Retirer », donc un retour sur une ligne armée supprime au premier tap [`app/courses/ListeCourses.tsx:658`]
+- [x] [Review][Patch] « Un instant… » est injoignable : `setAConfirmer(null)` précède l'appel, donc aucun retour visible pendant l'écriture [`app/courses/GestesDeListe.tsx:199`]
+- [x] [Review][Patch] La ligne n'a **pas** de région de statut : ses deux messages s'écrivent sous les trente articles, hors champ — la règle que la story pose elle-même en Task 3 [`app/courses/ListeCourses.tsx:292,302`]
+- [x] [Review][Patch] WCAG 2.5.3 « Label in Name » violé sur les deux boutons « Non » — deux lignes sous le commentaire qui invoque cette règle [`app/courses/ListeCourses.tsx:767`, `app/courses/GestesDeListe.tsx:205`]
+- [x] [Review][Patch] L'explication de confirmation est annoncée **deux fois** au lecteur d'écran, et la chaîne est écrite quatre fois pour deux phrases [`app/courses/GestesDeListe.tsx:139,210`]
+- [x] [Review][Patch] Le compte rendu survit à la reconstitution de la liste : « 11 articles retirés. » reste affiché au-dessus d'articles neufs [`app/courses/ListeCourses.tsx:530`]
+- [x] [Review][Patch] « Ta liste est vide. » s'affiche pendant un vidage **en vol** — l'affirmation avant acquittement que l'en-tête du fichier interdit [`app/courses/ListeCourses.tsx:404`]
+- [x] [Review][Patch] Le focus clavier retombe sur `<body>` à chaque armement ; le motif source (`ListeRayons.tsx:223`) porte le mécanisme, il n'a pas été repris [`app/courses/ListeCourses.tsx:784`]
+- [x] [Review][Patch] `.btn-ligne:disabled` est mathématiquement invisible : `saturate(0.6)` déplace l'encre de 3 unités sur 255 [`app/globals.css:648`]
+- [x] [Review][Patch] `EXPERIENCE.md:104` n'a **pas** été réécrit — D1 exigeait de le DATER, pas de le contredire dans un commentaire de CSS. `EXPERIENCE.md:142` et `DESIGN.md:279,298` disent la même chose et sont aussi contredits [`EXPERIENCE.md:104`]
+- [x] [Review][Patch] La story affirme que la contrainte « n'est évaluée qu'à l'écriture » — **faux** : un `ADD CONSTRAINT … CHECK` sans `NOT VALID` scanne les lignes existantes, ce que l'en-tête de la migration dit correctement deux paragraphes plus loin [story, D4]
+- [x] [Review][Patch] Trois trous de couverture : aucun test n'exerce les RPC en rôle contournant la RLS, ne fige le `P0001` sans session, ni ne vérifie qu'un tombstone à +2 min est **accepté** (la tolérance que la migration argumente sur un paragraphe entier) [`supabase/tests/isolation.test.ts`]
+- [x] [Review][Patch] Indentation JSX cassée sur ~45 lignes ; aucune porte ne le voit (ni Prettier ni règle de format en CI) [`app/courses/ListeCourses.tsx:405-511`]
+
+#### Ce que la passe de correction a produit — 2026-08-20
+
+**Les 2 décisions tranchées par Florian et les 14 correctifs sont appliqués.** Portes rejouées :
+`npm test` **271/271** · isolation **124 · 123 pass · 0 fail · 1 skipped** (+3) · typecheck · lint ·
+`check:migrations` **20/18/2/0** · build 14 routes.
+
+✅ **Les deux décisions sont PROUVÉES, pas seulement appliquées :**
+
+| Décision | Preuve exécutée |
+|---|---|
+| **D-1** — filtre de foyer | Contrôle n°2 de la migration neuve : en `service_role` avec le JWT du foyer A (1 article), `vider_la_liste()` rend **1** et **les 3 articles du foyer B restent vivants**. Avant : rendait 11 et vidait B |
+| **D-2** — `graphql_public` | `npx supabase gen types typescript --local \| diff - lib/supabase/types.ts` → **0 ligne**. La commande documentée nue reproduit désormais le fichier du dépôt |
+
+⛔ **ET CE SECOND PARCOURS À L'ŒIL A TROUVÉ DEUX DÉFAUTS DE PLUS — dans mes propres correctifs.**
+Les deux passaient les six portes.
+
+1. **La zone de statut de ligne a cassé la mise en page.** Je l'avais posée en `<Notice
+   className="basis-full">` **dans** le `<li className="ligne-article">`, qui est un flex sans
+   `flex-wrap` : un troisième enfant y a écrasé la colonne du nom, et **les libellés se rendaient
+   une lettre par ligne**. ⛔ Typecheck, lint, 271 tests, 123 tests d'isolation, build et sonde CSS
+   étaient tous verts. Le rang est désormais un `<div>` dans le `<li>`, le message vit dessous.
+2. **Le message de ligne n'apparaissait sur aucun chemin réussi.** Mesuré : sur « il n'était déjà
+   plus là », la ligne est retirée **optimistement**, donc sa zone de statut part avec elle. Les
+   deux cas ne se ressemblent pas et sont maintenant routés séparément — **échec** → la ligne
+   revient, le message se pose dessus ; **succès sans effet** → la ligne est légitimement partie,
+   le message va sous la liste.
+
+✅ **Vérifié à l'écran, aux deux thèmes, thème remis :**
+
+| Vérifié | Résultat |
+|---|---|
+| Une seule ligne armée | ✅ armer une seconde ligne **désarme** la première (`nbConfirmer: 1`) |
+| Focus clavier | ✅ armer déplace le focus sur « Confirmer » (`activeElement` mesuré) — il retombait sur `<body>` |
+| ⛔ **Message de ligne, chemin d'échec** | ✅ **provoqué pour de vrai** (`revoke execute`) : la ligne « Pommes » revient et le message s'affiche **dans cette ligne**, plus sous les trente autres |
+| « Non » et WCAG 2.5.3 | ✅ `aria-label` = « Non — garder Salade dans la liste » |
+| État inerte visible | ✅ l'encre passe de `rgb(174,182,201)` à `rgb(137,144,165)` — **38 unités sur 255**, contre 3 avant |
+| Contraste de `.btn-ligne` | ✅ **8,059:1** en sombre (fond recomposé `#261d23`), inchangé |
+| NFR-3 | ✅ **0 débordement** à 390 / 360 / 320 px avec la nouvelle structure |
+
+⚠️ **« Un instant… » n'a PAS pu être capté** : en local l'écriture rend en quelques millisecondes,
+et six relevés à 60 ms ne l'ont pas vu passer. Le chemin est corrigé et lisible dans le code — le
+geste reste armé pendant l'attente — mais **je ne l'ai pas observé**, et je l'écris plutôt que de
+le supposer.
+
+#### Reportés
+
+- [x] [Review][Defer] `basculerStatut` n'exclut pas les lignes tombstonées ; cocher un article retiré ailleurs rend `UPDATE 1` sans erreur et écrase `intent_at` [`lib/liste/basculer.ts`] — reporté, code de la 4.3 rendu atteignable par la 4.5, l'arbitrage appartient à la **4.10**
+- [x] [Review][Defer] Le rollback d'un geste de masse écrase un ajout ou une coche concurrents [`app/courses/ListeCourses.tsx:265,285`] — reporté, la réconciliation est la **4.11**
+- [x] [Review][Defer] Aucune relecture après un geste de masse : le compte annoncé peut dépasser ce qui a disparu de l'écran [`app/courses/ListeCourses.tsx:306`] — reporté, **4.11**
+- [x] [Review][Defer] La borne haute laisse une fenêtre de 24 h dans laquelle un tombstone gagne tout arbitrage LWW [`20260817160000_….sql:111`] — reporté, **4.10**
+- [x] [Review][Defer] `revoke all … from public` ne retire rien : les privilèges par défaut de `20260729094500` réaccordent `execute` nominativement à `anon` et `service_role` [`20260817160000_….sql:221`] — reporté, pré-existant, et c'est le mécanisme sous-jacent de la décision D-1
+
 ---
 
 ## Dev Notes
@@ -405,9 +492,19 @@ Le parcours à l'écran se fait sur le **stack local**, jamais sur la prévisual
 
 Aucune dépendance nouvelle (NFR-10), aucune API externe, aucune bibliothèque de geste. PostgreSQL
 **17.6** en local comme en production. ⚠️ **`now()` dans un `check` est accepté et déjà employé**
-sur cette table (M9) — ce n'est pas une supposition, mais la contrainte n'est évaluée **qu'à
-l'écriture** : elle ne réécrit pas les lignes existantes, ce qui la rend sûre ici (aucun tombstone
-n'existe encore, cette story étant la première à en poser).
+sur cette table (M9) — ce n'est pas une supposition.
+
+⛔ **CETTE PHRASE DISAIT ENSUITE « la contrainte n'est évaluée qu'à l'écriture : elle ne réécrit
+pas les lignes existantes, ce qui la rend sûre ici ». C'EST FAUX**, et la revue du 2026-08-19 l'a
+relevé. Un `alter table … add constraint … check` **sans `not valid`** SCANNE les lignes
+existantes : une seule en violation fait échouer la migration, donc le déploiement. L'en-tête de
+la migration le dit correctement deux paragraphes plus loin (« `violeraient` DOIT valoir 0, sinon
+le volet 1 échoue et le déploiement s'arrête ») — c'est bien cette ligne-ci qui affirmait
+l'inverse, et elle servait d'argument de sûreté.
+
+✅ **Ce qui reste vrai** : la contrainte est passée en production le 2026-08-19, donc aucune ligne
+ne la violait. Mais c'est une preuve **par l'application**, obtenue après coup — pas la garantie
+*a priori* que cette phrase prétendait donner.
 
 ---
 
