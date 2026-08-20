@@ -33,14 +33,17 @@ function ligne(surcharge: Partial<Parameters<typeof versArticle>[0]> = {}) {
     aisle_name: "Crèmerie",
     aisle_icon: "🧀",
     aisle_sort: 42,
+    actor_kind: "profile",
+    surface: "web",
+    recipe_id: "recette-7",
     ...surcharge,
   };
 }
 
 test("chaque colonne atterrit dans le CHAMP qui lui correspond", () => {
   /*
-   * ⛔ **Le test qui justifie ce fichier.** NEUF colonnes, neuf champs, et neuf
-   * valeurs toutes DISTINCTES — c'est ce qui le rend capable de voir une
+   * ⛔ **Le test qui justifie ce fichier.** DOUZE colonnes, douze champs, et douze
+   * valeurs toutes DISTINCTES *(neuf jusqu'à la story 4.6, qui ajoute la provenance)* — c'est ce qui le rend capable de voir une
    * permutation. Avec deux `null` au même endroit ou deux nombres égaux, un
    * mapping croisé passerait.
    *
@@ -60,6 +63,9 @@ test("chaque colonne atterrit dans le CHAMP qui lui correspond", () => {
     rayonNom: "Crèmerie",
     rayonIcone: "🧀",
     rayonOrdre: 42,
+    acteurType: "profile",
+    surface: "web",
+    recetteId: "recette-7",
   });
 });
 

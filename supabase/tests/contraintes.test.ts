@@ -6,6 +6,7 @@ import { stackLocal } from "./stack-local.ts";
 import { normaliserNomRayon } from "../../lib/rayons/saisie.ts";
 import { normaliserEntier, normaliserQuantite, normaliserTitre } from "../../lib/recettes/saisie.ts";
 import { UNITES, estUniteConnue } from "../../lib/recettes/unites.ts";
+import { SURFACES, estSurfaceConnue } from "../../lib/liste/surfaces.ts";
 import { normaliserTexte } from "../../lib/texte.ts";
 import { ingredientsDeRecette } from "../../lib/recettes/ingredients.ts";
 import { analyserPersonnes } from "../../lib/personnes.ts";
@@ -414,6 +415,42 @@ test("chaque jeton de UNITES est accepté par la base, et rien d'autre", async (
       .select("id");
     assert.equal(error, null, `la base a refusé le jeton « ${unite} » que le code publie`);
     await admin.from("recipe_ingredients").delete().eq("id", data![0].id);
+  }
+});
+
+test("chaque jeton de SURFACES est accepté par la base, et rien d'autre", async () => {
+  /*
+   * ⛔ **L'INVARIANT DE LA STORY 4.6, ET IL N'ÉTAIT MESURÉ PAR RIEN — revue du 2026-08-20.**
+   * `SURFACES` (code) et `grocery_list_items_surface_fermee` (base) prétendent nommer le même
+   * ensemble, et le module l'AFFIRMAIT dans un commentaire. C'est exactement la forme que la
+   * règle §4 interdit — « un invariant entre deux fichiers se mesure, il ne s'affirme pas » —
+   * alors que ce fichier portait déjà DEUX précédents qui le mesurent, pour les unités.
+   *
+   * ⚠️ **Le sens qui manquait est celui qui ne casse rien tout de suite** : un septième jeton
+   * ajouté au `check` sans être ajouté à `SURFACES` passe toutes les portes, puis n'affiche
+   * aucune provenance et journalise un avertissement par lecture.
+   *
+   * ⚠️ Les tests neufs de la 4.6 n'envoyaient que deux jetons sur six à la base ; une coquille
+   * sur `dashboard`, `voix`, `dictee` ou `pont` restait verte des deux côtés.
+   */
+  for (const surface of SURFACES) {
+    const { data, error } = await admin
+      .from("grocery_list_items")
+      .insert({ household_id: foyerId, name: `zzsurf ${surface}`, surface })
+      .select("id");
+    assert.equal(error, null, `la base a refusé le jeton « ${surface} » que le code publie`);
+    await admin.from("grocery_list_items").delete().eq("id", data![0].id);
+  }
+});
+
+test("une surface hors vocabulaire est refusée par la base, comme par le code", async () => {
+  for (const faux of ["Web", "WEB", "shortcut", "sms", "partage", " web", "voice"]) {
+    assert.equal(estSurfaceConnue(faux), false, `le code accepte « ${faux} »`);
+    const { error } = await admin
+      .from("grocery_list_items")
+      .insert({ household_id: foyerId, name: "hors vocabulaire", surface: faux });
+    assert.notEqual(error, null, `la base accepte « ${faux} »`);
+    assert.match(error!.message, /grocery_list_items_surface_fermee/);
   }
 });
 

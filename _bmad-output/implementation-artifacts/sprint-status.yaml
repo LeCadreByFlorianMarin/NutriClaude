@@ -41,7 +41,121 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
-last_updated: 2026-08-20  # 2026-08-20 — Story 4.5 REVUE puis FERMÉE (`done`). Revue adversariale
+last_updated: 2026-08-20  # 2026-08-20 (4) — Story 4.6 REVUE puis FERMÉE (`done`). Revue
+                          # adversariale à QUATRE couches (les 3 BMad + Clean Code / Clean
+                          # Architecture). Notes : Clean Code 7/10, Clean Architecture 7/10.
+                          # Bilan : 2 décisions, 19 correctifs, 5 reports.
+                          # ⛔ LES QUATRE COUCHES ONT TROUVÉ LE MÊME DÉFAUT : LA STORY ÉTAIT
+                          # INERTE. `ajouterArticle` ne transmettait pas la surface (0 occurrence
+                          # de p_source dans tout le code de production), donc toute ligne ajoutée
+                          # par le produit avait surface=null et l'icône ne s'affichait JAMAIS.
+                          # ⛔ ET MON PARCOURS À L'ŒIL AVAIT VALIDÉ MA PROPRE MISE EN SCÈNE : les
+                          # 5 lignes qui portaient une surface, c'est moi qui les avais plantées en
+                          # psql quelques minutes avant de regarder. Règle §1 dans sa forme la plus
+                          # grave — une case cochée sur une preuve fabriquée — et c'est nommément
+                          # la « contamination croisée » que la revue de la 2.4 avait DÉJÀ consignée.
+                          # ⛔ LE FILET A ÉCHOUÉ POUR LA MÊME RAISON : les 5 tests d'isolation
+                          # appelaient le RPC en direct avec la surface en dur, au lieu de passer
+                          # par la porte du dépôt. Ils le font désormais.
+                          # ⛔ AUTRE DÉFAUT MESURÉ : `provenanceDe` rendait 🍴 sur
+                          # `recipeId: undefined` — le garde `!== null` ne couvrait pas `undefined`,
+                          # alors que « la valeur arrive undefined en silence » est le mode de
+                          # défaillance que cette story invoque QUATRE FOIS pour se justifier.
+                          # ⛔ deferred-work.md N'AVAIT PAS ÉTÉ TOUCHÉ alors que TROIS endroits
+                          # affirmaient y avoir reporté, dont deux commentaires de la migration
+                          # livrée. Six entrées y sont désormais écrites.
+                          # ✅ DÉCISIONS DE FLORIAN : (1) `source` → `surface` — le nom obligeait à
+                          # réécrire six fois la même mise en garde dans quatre fichiers ; (2)
+                          # scission en `surfaces.ts` (vocabulaire pur) + `provenance.ts`
+                          # (présentation), parce que l'adaptateur de persistance importait la
+                          # présentation — la seule dépendance qui pointait à l'envers.
+                          # ⚠️ La migration n'étant NI commitée NI déployée, elle a été corrigée EN
+                          # PLACE plutôt qu'empilée : docs/migrations.md n'interdit que la retouche
+                          # d'une migration APPLIQUÉE.
+                          # ✅ RE-PROUVÉ SUR UNE DONNÉE DU PRODUIT : 0 ligne sur 11 avant le
+                          # parcours, puis « Basilic » ajouté PAR L'ÉCRAN → actor_kind='profile',
+                          # surface='web', estampillé au bon membre, icône ＋ visible, et le nom
+                          # accessible de la case dit « Basilic, à prendre, ajout manuel ».
+                          # ⚠️ CE QUI RESTE NON VÉRIFIÉ À L'ŒIL, ET N'EST PAS ENSEMENCÉ : seul le
+                          # canal ＋ est produisible aujourd'hui. voix/dictee/pont (E6), dashboard
+                          # (E5), mcp (E7) et 🍴 (4.7) ne sont couverts que par les tests unitaires.
+                          # Portes : npm test 279/279 · isolation 131, 130 pass, 0 fail, 1 skipped ·
+                          # typecheck · lint · check:migrations 21/19/2/0 · build 14 routes.
+                          #
+                          # 2026-08-20 (3) — Story 4.6 IMPLÉMENTÉE (statut `review`).
+                          # D1 à D5 appliquées sur leur DÉFAUT PRESCRIT, faute d'arbitrage.
+                          # ⛔ TROIS PIÈGES MESURÉS AVANT D'ÉCRIRE, DONT DEUX CASSAIENT LE PRODUIT :
+                          # (1) ajouter un paramètre à ajouter_article crée une SURCHARGE — tout
+                          #     appel à 3 arguments rendait `is not unique`, donc le chemin d'ajout
+                          #     cessait de fonctionner. La migration DROP l'ancienne signature
+                          #     AVANT de créer la nouvelle ;
+                          # (2) AJOUTER UNE COLONNE À LA TABLE NE L'AJOUTE PAS À LA VUE, qui
+                          #     énumère ses colonnes depuis la 4.1. ⚠️ Trouvé par le TYPAGE
+                          #     (SelectQueryError), pas à l'exécution — sans lui, le défaut
+                          #     apparaissait en production sur une requête refusée ;
+                          # (3) une chaîne .select() CONCATÉNÉE casse l'inférence de supabase-js.
+                          # ⛔ LA PROVENANCE EST DÉSORMAIS ESTAMPILLÉE CÔTÉ SERVEUR. Mesuré avant :
+                          # un membre pouvait attribuer un article À UN AUTRE MEMBRE et inventer un
+                          # actor_kind='device' désignant un appareil inexistant (device_credentials
+                          # n'existe même pas). ajouter_article étant l'unique chemin d'ajout (AD-6),
+                          # elle pose auth.uid() : le client n'a plus rien à déclarer.
+                          # ⚠️ CEINTURE RLS SUR `insert` SEULEMENT, et c'est mécanique : `with check`
+                          # juge la ligne NEUVE et RLS ne compare pas l'ancienne à la nouvelle. Sur
+                          # `update`, elle refuserait TOUT geste sur l'article d'autrui, sur une
+                          # liste partagée (AD-16). Le trou résiduel — un update peut réécrire
+                          # actor_id — demande un TRIGGER, pas une politique. Reporté.
+                          # ⚠️ `device` reste délibérément non contraint : auth.uid() n'y a pas de
+                          # sens (AD-9), et la table qui rendrait la contrainte exprimable est
+                          # l'Epic 5. C'est exactement pourquoi la 4.1 avait reporté.
+                          # ⛔ L'AC3 N'EST PAS LIVRÉ (D3a), et re-daté vers la 4.7 : la fonction
+                          # segfaute ET le modèle ne peut pas porter la réponse (N recettes → un
+                          # recipe_id unique). La LECTURE est livrée et figée par un test.
+                          # ⚠️ added_by CONSERVÉE (D4a) : vide sur les 15 lignes, son unique
+                          # écrivain est la fonction qui segfaute. Retrait daté vers la 4.7.
+                          # ⚠️ UN ÉCHEC D'ISOLATION NON REPRODUIT au premier passage (fail 1), les
+                          # trois suivants propres. CAUSE NON ÉTABLIE — écrit plutôt qu'inventé.
+                          # Portes : npm test 277/277 (+6) · isolation 129, 128 pass, 0 fail,
+                          # 1 skipped (+5) · typecheck · lint · check:migrations 21/19/2/0 ·
+                          # build 14 routes · banc de mutations 4/4 tués · contraste .provenance
+                          # 5,713:1 clair et 8,059:1 sombre · NFR-3 0 débordement à 390/360/320 px.
+                          #
+                          # 2026-08-20 (2) — Story 4.6 CONTEXTUALISÉE (`backlog` →
+                          # `ready-for-dev`), sur `065ec58`. Dix mesures exécutées.
+                          # ⛔ LE FAIT CENTRAL : L'AC1 DEMANDE D'ENREGISTRER UNE DONNÉE QUI N'A PAS
+                          # DE COLONNE. Il exige « actor_kind + actor_id, LA SURFACE D'ARRIVÉE, et
+                          # recipe_id ». Les trois autres existent ; la surface, non (M1). Et la
+                          # seule colonne vers laquelle le réflexe pousse — source_ref — est
+                          # l'idempotence du pont Google (AD-12 mot pour mot, ERD « dedup
+                          # pont/shortcut », AD-17 « dédup pont par source_ref »), dont l'index
+                          # unique est DATÉ à l'Epic 6. L'y écrire une surface déduplirait tous les
+                          # ajouts d'une même surface. D'où D1 : une colonne `source` à vocabulaire
+                          # fermé. ⚠️ Ce n'est PAS une énumération qui court après une catégorie
+                          # (règle §3) : les surfaces sont un ensemble que NOUS contrôlons.
+                          # ⛔ ET L'AC3 N'EST PAS ATTEIGNABLE, POUR DEUX RAISONS INDÉPENDANTES :
+                          # (1) generate_grocery_list_from_menu SEGFAUTE et appartient à la 4.7 ;
+                          # (2) plus profond, LE MODÈLE NE PEUT PAS PORTER LA RÉPONSE — la
+                          # génération agrège `group by name, unit, product_id, aisle_keyword` À
+                          # TRAVERS TOUTES LES RECETTES (M8), donc une ligne vient de N recettes
+                          # pour un recipe_id unique. « La recette d'origine » n'existe pas au
+                          # singulier. Re-daté vers la 4.7, écrit plutôt qu'esquivé — même forme
+                          # que l'AC3 de la 4.4 (l'arrondi).
+                          # ✅ UNE BONNE NOUVELLE MESURÉE : la 4.4 a fermé le chemin d'usurpation
+                          # sans le chercher. « Ajouter » passant obligatoirement par
+                          # ajouter_article (AD-6), la fonction peut ESTAMPILLER auth.uid() côté
+                          # serveur — le client n'a plus rien à déclarer (D2).
+                          # ⛔ CE QUI RESTE OUVERT ET MESURÉ : A peut attribuer un article à B (M6)
+                          # et inventer un appareil (M7) — device_credentials n'existe même pas.
+                          # ⚠️ DEUX REPORTS DATÉS DE LA 4.1 SONT ADRESSÉS À CETTE STORY et tranchés :
+                          # le sort d'added_by (D4 → conservée, retrait daté vers la 4.7, sa
+                          # colonne étant VIDE sur les 15 lignes) et la ceinture RLS sur actor_id.
+                          # ⚠️ --provenance-color N'EXISTE PAS dans globals.css : première story à
+                          # le monter, et DESIGN.md mesure l'ancienne forme à 2,86:1 (plancher 3:1).
+                          # ⚠️ Un recipe_id nul est AMBIGU (FK on delete set null) : « ajout
+                          # manuel » ou « recette supprimée ». Seule `source` tranchera.
+                          # Portes au départ : npm test 271/271 · isolation 124, 123 pass, 0 fail,
+                          # 1 skipped · check:migrations 20/18/2/0.
+                          #
+                          # 2026-08-20 — Story 4.5 REVUE puis FERMÉE (`done`). Revue adversariale
                           # à trois couches parallèles. ⚠️ MÊME MODÈLE QUE L'IMPLÉMENTATION — la
                           # règle §6 recommande un autre LLM ; les convergences entre couches
                           # indépendantes ont donc servi de signal, et elles ont porté.
@@ -1135,7 +1249,7 @@ development_status:
   4-3-cocher-et-decocher-idempotent-et-reversible: done
   4-4-ajouter-un-article-avec-agregation-et-unites-fermees: done
   4-5-supprimer-archiver-les-achetes-vider-la-liste: done
-  4-6-provenance-de-chaque-article: backlog
+  4-6-provenance-de-chaque-article: done
   4-7-generer-la-liste-depuis-le-menu-sans-rien-ecraser: backlog
   4-8-consulter-la-liste-hors-ligne: backlog
   4-9-ecrire-hors-ligne-via-une-outbox-rejouee: backlog

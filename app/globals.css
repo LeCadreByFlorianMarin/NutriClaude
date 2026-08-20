@@ -53,6 +53,8 @@
    * « Se déconnecter ».)
    */
   --muted: #63685f;
+  /* Icône de provenance (DESIGN.md:159) : porteuse, donc ≥3:1, jamais d'opacity. */
+  --provenance-color: #63685f;
   --muted-2: #8b9083; /* non-essentiel SEULEMENT — jamais un texte porteur */
   --checkbox-empty: #83887b; /* 3,64:1 sur carte blanche */
   --checkbox-empty-fill: rgba(20, 20, 20, 0.03);
@@ -82,6 +84,7 @@
     --card-shadow: none; /* sur sombre, la profondeur vient du verre, pas de l'ombre */
     --text: #eef1f8;
     --muted: #aeb6c9; /* 8,06:1 sur le verre carte. AA. */
+    --provenance-color: #aeb6c9;
     --muted-2: #8990a5;
     --checkbox-empty: #828aa3; /* 4,77:1 sur le verre carte */
     --checkbox-empty-fill: rgba(255, 255, 255, 0.04);
@@ -668,6 +671,28 @@ body::before {
    */
   .btn-ligne:disabled {
     @apply cursor-default text-muted-2;
+  }
+
+  /*
+   * L'icône de PROVENANCE (story 4.6, FR-7).
+   *
+   * ⛔ **`--provenance-color` EST SPÉCIFIÉE DEPUIS DESIGN.md:159 ET N'AVAIT JAMAIS ÉTÉ
+   * MONTÉE.** Son commentaire porte la mesure qui l'a fait naître : « ≥3:1, jamais d'opacity
+   * réductrice — **était muted-2-dark + opacity .7 ~2,86:1** ». C'est donc un token né d'un
+   * défaut de contraste, et le reproduire par une opacité le rouvrirait.
+   *
+   * ⚠️ **`--muted` et rien d'autre.** L'icône PORTE de l'information (d'où vient l'article) :
+   * `muted-2` est « strictement réservé au non-essentiel ». ⛔ La SEULE exception est l'article
+   * déjà coché, où la provenance devient redondante — c'est `done-meta-color`, et c'est le
+   * même emploi que la quantité barrée.
+   *
+   * ⚠️ **`shrink-0`** : l'icône ne se comprime jamais, sinon elle devient illisible avant que
+   * le nom ne se réduise. ⚠️ **Elle n'intercepte pas le tap** (`EXPERIENCE.md:142`) : elle vit
+   * dans le `<label>` de bascule, donc un clic dessus bascule la case comme partout ailleurs.
+   */
+  .provenance {
+    @apply shrink-0 text-meta;
+    color: var(--provenance-color);
   }
 
   /*

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../supabase/types";
 import { estUniteConnue, type Unite } from "../recettes/unites.ts";
+import type { Surface } from "./surfaces.ts";
 
 /**
  * Ajouter un article à la liste du foyer — ou **incrémenter** sa quantité.
@@ -41,6 +42,22 @@ import { estUniteConnue, type Unite } from "../recettes/unites.ts";
 export async function ajouterArticle(
   supabase: SupabaseClient<Database>,
   nom: string,
+  /**
+   * La surface d'où part l'ajout (FR-7, story 4.6).
+   *
+   * ⛔ **CE PARAMÈTRE MANQUAIT, ET TOUTE LA STORY 4.6 ÉTAIT INERTE — revue du 2026-08-20.**
+   * `p_source` avait un défaut `null` côté SQL : l'appel réussissait, écrivait une surface
+   * nulle, et l'icône de provenance ne s'affichait **jamais**. Quatre volets de migration, un
+   * token CSS, un composant et onze tests livrés pour un écran qui ne montrait rien.
+   *
+   * ⛔ **Et aucun test ne l'a vu**, parce qu'ils appelaient le RPC en direct avec la surface
+   * en dur au lieu de passer par cette fonction. Ils le font désormais.
+   *
+   * ⚠️ **Obligatoire, pas optionnel.** Un défaut ici reproduirait exactement le défaut qu'on
+   * corrige : un appelant futur (dashboard, pont, MCP) qui l'oublie doit être arrêté par le
+   * compilateur, pas écrire une provenance vide en silence.
+   */
+  surface: Surface,
   quantite?: number,
   unite?: Unite
 ): Promise<void> {
@@ -54,6 +71,7 @@ export async function ajouterArticle(
      */
     ...(quantite === undefined ? {} : { p_quantite: quantite }),
     ...(unite === undefined ? {} : { p_unite: unite }),
+    p_surface: surface,
   });
 
   if (error) {

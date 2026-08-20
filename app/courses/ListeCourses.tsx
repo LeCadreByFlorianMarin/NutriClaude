@@ -19,6 +19,7 @@ import {
   compteRenduVidage,
 } from "@/lib/liste/suppression";
 import { formaterQuantiteEtUnite } from "@/lib/quantite";
+import { provenanceDe } from "@/lib/liste/provenance";
 import { AjouterArticle } from "./AjouterArticle";
 import { GestesDeListe } from "./GestesDeListe";
 
@@ -756,6 +757,17 @@ function LigneArticle({
 }) {
   const quantite = formaterQuantiteEtUnite(article.quantite, article.unite);
   const achete = article.statut === "bought";
+  /*
+   * ⚠️ **La provenance se DÉRIVE, elle n'est pas stockée.** L'état garde ce que la base a
+   * rendu (`actorKind`, `source`, `recipeId`) ; la règle qui choisit l'icône et son texte vit
+   * dans `lib/liste/provenance.ts`, exportée et mesurée. La laisser ici la rendrait
+   * intestable — NFR-10 interdit un harnais de composants, et le dépôt a payé cette leçon
+   * deux fois.
+   */
+  const provenance = provenanceDe({
+    surface: article.surface,
+    recipeId: article.recetteId,
+  });
 
   /*
    * ⛔ **L'ARMEMENT A QUITTÉ CETTE LIGNE — correctif de la revue du 2026-08-19.** Il y
@@ -817,7 +829,10 @@ function LigneArticle({
           type="checkbox"
           className="coche"
           checked={achete}
-          aria-label={`${article.nom}, ${achete ? "dans le panier" : "à prendre"}`}
+          aria-label={
+            `${article.nom}, ${achete ? "dans le panier" : "à prendre"}` +
+            (provenance === null ? "" : `, ${provenance.texte}`)
+          }
           onChange={(e) => onBasculer(article, e.currentTarget.checked)}
         />
       {/*
@@ -862,6 +877,45 @@ function LigneArticle({
             className={`text-qty shrink-0 tabular-nums ${achete ? "text-muted-2" : "text-muted"}`}
           >
             {quantite}
+          </span>
+        ) : null}
+
+        {/*
+         * ⛔ **L'ICÔNE N'EST JAMAIS SEULE — UX-DR6, et c'est l'AC2.** « Provenance jamais
+         * mono-canal : l'icône est doublée d'un équivalent texte / `aria-label`, de sorte
+         * qu'un daltonien, un malvoyant ou un lecteur d'écran distingue la source sans la
+         * couleur ni la forme de l'icône. »
+         *
+         * ⚠️ **L'emoji est `aria-hidden`, le sens vit dans un jumeau `.sr-only`.** Un emoji
+         * nu est vocalisé de façon imprévisible d'un lecteur à l'autre — « fourchette et
+         * couteau », « U+1F374 », ou rien. C'est le motif du compteur, né de la même leçon :
+         * `aria-label` sur un nœud non interactif est ignoré, le jumeau ne l'est pas.
+         *
+         * ⚠️ **`title` pour la souris**, en plus et jamais à la place : il ne répond ni au
+         * clavier ni au tactile.
+         *
+         * ⛔ **ELLE EST APRÈS LA QUANTITÉ — correctif de la revue du 2026-08-20.** Elle était
+         * avant. `DESIGN.md:279` fixe l'ordre du rang : coche / libellé / pastille / quantité /
+         * **icône de provenance**.
+         *
+         * ⛔ **LE SENS EST DANS L'`aria-label` DE LA CASE, PAS SEULEMENT DANS UN `.sr-only`.**
+         * Le jumeau vit dans un `<label>` dont l'`<input>` porte un `aria-label` explicite —
+         * lequel l'emporte sur le contenu du label. Au parcours par contrôle (Tab, mode
+         * formulaire), qui est le parcours naturel d'une liste de cases, la provenance n'était
+         * donc **jamais** annoncée : UX-DR6 n'était tenu que dans un mode de lecture sur deux.
+         * Le `.sr-only` reste pour le mode navigation ; le nom accessible de la case porte
+         * désormais la même information.
+         *
+         * ⛔ **Rien ne s'affiche si la provenance est inconnue.** Toutes les lignes créées
+         * avant cette story ont `source` nul (mesuré : 0 sur 15). Retomber sur ＋ « ajout
+         * manuel » affirmerait une origine qu'on ignore — règle §1, appliquée à l'écran.
+         */}
+        {provenance !== null ? (
+          <span className={`provenance${achete ? " text-muted-2" : ""}`}>
+            <span aria-hidden title={provenance.texte}>
+              {provenance.icone}
+            </span>
+            <span className="sr-only">{provenance.texte}</span>
           </span>
         ) : null}
       </label>
