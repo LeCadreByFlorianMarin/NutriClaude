@@ -41,7 +41,54 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
-last_updated: 2026-08-19  # 2026-08-19 — Story 4.5 FUSIONNÉE ET DÉPLOYÉE (PR #31, squash `fefa2ec`). Les
+last_updated: 2026-08-20  # 2026-08-20 — Story 4.5 REVUE puis FERMÉE (`done`). Revue adversariale
+                          # à trois couches parallèles. ⚠️ MÊME MODÈLE QUE L'IMPLÉMENTATION — la
+                          # règle §6 recommande un autre LLM ; les convergences entre couches
+                          # indépendantes ont donc servi de signal, et elles ont porté.
+                          # Bilan : 2 décisions tranchées par Florian, 14 correctifs appliqués,
+                          # 5 reports, 3 constats écartés.
+                          # ⛔ LE DÉFAUT LE PLUS GRAVE, trouvé par DEUX couches indépendamment et
+                          # reproduit une 3e fois au triage : les trois fonctions SQL ne portaient
+                          # AUCUN filtre de foyer. En `service_role` (qui contourne la RLS) avec le
+                          # JWT du foyer A, `vider_la_liste()` rendait 11 et vidait le foyer B.
+                          # Atteignabilité alors : NULLE (aucun service_role dans app/lib/proxy),
+                          # mais le `comment on function` promettait « du foyer courant » et
+                          # suppression.ts annonçait ces RPC pour le dashboard (E5) et MCP (E7) —
+                          # les surfaces à clé de service. CORRIGÉ par une migration NEUVE
+                          # (20260820090000), et PROUVÉ : rend 1, foyer B intact.
+                          # ⚠️ L'en-tête de 20260817160000 affirmait qu'un filtre de foyer
+                          # contredirait AD-1/AD-2. C'est daté plutôt qu'effacé : AD-1/AD-2
+                          # interdisent qu'une SURFACE se porte garante, pas qu'un `where` vive
+                          # dans une fonction SQL — qui EST la base.
+                          # ✅ graphql_public retiré de config.toml : `supabase gen types --local`
+                          # reproduit désormais EXACTEMENT le fichier du dépôt (0 ligne de diff).
+                          # ⛔ TROIS ÉCARTS DE MÉTHODE, plus instructifs que les défauts :
+                          # (1) la story revendiquait des règles qu'elle ne s'appliquait pas —
+                          #     « une région de statut par zone d'action » (la ligne n'en avait
+                          #     pas), « un compte rendu ment dès qu'un geste est armé » (il ne
+                          #     mentait pas qu'à l'armement), « un état vide se mérite » (il
+                          #     s'affichait pendant un vidage EN VOL) ;
+                          # (2) les motifs étaient cités mais partiellement repris — ListeRayons
+                          #     porte la restitution du focus AVEC sa raison écrite, elle n'avait
+                          #     pas été reprise ; InviteCard ne porte pas de sr-only, il avait été
+                          #     ajouté et doublait l'annonce ;
+                          # (3) UNE CASE COCHÉE À TORT : D1 exigeait de DATER EXPERIENCE.md:104.
+                          #     Le fichier n'avait pas été touché — la réécriture ne vivait que
+                          #     dans un commentaire de CSS, ce que D1 nommait « contredire en
+                          #     silence ». EXPERIENCE.md:104 et :142, DESIGN.md:279 et :298 sont
+                          #     désormais datés.
+                          # ⛔ ET LE SECOND PARCOURS À L'ŒIL A TROUVÉ 2 DÉFAUTS DANS MES PROPRES
+                          # CORRECTIFS, tous deux verts aux six portes : la zone de statut de ligne
+                          # posée en `basis-full` dans un flex sans wrap rendait LES LIBELLÉS UNE
+                          # LETTRE PAR LIGNE ; et ce message n'apparaissait sur aucun chemin réussi
+                          # (la ligne est retirée optimistement, sa zone part avec elle).
+                          # Portes : npm test 271/271 · isolation 124, 123 pass, 0 fail, 1 skipped
+                          # (+3) · typecheck · lint · check:migrations 20/18/2/0 · build 14 routes.
+                          # ⚠️ « Un instant… » NON OBSERVÉ : l'écriture locale rend en quelques ms.
+                          # Le chemin est corrigé, mais je ne l'ai pas vu — écrit plutôt que supposé.
+                          # ⛔ TOUJOURS OUVERT : la décision `intent_at`, à trancher AVANT la 4.10.
+                          #
+                          # 2026-08-19 — Story 4.5 FUSIONNÉE ET DÉPLOYÉE (PR #31, squash `fefa2ec`). Les
                           # stories 4.1 à 4.5 sont dans `main` ; aucune PR ouverte, aucune branche
                           # de travail restante. Les 4 contrôles de la PR étaient verts.
                           # ⛔ LA REQUÊTE DE CONTRÔLE EN PRODUCTION N'A PAS ÉTÉ EXÉCUTÉE — décision
@@ -1087,7 +1134,7 @@ development_status:
   4-2-lecture-client-direct-de-la-liste-groupee-par-rayon: done
   4-3-cocher-et-decocher-idempotent-et-reversible: done
   4-4-ajouter-un-article-avec-agregation-et-unites-fermees: done
-  4-5-supprimer-archiver-les-achetes-vider-la-liste: review
+  4-5-supprimer-archiver-les-achetes-vider-la-liste: done
   4-6-provenance-de-chaque-article: backlog
   4-7-generer-la-liste-depuis-le-menu-sans-rien-ecraser: backlog
   4-8-consulter-la-liste-hors-ligne: backlog

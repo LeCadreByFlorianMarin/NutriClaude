@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Notice } from "@/app/_lib/Notice";
 
 /**
@@ -26,6 +26,19 @@ import { Notice } from "@/app/_lib/Notice";
  * correction elle-même. ⚠️ **`reserve` parce que la zone SURPLOMBE ses boutons** :
  * sans lui, l'arrivée du message pousse la cible sous le doigt au moment du clic.
  */
+/**
+ * Les deux phrases d'explication, chacune écrite UNE fois.
+ *
+ * ⛔ **Elles l'étaient quatre fois pour deux phrases — correctif de la revue du 2026-08-19.**
+ * Chaque `Geste` recevait sa chaîne en propriété ET le parent la réécrivait littéralement dans
+ * son paragraphe visible. Quatre littéraux pour deux phrases : une reformulation de l'un aurait
+ * laissé le texte lu à l'écran et le texte annoncé dire deux choses différentes.
+ */
+const EXPLICATION = {
+  panier: "Les articles pris sortent de ta liste. Tu peux les rajouter.",
+  tout: "Tout part, même ce qui n'est pas encore pris.",
+} as const;
+
 export function GestesDeListe({
   aDesArticlesPris,
   aDesArticles,
@@ -39,8 +52,8 @@ export function GestesDeListe({
   aDesArticles: boolean;
   occupe: boolean;
   message: string | null;
-  onArchiver: () => void;
-  onVider: () => void;
+  onArchiver: () => void | Promise<void>;
+  onVider: () => void | Promise<void>;
   onOublierMessage: () => void;
 }) {
   /*
@@ -51,6 +64,7 @@ export function GestesDeListe({
    * en fermant son panneau dans quatre chemins.
    */
   const [aConfirmer, setAConfirmer] = useState<"panier" | "tout" | null>(null);
+  const idExplication = useId();
 
   /*
    * ⛔ **ARMER UNE CONFIRMATION EFFACE LE COMPTE RENDU PRÉCÉDENT — défaut trouvé au
@@ -62,6 +76,45 @@ export function GestesDeListe({
   function armer(quoi: "panier" | "tout") {
     setAConfirmer(quoi);
     onOublierMessage();
+  }
+
+  /*
+   * ⛔ **UNE CONFIRMATION NE SURVIT PAS À LA DISPARITION DE SA CIBLE — correctif de la revue
+   * du 2026-08-19.** `aConfirmer` vit dans CE composant, mais chaque `Geste` est monté sous
+   * condition, et rendre `null` plus bas **ne démonte pas** ce composant : ses hooks
+   * survivent. Deux chemins mesurés à la lecture :
+   *
+   * - armer « Vider le panier », puis DÉCOCHER le dernier article pris → le geste disparaît,
+   *   l'état restait `"panier"` ; re-cocher un article le remontait **déjà armé**, et un
+   *   seul tap archivait ;
+   * - armer « Tout enlever », puis retirer le dernier article ligne à ligne → même chose, et
+   *   l'AC3 (« une confirmation est exigée ») était court-circuité.
+   *
+   * ⚠️ **C'est une valeur DÉRIVÉE, pas un état synchronisé par un effet.** Remettre l'état à
+   * zéro dans un `useEffect` marcherait, mais ferait rendre une fois le geste armé sans cible
+   * avant de se corriger — et le dépôt refuse `setState` dans un effet.
+   */
+  const arme =
+    aConfirmer === "panier" && aDesArticlesPris
+      ? "panier"
+      : aConfirmer === "tout" && aDesArticles
+        ? "tout"
+        : null;
+
+  /*
+   * ⛔ **« Un instant… » ÉTAIT INJOIGNABLE — correctif de la revue.** `onConfirmer` posait
+   * `setAConfirmer(null)` **avant** d'appeler le parent : React groupant les deux, le rendu
+   * suivant avait `arme === false`, donc la branche qui porte le libellé d'attente n'était
+   * jamais atteinte. Le motif source (`ListeRayons.tsx:840`) ne fait pas cela — il ne referme
+   * qu'APRÈS l'attente.
+   *
+   * ⚠️ On garde donc le geste armé pendant l'écriture, et on referme quand elle rend. C'est ce
+   * qui rend le libellé d'attente visible, sur le seul écran où l'on tape dans un magasin, sur
+   * réseau instable.
+   */
+  async function confirmer(action: () => void | Promise<void>) {
+    await action();
+    setAConfirmer(null);
   }
 
   /*
@@ -87,7 +140,7 @@ export function GestesDeListe({
         <div className="flex flex-wrap items-center gap-2">
           {aDesArticlesPris ? (
             <Geste
-            arme={aConfirmer === "panier"}
+            arme={arme === "panier"}
             occupe={occupe}
             libelle="Vider le panier"
             /*
@@ -95,18 +148,15 @@ export function GestesDeListe({
              * panier : archiver les achetés d'un geste, avec confirmation (FR-8) ».
              * Ce n'est pas une reformulation : c'est la source.
              */
-            explication="Les articles pris sortent de ta liste. Tu peux les rajouter."
+            idExplication={idExplication}
               onArmer={() => armer("panier")}
               onDesarmer={() => setAConfirmer(null)}
-              onConfirmer={() => {
-                setAConfirmer(null);
-                onArchiver();
-              }}
+              onConfirmer={() => confirmer(onArchiver)}
             />
           ) : null}
 
           <Geste
-            arme={aConfirmer === "tout"}
+            arme={arme === "tout"}
             occupe={occupe}
             /*
            * ⚠️ **« Tout enlever » est une chaîne INVENTÉE, et c'est signalé.**
@@ -118,13 +168,10 @@ export function GestesDeListe({
            * À valider en revue, comme « Tout est dans le panier. » de la 4.3.
            */
             libelle="Tout enlever"
-            explication="Tout part, même ce qui n'est pas encore pris."
+            idExplication={idExplication}
             onArmer={() => armer("tout")}
             onDesarmer={() => setAConfirmer(null)}
-            onConfirmer={() => {
-              setAConfirmer(null);
-              onVider();
-            }}
+            onConfirmer={() => confirmer(onVider)}
           />
         </div>
       ) : null}
@@ -134,11 +181,16 @@ export function GestesDeListe({
        * montrer en permanence remplirait le bas de l'écran de deux phrases que
        * personne ne lit, et diluerait celle qui compte au moment où elle compte.
        */}
-      {aConfirmer !== null ? (
-        <p className="hint mt-2">
-          {aConfirmer === "panier"
-            ? "Les articles pris sortent de ta liste. Tu peux les rajouter."
-            : "Tout part, même ce qui n'est pas encore pris."}
+      {/*
+       * ⛔ **UNE SEULE OCCURRENCE, ET ELLE EST RELIÉE AU BOUTON — correctif de la revue.**
+       * `Geste` portait en plus un jumeau `.sr-only` : le lecteur d'écran lisait la phrase
+       * DEUX fois en mode navigation, et l'utilisateur qui tabulait droit sur « Confirmer »
+       * ne l'entendait JAMAIS (un `sr-only` voisin n'entre ni dans le nom accessible ni dans
+       * la description). `aria-describedby` règle les deux d'un coup.
+       */}
+      {arme !== null ? (
+        <p className="hint mt-2" id={idExplication}>
+          {EXPLICATION[arme]}
         </p>
       ) : null}
     </div>
@@ -161,7 +213,7 @@ function Geste({
   arme,
   occupe,
   libelle,
-  explication,
+  idExplication,
   onArmer,
   onDesarmer,
   onConfirmer,
@@ -169,10 +221,10 @@ function Geste({
   arme: boolean;
   occupe: boolean;
   libelle: string;
-  explication: string;
+  idExplication: string;
   onArmer: () => void;
   onDesarmer: () => void;
-  onConfirmer: () => void;
+  onConfirmer: () => void | Promise<void>;
 }) {
   if (!arme) {
     return (
@@ -193,7 +245,15 @@ function Geste({
          * peuvent se succéder au même endroit ; hors contexte visuel, le mot seul
          * ne dit pas lequel des deux gestes on déclenche.
          */
-        aria-label={`Confirmer : ${libelle.toLowerCase()}`}
+        aria-describedby={idExplication}
+        /*
+         * ⚠️ **L'`aria-label` rappelle DE QUOI on confirme**, et il CONTIENT son libellé
+         * visible — WCAG 2.5.3 « Label in Name ». Quand `occupe`, le texte visible devient
+         * « Un instant… » : le nom accessible suit, sinon la commande vocale décroche.
+         */
+        aria-label={
+          occupe ? "Un instant…" : `Confirmer : ${libelle.toLowerCase()}`
+        }
         onClick={onConfirmer}
       >
         {occupe ? "Un instant…" : "Confirmer"}
@@ -202,12 +262,17 @@ function Geste({
         type="button"
         className="btn-quiet"
         disabled={occupe}
-        aria-label={`Annuler : ${libelle.toLowerCase()}`}
+        /*
+         * ⛔ **« Non » DOIT figurer dans le nom accessible — correctif de la revue.** Il
+         * n'y était pas, deux lignes sous le commentaire qui invoque WCAG 2.5.3 : un membre
+         * en commande vocale voyait « Non », disait « Non », et rien ne se déclenchait. Le
+         * seul chemin de sortie d'une confirmation était inatteignable à la voix.
+         */
+        aria-label={`Non — annuler : ${libelle.toLowerCase()}`}
         onClick={onDesarmer}
       >
         Non
       </button>
-      <span className="sr-only">{explication}</span>
     </span>
   );
 }

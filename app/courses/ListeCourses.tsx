@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { CarteRayon } from "@/app/_lib/CarteRayon";
 import { Notice } from "@/app/_lib/Notice";
 import { createNavigateurClient } from "@/lib/supabase/client";
@@ -113,6 +113,16 @@ export function ListeCourses() {
       const recus = await articlesDuFoyer(createNavigateurClient());
       setArticles(recus);
       setEchec(false);
+      /*
+       * ⛔ **UN COMPTE RENDU NE SURVIT PAS À LA LISTE QU'IL DÉCRIT — correctif de la revue.**
+       * « 11 articles retirés. » restait affiché au-dessus d'articles neufs après un ajout, et
+       * jusqu'au rechargement de la page : `armer()` l'effaçait, mais plus rien ne pouvait
+       * l'armer une fois la liste vide. La règle écrite dans `GestesDeListe` — « un compte
+       * rendu parle du passé ; dès qu'un geste est armé, il ment » — vaut identiquement dès
+       * que la liste change sous lui.
+       */
+      setMessageGeste(null);
+      setMessageLigne(null);
     } catch (erreur) {
       console.error("[courses] Relecture de la liste :", erreur);
       setEchec(true);
@@ -252,6 +262,32 @@ export function ListeCourses() {
   const [messageGeste, setMessageGeste] = useState<string | null>(null);
   const [occupe, setOccupe] = useState(false);
 
+  /*
+   * ⛔ **UNE SEULE LIGNE ARMÉE À LA FOIS, ET L'ÉTAT VIT ICI — correctif de la revue du
+   * 2026-08-19.** Il vivait dans `LigneArticle`, donc chaque ligne gardait le sien : taper
+   * « Retirer » sur cinq lignes laissait cinq confirmations armées, indéfiniment.
+   *
+   * ⛔ **Et le piège n'est pas cosmétique** : « Confirmer » occupe la position EXACTE de
+   * « Retirer ». Un membre qui revient sur une ligne armée croit taper « Retirer » et
+   * **supprime au premier tap** — la confirmation qui existe « comme seul filet contre un
+   * doigt qui rate la bascule » est alors absente, précisément là où on croit l'avoir.
+   *
+   * ⚠️ **C'est la règle que `GestesDeListe` s'appliquait déjà** — « armer l'un doit désarmer
+   * l'autre » — qui n'avait pas été transposée aux lignes.
+   */
+  const [ligneArmee, setLigneArmee] = useState<string | null>(null);
+
+  /*
+   * ⚠️ **Le message d'une ligne est SÉPARÉ de celui des gestes globaux.** La story pose la
+   * règle en Task 3 — « une région de statut PAR zone d'action » — et l'avait appliquée aux
+   * deux gestes du bas en oubliant la troisième zone, celle qu'elle nomme en premier : la
+   * ligne. Ses deux messages s'écrivaient donc sous les trente articles, hors champ au moment
+   * où ils s'écrivaient. C'est le défaut de `/rayons`, en miroir.
+   */
+  const [messageLigne, setMessageLigne] = useState<
+    { id: string; texte: string } | null
+  >(null);
+
   /**
    * Applique un retrait : on enlève d'abord, on écrit ensuite, on rétablit si ça
    * casse. `ecrire` rend le compte réel, `garder` dit ce qui survit à l'écran.
@@ -260,15 +296,43 @@ export function ListeCourses() {
     garder: (a: ArticleDeListe) => boolean,
     ecrire: () => Promise<number>,
     phrase: (compte: number) => string | null,
-    quoi: string
+    quoi: string,
+    /**
+     * L'identifiant de la ligne visée, quand le geste part d'une ligne.
+     *
+     * ⚠️ **C'est lui qui décide OÙ le message s'écrit** : dans la ligne pour un retrait
+     * unitaire, sous la liste pour un geste de masse. Sans ça, un message né en haut de
+     * l'écran s'affichait après la trentième ligne.
+     */
+    surLaLigne?: string
   ) {
     const precedent = articles;
     setOccupe(true);
     setMessageGeste(null);
+    setMessageLigne(null);
     setArticles((actuels) => (actuels === null ? actuels : actuels.filter(garder)));
 
+    /*
+     * ⛔ **LE MESSAGE VA LÀ OÙ LA LIGNE EST ENCORE — corrigé au parcours du 2026-08-20.**
+     * Première rédaction : tout message né d'une ligne allait dans la ligne. Mesuré à
+     * l'écran, ça ne marche que pour la moitié des cas — sur un retrait RÉUSSI, la ligne
+     * est retirée optimistement, donc sa zone de statut part avec elle et le message
+     * n'apparaît nulle part. Les deux cas ne se ressemblent pas :
+     *
+     * - **échec** → la liste est rétablie, la ligne REVIENT : le message doit se poser
+     *   dessus, sans quoi le membre voit un rang réapparaître sans explication à côté.
+     *   C'est le constat de la revue, et c'est celui qui compte.
+     * - **succès sans effet** (« il n'était déjà plus là ») → la ligne est légitimement
+     *   partie : il n'y a plus de ligne où écrire, le message va sous la liste.
+     */
+    const surLaLigneSiElleRevient = (texte: string) => {
+      if (surLaLigne === undefined) setMessageGeste(texte);
+      else setMessageLigne({ id: surLaLigne, texte });
+    };
+
     try {
-      setMessageGeste(phrase(await ecrire()));
+      const texte = phrase(await ecrire());
+      if (texte !== null) setMessageGeste(texte);
     } catch (erreur) {
       /*
        * ⚠️ **Le membre voit une phrase, le développeur voit la cause** — la règle
@@ -283,14 +347,23 @@ export function ListeCourses() {
        * condition non transitoire, et ce `catch` attrape aussi la configuration
        * absente. La phrase constate, elle ne promet pas.
        */
-      setMessageGeste("Ça n'a pas marché. Rien n'a été retiré.");
+      /*
+       * ⛔ **ELLE N'AFFIRME PLUS UN ÉTAT DE LA BASE — correctif de la revue du 2026-08-19.**
+       * Elle disait « Rien n'a été retiré. » Or ce `catch` attrape aussi bien un refus de la
+       * base qu'un échec de TRANSPORT survenu après que l'écriture a été commise côté serveur :
+       * dans ce second cas la phrase est fausse. Elle ne décrit donc plus que ce que l'écran
+       * vient de faire — rétablir la liste — ce qui est vrai dans les deux cas. Règle §1.
+       */
+      surLaLigneSiElleRevient(
+        "Ça n'a pas marché. Ta liste est restée comme elle était."
+      );
     } finally {
       setOccupe(false);
     }
   }
 
-  const supprimer = (article: ArticleDeListe) =>
-    retirer(
+  const supprimer = async (article: ArticleDeListe) => {
+    await retirer(
       (a) => a.id !== article.id,
       async () => supprimerArticle(createNavigateurClient(), article.id),
       /*
@@ -300,8 +373,16 @@ export function ListeCourses() {
        * où rien n'a bougé — l'autre membre l'avait déjà retiré.
        */
       (compte) => (compte === 0 ? "Cet article n'était déjà plus dans ta liste." : null),
-      "Suppression d'un article"
+      "Suppression d'un article",
+      article.id
     );
+    /*
+     * ⚠️ **On referme APRÈS l'écriture, jamais avant.** Refermer dans le gestionnaire de
+     * clic aurait fait disparaître « Un instant… » avant qu'il ne s'affiche — le défaut
+     * exact que la revue a trouvé sur les gestes globaux.
+     */
+    setLigneArmee(null);
+  };
 
   const archiver = () =>
     retirer(
@@ -400,29 +481,40 @@ export function ListeCourses() {
            * tout l'objet du troisième état plus haut : « Ta liste est vide. » est
            * une AFFIRMATION, elle ne se dit qu'après avoir lu.
            */}
-          {articles.length === 0 ? (
+          {/*
+           * ⛔ **PAS PENDANT UNE ÉCRITURE EN VOL — correctif de la revue du 2026-08-19.**
+           * `retirer` vide le tableau AVANT d'attendre le serveur : pour « Tout enlever »,
+           * `articles` valait `[]` pendant tout l'aller-retour, et l'écran AFFIRMAIT « Ta liste
+           * est vide. » avant tout acquittement. Si l'écriture échouait, les trente lignes
+           * revenaient : l'écran avait menti puis s'était contredit.
+           *
+           * ⚠️ **C'est le défaut que l'en-tête de ce fichier dit avoir corrigé** — « un état
+           * vide se mérite : il faut avoir LU pour avoir le droit de dire qu'il n'y a rien ».
+           * La règle valait pour la lecture ; elle vaut identiquement pour l'écriture.
+           */}
+          {articles.length === 0 && !occupe ? (
             <p className="hint mt-6">Ta liste est vide.</p>
           ) : null}
 
           {articles.length > 0 ? (
             <>
               {/*
-           * ⛔ **TROIS ÉTATS DE CONTENU DEPUIS LA 4.3, PAS DEUX.** Avant elle, la
-           * vue filtrait les achetés : « aucun article » et « rien à prendre »
-           * étaient le même état, et `articles.length === 0` suffisait. Ce n'est
-           * plus vrai — une liste dont TOUT est acheté a des articles et zéro à
-           * prendre.
-           *
-           * ⛔ **Réutiliser « Ta liste est vide. » ici aurait été un MENSONGE**, et
-           * la même famille que l'échec qui affirmait le vide, corrigé en revue de
-           * la 4.2 : la liste n'est pas vide, elle est FAITE. Et c'est le moment
-           * du parcours où le membre a le plus besoin d'être conforté — d'où une
-           * phrase qui constate un succès plutôt qu'un manque.
-           *
-           * ⚠️ **Le compteur reste monté**, à zéro : le retirer ferait sauter la
-           * mise en page au dernier article coché, et priverait le lecteur d'écran
-           * de l'annonce du passage à zéro.
-           */}
+               * ⛔ **TROIS ÉTATS DE CONTENU DEPUIS LA 4.3, PAS DEUX.** Avant elle, la
+               * vue filtrait les achetés : « aucun article » et « rien à prendre »
+               * étaient le même état, et `articles.length === 0` suffisait. Ce n'est
+               * plus vrai — une liste dont TOUT est acheté a des articles et zéro à
+               * prendre.
+               *
+               * ⛔ **Réutiliser « Ta liste est vide. » ici aurait été un MENSONGE**, et
+               * la même famille que l'échec qui affirmait le vide, corrigé en revue de
+               * la 4.2 : la liste n'est pas vide, elle est FAITE. Et c'est le moment
+               * du parcours où le membre a le plus besoin d'être conforté — d'où une
+               * phrase qui constate un succès plutôt qu'un manque.
+               *
+               * ⚠️ **Le compteur reste monté**, à zéro : le retirer ferait sauter la
+               * mise en page au dernier article coché, et priverait le lecteur d'écran
+               * de l'annonce du passage à zéro.
+               */}
               <CompteurAPrendre nombre={aPrendre} />
 
               {aPrendre === 0 ? (
@@ -444,70 +536,77 @@ export function ListeCourses() {
           <AjouterArticle onAjout={relire} />
 
           {articles.length > 0 ? (
-          <ul className="mt-6 flex flex-col gap-gutter">
-            {groupes.map((groupe) => (
-              <li key={groupe.rayonId ?? "a-classer"}>
-                <CarteRayon
-                  id={groupe.rayonId}
-                  nom={groupe.nom}
-                  icone={groupe.icone}
-                  /*
-                   * ⛔ **`pris` EST RÉEL DEPUIS LA 4.3.** Il valait `0` en dur
-                   * tant que la vue filtrait `status = 'pending'` : aucun article
-                   * ne pouvait être « pris » puisqu'un article coché sortait de
-                   * la lecture. La migration du 2026-08-13 l'a rendu mesurable.
-                   *
-                   * ⛔ **`pris`, `total` ET les enfants viennent du MÊME tableau,
-                   * dans la MÊME expression.** La carte reçoit trois vérités sur
-                   * le même fait et ne peut pas les rapprocher — l'AC3 de la 2.4
-                   * lui interdit de connaître le type des articles qu'elle
-                   * enveloppe. Compter sur un tableau et rendre l'autre ferait
-                   * annoncer « 3 sur 5 pris » au-dessus de 4 lignes, et **aucune
-                   * porte ne le verrait**.
-                   *
-                   * ⚠️ **Le dénominateur ne décroît PLUS** : il valait `0/4 →
-                   * 0/3` quand cocher retirait l'article de la vue. Il vaut
-                   * désormais `1/4 → 2/4`, ce que le ratio annonce depuis
-                   * toujours. La note de la 4.2 pour la story 4.5 tombe d'elle-même.
-                   */
-                  pris={groupe.articles.filter((a) => a.statut === "bought").length}
-                  total={groupe.articles.length}
-                >
-                  <ul>
-                    {groupe.articles.map((article, rang) => (
-                      <Fragment key={article.id}>
-                        {/*
-                         * ⛔ **LE SÉPARATEUR NAÎT DE LA TRANSITION, PAS D'UN
-                         * DEUXIÈME PARCOURS.** `trierPanierEnBas` a déjà rangé
-                         * les achetés en fin de tableau : le séparateur se pose
-                         * donc au PREMIER article acheté, c'est-à-dire là où le
-                         * statut change. Rendre deux listes séparées aurait
-                         * dédoublé le `map`, et fait diverger deux ordres qui
-                         * doivent rester le même.
-                         *
-                         * ⚠️ **Il ne se rend que s'il a quelque chose à séparer** :
-                         * un rayon dont TOUT est acheté commence au rang 0, donc
-                         * pas de séparateur — il n'y a rien au-dessus.
-                         */}
-                        {article.statut === "bought" && rang > 0 &&
-                        groupe.articles[rang - 1]?.statut === "pending" ? (
-                          <li aria-hidden className="separateur-panier">
-                            Dans le panier
-                          </li>
-                        ) : null}
-                        <LigneArticle
-                          article={article}
-                          onBasculer={basculer}
-                          onSupprimer={supprimer}
-                          occupe={occupe}
-                        />
-                      </Fragment>
-                    ))}
-                  </ul>
-                </CarteRayon>
-              </li>
-            ))}
-          </ul>
+            <ul className="mt-6 flex flex-col gap-gutter">
+              {groupes.map((groupe) => (
+                <li key={groupe.rayonId ?? "a-classer"}>
+                  <CarteRayon
+                    id={groupe.rayonId}
+                    nom={groupe.nom}
+                    icone={groupe.icone}
+                    /*
+                     * ⛔ **`pris` EST RÉEL DEPUIS LA 4.3.** Il valait `0` en dur
+                     * tant que la vue filtrait `status = 'pending'` : aucun article
+                     * ne pouvait être « pris » puisqu'un article coché sortait de
+                     * la lecture. La migration du 2026-08-13 l'a rendu mesurable.
+                     *
+                     * ⛔ **`pris`, `total` ET les enfants viennent du MÊME tableau,
+                     * dans la MÊME expression.** La carte reçoit trois vérités sur
+                     * le même fait et ne peut pas les rapprocher — l'AC3 de la 2.4
+                     * lui interdit de connaître le type des articles qu'elle
+                     * enveloppe. Compter sur un tableau et rendre l'autre ferait
+                     * annoncer « 3 sur 5 pris » au-dessus de 4 lignes, et **aucune
+                     * porte ne le verrait**.
+                     *
+                     * ⚠️ **Le dénominateur ne décroît PLUS** : il valait `0/4 →
+                     * 0/3` quand cocher retirait l'article de la vue. Il vaut
+                     * désormais `1/4 → 2/4`, ce que le ratio annonce depuis
+                     * toujours. La note de la 4.2 pour la story 4.5 tombe d'elle-même.
+                     */
+                    pris={groupe.articles.filter((a) => a.statut === "bought").length}
+                    total={groupe.articles.length}
+                  >
+                    <ul>
+                      {groupe.articles.map((article, rang) => (
+                        <Fragment key={article.id}>
+                          {/*
+                           * ⛔ **LE SÉPARATEUR NAÎT DE LA TRANSITION, PAS D'UN
+                           * DEUXIÈME PARCOURS.** `trierPanierEnBas` a déjà rangé
+                           * les achetés en fin de tableau : le séparateur se pose
+                           * donc au PREMIER article acheté, c'est-à-dire là où le
+                           * statut change. Rendre deux listes séparées aurait
+                           * dédoublé le `map`, et fait diverger deux ordres qui
+                           * doivent rester le même.
+                           *
+                           * ⚠️ **Il ne se rend que s'il a quelque chose à séparer** :
+                           * un rayon dont TOUT est acheté commence au rang 0, donc
+                           * pas de séparateur — il n'y a rien au-dessus.
+                           */}
+                          {article.statut === "bought" && rang > 0 &&
+                          groupe.articles[rang - 1]?.statut === "pending" ? (
+                            <li aria-hidden className="separateur-panier">
+                              Dans le panier
+                            </li>
+                          ) : null}
+                          <LigneArticle
+                            article={article}
+                            onBasculer={basculer}
+                            onSupprimer={supprimer}
+                            occupe={occupe}
+                            arme={ligneArmee === article.id}
+                            onArmer={setLigneArmee}
+                            message={
+                              messageLigne?.id === article.id
+                                ? messageLigne.texte
+                                : null
+                            }
+                          />
+                        </Fragment>
+                      ))}
+                    </ul>
+                  </CarteRayon>
+                </li>
+              ))}
+            </ul>
           ) : null}
 
           {/*
@@ -618,9 +717,13 @@ function CompteurAPrendre({ nombre }: { nombre: number }) {
  * rendrait un doublon apparent que rien n'expliquerait, et le membre en
  * conclurait que l'agrégation est cassée.
  *
- * ⚠️ **UN SEUL élément interactif par ligne.** Y ajouter un second (bouton de
- * suppression, menu) casserait le hit-target unique — la suppression est la
- * story 4.5, et elle devra trancher ce point plutôt que le contourner.
+ * ⛔ **CE DOCBLOC DISAIT « UN SEUL élément interactif par ligne » JUSQU'AU 2026-08-17.**
+ * La story 4.5 a tranché ce point (D1, option a) : la ligne porte désormais un
+ * hit-target de BASCULE — le `<label>`, qui reste la plus grande zone du rang — et
+ * un contrôle EXPLICITE de retrait, son FRÈRE. Le bouton ne peut pas être son
+ * enfant : le label capturerait ses clics et basculerait aussi la case.
+ * ⚠️ `EXPERIENCE.md:104` et `:142`, `DESIGN.md:279` et `:298` portent la date de
+ * cette décision.
  *
  * ⚠️ **`text-muted`, jamais `muted-2`** : la quantité PORTE de l'information, et
  * `DESIGN.md` est explicite — « aucun texte porteur d'information n'est en
@@ -639,26 +742,57 @@ function LigneArticle({
   onBasculer,
   onSupprimer,
   occupe,
+  arme,
+  onArmer,
+  message,
 }: {
   article: ArticleDeListe;
   onBasculer: (article: ArticleDeListe, versAchete: boolean) => void;
   onSupprimer: (article: ArticleDeListe) => void;
   occupe: boolean;
+  arme: boolean;
+  onArmer: (id: string | null) => void;
+  message: string | null;
 }) {
   const quantite = formaterQuantiteEtUnite(article.quantite, article.unite);
   const achete = article.statut === "bought";
 
   /*
-   * ⚠️ **La confirmation est un état LOCAL à la ligne**, et c'est ce qui la rend
-   * sûre : elle meurt avec la ligne. Une confirmation portée par l'écran devrait
-   * désigner l'article par son `id`, et survivrait donc à sa disparition — le
-   * défaut exact que `ListeRayons` a corrigé en remettant `aConfirmer` à `null`
-   * dans quatre chemins différents.
+   * ⛔ **L'ARMEMENT A QUITTÉ CETTE LIGNE — correctif de la revue du 2026-08-19.** Il y
+   * vivait, donc chaque ligne gardait le sien et cinq confirmations pouvaient coexister
+   * indéfiniment. Il vit maintenant dans `ListeCourses`, qui n'en garde qu'une.
+   *
+   * ⚠️ **Le focus, sinon il retombe sur `<body>`.** Armer démonte le bouton focalisé et
+   * en monte deux autres ; sans restitution, il faut repartir de `Tab` depuis le haut de
+   * la page — à travers onze lignes de deux contrôles. `ListeRayons.tsx:223` porte ce
+   * mécanisme avec cette raison écrite, et la 4.5 ne l'avait PAS repris alors qu'elle
+   * citait ce fichier comme motif. L'ironie était documentée : le balayage a été écarté
+   * parce qu'il « serait inatteignable au clavier ».
    */
-  const [confirme, setConfirme] = useState(false);
+  const versConfirmer = useRef<HTMLButtonElement | null>(null);
+  const versRetirer = useRef<HTMLButtonElement | null>(null);
+  const etaitArme = useRef(false);
+
+  useEffect(() => {
+    if (arme && !etaitArme.current) versConfirmer.current?.focus();
+    if (!arme && etaitArme.current) versRetirer.current?.focus();
+    etaitArme.current = arme;
+  }, [arme]);
 
   return (
-    <li className="ligne-article">
+    <li>
+      {/*
+       * ⛔ **LE MESSAGE EST SOUS LE RANG, PAS DEDANS — correctif du parcours du 2026-08-20.**
+       * Première rédaction : un `<Notice className="basis-full">` posé directement dans le
+       * `<li className="ligne-article">`, qui est un flex SANS `flex-wrap`. Un troisième
+       * enfant y a écrasé la colonne du nom, et les libellés se rendaient **une lettre par
+       * ligne**. ⛔ Aucune des six portes ne l'a vu — typecheck, lint, 271 tests, 123 tests
+       * d'isolation, build et sonde CSS étaient tous verts. C'est la règle §7, quatrième
+       * famille : ce que seul l'œil attrape.
+       *
+       * ⚠️ Le rang garde donc `.ligne-article` ; le `<li>` n'est plus qu'un conteneur.
+       */}
+      <div className="ligne-article">
       {/*
        * ⛔ **LE BOUTON EST LE FRÈRE DU `<label>`, JAMAIS SON ENFANT.** Un
        * `<button>` placé dans le label verrait chacun de ses clics basculer AUSSI
@@ -746,26 +880,39 @@ function LigneArticle({
        * réajouter l'article le fait revenir, mais rien à l'écran ne le propose. La
        * confirmation est donc le seul filet contre un doigt qui rate la bascule.
        */}
-      {confirme ? (
+      {arme ? (
         <>
           <button
+            ref={versConfirmer}
             type="button"
             className="btn-ligne"
             disabled={occupe}
-            aria-label={`Confirmer le retrait de ${article.nom}`}
-            onClick={() => {
-              setConfirme(false);
-              onSupprimer(article);
-            }}
+            aria-label={
+              occupe ? "Un instant…" : `Confirmer le retrait de ${article.nom}`
+            }
+            onClick={() => onSupprimer(article)}
           >
-            Confirmer
+            {/*
+             * ⛔ **LE LIBELLÉ BASCULE PENDANT L'ÉCRITURE — correctif de la revue.** Il ne
+             * le faisait nulle part sur cet écran : `.btn-ligne:disabled` ne changeant que
+             * la saturation (3 unités sur 255, imperceptible), un bouton en vol était
+             * strictement identique à un bouton actif. Le membre tapait, rien ne bougeait,
+             * il en concluait que l'écran était cassé.
+             */}
+            {occupe ? "Un instant…" : "Confirmer"}
           </button>
           <button
             type="button"
             className="btn-ligne"
             disabled={occupe}
-            aria-label={`Garder ${article.nom} dans la liste`}
-            onClick={() => setConfirme(false)}
+            /*
+             * ⛔ **« Non » DOIT figurer dans le nom accessible — correctif de la revue.**
+             * Il disait « Garder {nom} dans la liste », deux lignes sous le commentaire
+             * qui invoque WCAG 2.5.3 : un membre en commande vocale voyait « Non », disait
+             * « Non », et rien ne se déclenchait.
+             */
+            aria-label={`Non — garder ${article.nom} dans la liste`}
+            onClick={() => onArmer(null)}
           >
             Non
           </button>
@@ -778,15 +925,31 @@ function LigneArticle({
          * utilisateur de commande vocale dit « Retirer » et doit être compris.
          */
         <button
+          ref={versRetirer}
           type="button"
           className="btn-ligne"
           disabled={occupe}
           aria-label={`Retirer ${article.nom}`}
-          onClick={() => setConfirme(true)}
+          onClick={() => onArmer(article.id)}
         >
           Retirer
         </button>
       )}
+      </div>
+
+      {/*
+       * ⛔ **LA RÉGION DE STATUT DE LA LIGNE — correctif de la revue du 2026-08-19.**
+       * Les deux messages d'un retrait unitaire s'écrivaient dans la zone des gestes
+       * globaux, c'est-à-dire SOUS les trente articles : le geste avait lieu en haut de
+       * l'écran, la phrase qui l'explique s'affichait deux écrans de défilement plus bas.
+       * C'est exactement le défaut que la story dit éviter en Task 3 — « une région de
+       * statut PAR zone d'action » — appliqué aux deux gestes du bas et oublié sur la
+       * troisième zone, celle qu'elle nomme en premier.
+       *
+       * ⚠️ **Sans `reserve`** : la zone est SOUS la ligne, pas au-dessus d'une cible.
+       * Y réserver une hauteur en permanence espacerait les trente lignes pour rien.
+       */}
+      <Notice>{message}</Notice>
     </li>
   );
 }

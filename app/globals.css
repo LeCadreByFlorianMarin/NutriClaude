@@ -645,9 +645,29 @@ body::before {
   .btn-ligne:hover:not(:disabled) {
     color: var(--text);
   }
+  /*
+   * ⛔ **L'ÉTAT DÉSACTIVÉ ÉTAIT MATHÉMATIQUEMENT INVISIBLE — correctif de la revue du
+   * 2026-08-19.** Il ne portait que `filter: saturate(0.6)`, repris de `.btn-quiet`. Or
+   * `--muted` est un gris quasi neutre : la matrice de saturation le déplace de `#63685f`
+   * à `#646762` en clair, de `#aeb6c9` à `#b1b6c1` en sombre — **3 unités sur 255**.
+   *
+   * ⚠️ **`.btn-quiet` pouvait s'en contenter, pas celui-ci** : là-bas le libellé bascule en
+   * « Un instant… », et le commentaire voisin dit que c'est « la SEULE indication qu'une
+   * soumission est en cours ». Ici il ne basculait pas non plus (corrigé dans le même
+   * passage) : il ne restait donc rien du tout, et trente boutons en vol étaient
+   * strictement identiques à trente boutons actifs.
+   *
+   * ⚠️ **`opacity` est refusée**, comme partout dans ce fichier : elle ferait tomber un
+   * texte porteur sous son seuil de contraste. On descend l'encre d'un cran vers le fond,
+   * ce qui est exactement le rôle de `--muted-2` — « strictement réservé au non-essentiel »,
+   * et un contrôle momentanément inerte l'est.
+   *
+   * ⛔ **PAS de barré** : il entrerait en collision avec le seul signal d'état de cet écran.
+   * Un article ACHETÉ est barré (`.article-achete`) ; barrer aussi un bouton en vol ferait
+   * dire deux choses au même trait, sur la même ligne.
+   */
   .btn-ligne:disabled {
-    @apply cursor-default;
-    filter: saturate(0.6);
+    @apply cursor-default text-muted-2;
   }
 
   /*

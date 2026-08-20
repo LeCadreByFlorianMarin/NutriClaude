@@ -2469,6 +2469,106 @@ test("la base refuse un tombstone daté dans le FUTUR (D4)", async () => {
   assert.equal(error!.code, "23514", `refus attendu 23514, obtenu ${error!.code}`);
 });
 
+test("la base ACCEPTE un tombstone à +2 minutes — la tolérance que la borne existe pour garder", async () => {
+  /*
+   * ⛔ **LE PENDANT DU TEST PRÉCÉDENT, ET IL MANQUAIT — correctif de la revue du 2026-08-19.**
+   * Seul le refus était mesuré. Resserrer la contrainte à `deleted_at <= now()` aurait donc
+   * laissé la suite ENTIÈREMENT VERTE tout en cassant la suppression pour tout membre dont le
+   * téléphone avance — exactement le défaut que la 4.4 a payé sur la borne BASSE, et dont la
+   * migration consacre un paragraphe entier à expliquer qu'il ne doit pas se reproduire.
+   *
+   * ⚠️ Deux minutes, pas deux heures : c'est l'ordre de grandeur d'une horloge d'appareil mal
+   * réglée, le cas que la tolérance vise.
+   */
+  await articleDeA("zz45tol-cible", null);
+
+  const { error } = await a.client
+    .from("grocery_list_items")
+    .update({ deleted_at: new Date(Date.now() + 2 * 60_000).toISOString() })
+    .eq("name", "zz45tol-cible");
+
+  assert.equal(error, null, "un tombstone à +2 min a été REFUSÉ — la tolérance a disparu");
+});
+
+test("les trois gestes REFUSENT d'agir sans session (P0001)", async () => {
+  /*
+   * ⛔ **AUCUN TEST NE FIGEAIT CETTE GARDE — correctif de la revue du 2026-08-19.**
+   * Les trois fonctions lèvent `Aucun foyer` quand `current_household_id()` est nul. Remplacer
+   * ce `raise` par un `return 0` aurait passé la suite sans un test rouge, en transformant un
+   * refus net en no-op silencieux — la famille de défaut que cette story existe pour interdire.
+   */
+  const anonyme = createClient(apiUrl, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  for (const rpc of ["archiver_les_achetes", "vider_la_liste"] as const) {
+    const { error } = await anonyme.rpc(rpc);
+    assert.notEqual(error, null, `${rpc} a répondu sans session`);
+    assert.equal(error!.code, "P0001", `${rpc} : attendu P0001, obtenu ${error!.code}`);
+  }
+
+  const { error } = await anonyme.rpc("supprimer_article", {
+    p_id: "00000000-0000-0000-0000-000000000000",
+  });
+  assert.notEqual(error, null, "supprimer_article a répondu sans session");
+  assert.equal(error!.code, "P0001");
+});
+
+test("⛔ un rôle qui CONTOURNE la RLS ne peut pas vider le foyer d'autrui", async () => {
+  /*
+   * ⛔ **LE TEST QUI MANQUAIT, ET LE DÉFAUT QU'IL FIGE — revue du 2026-08-19.**
+   * Les dix tests de la 4.5 n'exerçaient que `authenticated`, pour qui la RLS écarte déjà tout.
+   * Mesuré alors : en rôle `service_role` (`rolbypassrls = t`) avec le JWT d'un membre du foyer
+   * A, `vider_la_liste()` rendait **11** et tombstonait les articles du foyer **B**. La seule
+   * garde était `current_household_id() is null`, qui passe dès qu'un `sub` est connu, quel que
+   * soit le RÔLE.
+   *
+   * ⚠️ **Atteignabilité au moment de la revue : nulle** — aucun `service_role` dans `app/`,
+   * `lib/` ni `proxy.ts`. Mais `suppression.ts` annonce ces fonctions comme réutilisables par le
+   * dashboard (Epic 5) et le serveur MCP (Epic 7), c'est-à-dire les surfaces à clé de service.
+   *
+   * ⚠️ **C'est le seul test du fichier qui emploie `admin` délibérément**, et il ne contredit
+   * pas AD-17 : il n'essaie pas de PROUVER l'isolation en contournant la RLS, il mesure que la
+   * fonction se borne elle-même quand la RLS ne la borne plus.
+   */
+  await articleDeA("zz45bypass-a", null);
+  const { error: eB } = await b.client
+    .from("grocery_list_items")
+    .insert({ household_id: b.foyerId, name: "zz45bypass-b" });
+  assert.equal(eB, null, "la fixture de B n'a pas pu être posée");
+
+  const { error } = await admin.rpc("vider_la_liste");
+
+  /*
+   * ⚠️ **CE QUE CE TEST MESURE EXACTEMENT, ET CE QU'IL NE MESURE PAS.** La clé de service
+   * porte `role = service_role` mais **aucun `sub`** : `current_household_id()` rend `null` et
+   * la garde lève `P0001`. Ce test fige donc la garde sur le chemin qui contourne la RLS —
+   * un rôle sans identité ne peut rien toucher, et le no-op silencieux est impossible.
+   *
+   * ⛔ **Il ne reproduit PAS le cas le plus grave** : une clé de service portant le `sub` d'un
+   * membre réel, où `current_household_id()` rend un foyer et où la RLS ne borne plus rien.
+   * Le forger ici demanderait de signer un JWT, donc le secret du stack — que `stackLocal()`
+   * n'expose pas. Ce cas est couvert par la **requête de contrôle n°2** de
+   * `20260820090000_borner_les_gestes_de_liste_au_foyer.sql`, exécutée et consignée :
+   * `vider_la_liste()` y rend le compte du foyer du JWT SEUL, les autres foyers intacts.
+   * ⚠️ Écrit plutôt qu'esquivé : la couverture s'arrête ici, la preuve est ailleurs.
+   */
+  assert.notEqual(error, null, "un rôle sans identité a pu appeler la fonction");
+  assert.equal(error!.code, "P0001", `attendu P0001, obtenu ${error!.code}`);
+
+  const { data: restant, error: eLire } = await admin
+    .from("grocery_list_items")
+    .select("name")
+    .in("name", ["zz45bypass-a", "zz45bypass-b"])
+    .is("deleted_at", null);
+  assert.equal(eLire, null, "la relecture a échoué");
+  assert.equal(
+    restant?.length,
+    2,
+    "⛔ un appel contournant la RLS a tombstoné des articles de foyers tiers",
+  );
+});
+
 test("B ne peut ni supprimer, ni archiver, ni vider la liste de A (NFR-5)", async () => {
   /*
    * ⛔ **LES TROIS FONCTIONS SONT `security invoker` : c'est la RLS qui refuse.**
