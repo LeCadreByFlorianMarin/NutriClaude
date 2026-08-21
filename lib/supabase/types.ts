@@ -636,10 +636,7 @@ export type Database = {
         Returns: string
       }
       current_household_id: { Args: never; Returns: string }
-      generate_grocery_list_from_menu: {
-        Args: { p_end_date: string; p_start_date: string }
-        Returns: number
-      }
+      fonctions_publiques_sans_execute: { Args: never; Returns: string[] }
       generate_household_invite: { Args: never; Returns: string }
       redeem_household_invite: {
         Args: { p_code: string; p_display_name: string }

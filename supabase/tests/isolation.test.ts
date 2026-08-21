@@ -2732,75 +2732,70 @@ test("la LECTURE rend la provenance — la vue et la chaîne select suivent (AC2
   assert.equal(vu!.recetteId, null, "une recette est apparue sans recette");
 });
 
-/* ⛔ ────────────────────────────────────────────────────────────────────────
- * LE TEST CI-DESSOUS EST **SAUTÉ** DEPUIS LE 2026-08-07, ET C'EST LA DÉCISION
- * D-1 DE LA REVUE DE LA STORY 4.2 (Florian).
- *
- * ⚠️ **MESURÉ le 2026-08-07** : chaque appel de `generate_grocery_list_from_menu`
- * fait tomber PostgreSQL en `signal 11: Segmentation fault` sur le stack local
- * (sonde à deux appels → **delta de exactement 2 segfauts**, journal du
- * conteneur `supabase_db_nutriclaude`). Tout ce qui s'exécute APRÈS lui frappe
- * une base en `recovery mode` et échoue sans rapport avec son objet.
- *
- * ⛔ **ET IL PASSAIT POUR LA MAUVAISE RAISON.** Il assertionne `error !== null`
- * sans regarder LEQUEL. L'erreur réellement rendue est
- * `PGRST001 « no connection to the server »` — l'erreur du CRASH, pas un refus
- * de permission. **Il ne démontrait donc pas le `revoke execute` du volet 8** ;
- * il observait sa propre panne, en vert.
- *
- * ⛔ **POURQUOI `skip` PLUTÔT QU'UN ORDRE D'EXÉCUTION CHOISI.** La première
- * rédaction plaçait simplement les tests de la 4.2 avant lui. Ça protégeait les
- * tests de la 4.2 et rien d'autre : la garde n'était qu'un encadré, à ~190
- * lignes de distance dans un fichier de 1913, et la story suivante qui ajoute
- * son test à la fin du fichier — l'endroit naturel — retombait dedans.
- * **`skip` est mécanique** : plus aucun test ne peut tomber derrière le crash,
- * et surtout un test sauté le DIT, là où un test vert le cachait. C'est la
- * règle §1 appliquée à une porte : une case vide honnête vaut mieux qu'une case
- * cochée à tort.
- *
- * ⚠️ **CE QUI EST PERDU, ET QUI DOIT ÊTRE ROUVERT** : le `revoke execute` du
- * volet 8 n'est plus mesuré par rien. Il ne l'était déjà pas — le test observait
- * le crash — donc `skip` ne retire aucune couverture réelle, il cesse d'en
- * simuler une. **Story 4.7** : diagnostiquer le segfault, puis RÉTABLIR ce test
- * avec une assertion sur le SQLSTATE (`42501`) et non sur « une erreur,
- * n'importe laquelle ».
- *
- * ⚠️ **Pré-existant, hors périmètre de la story 4.2**, daté dans
- * `deferred-work.md`. Mesuré sur le stack LOCAL seulement : rien n'a été
- * vérifié en production, et rien n'est affirmé à son sujet.
- * ──────────────────────────────────────────────────────────────────────── */
-
-test.skip("un membre authentifié ne peut PAS appeler la génération de liste", async () => {
+test("la génération de liste est INJOIGNABLE depuis une surface, et ne crashe plus la base", async () => {
   /*
-   * ⚠️ **LE TEST DU VOLET 8, ET IL EST NÉ D'UN DÉFAUT QUE LA STORY DÉCLARAIT
-   * FERMÉ.** La story affirmait « l'AC4 est tenu pour les SURFACES, et pas pour
-   * cette fonction `security definer` ». Mesuré en revue le 2026-08-05 : cette
-   * fonction *est* une surface. PostgREST l'expose en RPC, et `execute` lui était
-   * accordé à `anon` et `authenticated` — dont, surtout, **par l'entrée `PUBLIC`
-   * de son ACL**, que révoquer les rôles nommés ne retire pas.
+   * ⛔ **CE TEST A REMPLACÉ UN TEST SAUTÉ DEPUIS LE 2026-08-07, ET IL PROUVE
+   * L'INVERSE DE CE QUE LA STORY 4.7 CROYAIT.**
    *
-   * Ce qu'un membre ordinaire pouvait donc faire, avec sa seule clé anon et son
-   * jeton (AD-13) :
+   * L'ancien test était sauté parce que « chaque appel fait tomber PostgreSQL en
+   * `signal 11` ». C'était vrai, mais la cause attribuée était fausse : on
+   * l'imputait à l'agrégation de la génération. Mesuré le 2026-08-20, avec
+   * témoins : **le crash est le chemin d'erreur « permission denied for
+   * function » lui-même**, sur l'image Postgres 17.6 de Supabase. Une fonction
+   * dont le corps tient en `return 42` segfaute pareil dès que son `EXECUTE` est
+   * révoqué et qu'un rôle sans droit l'appelle — `sql` comme `plpgsql`,
+   * `definer` comme `invoker`. Le refus sur une **table**, lui, est propre.
    *
-   *   avant  = 2 lignes (1 vivante + 1 tombstonée)
-   *   POST /rest/v1/rpc/generate_grocery_list_from_menu
-   *   après  = 0 ligne, tombstones compris
+   * ⛔ **Donc la mitigation de la revue de la 4.5 ÉTAIT le danger.** Révoquer
+   * `EXECUTE` en laissant la fonction dans `public` a changé « un membre peut
+   * détourner la génération » en « **n'importe qui peut coucher la base** » : un
+   * seul POST anonyme, sans compte ni session, avec la seule clé publiable —
+   * publique par construction dans le bundle navigateur. Reproduit deux fois,
+   * isolément, journal du conteneur à l'appui.
    *
-   * — un DELETE dur, exactement ce que l'AC4 proscrit, par la porte de derrière.
+   * ⚠️ **CE TEST N'ASSERTIONNE DONC PAS `42501`**, contrairement à ce que la
+   * story 4.7 prescrivait. Exiger un refus de permission depuis une surface,
+   * c'est exiger le crash : le test ne pourrait jamais être VERT, et chaque
+   * exécution coucherait le stack. Ce qu'il faut prouver n'est pas que l'appel
+   * est REFUSÉ, c'est qu'il est **INJOIGNABLE** — la fonction n'existe plus.
    *
-   * ⚠️ **Ce test ne dit PAS que la fonction est réparée.** Elle ne l'est pas :
-   * elle échoue en `23505` sur deux chemins mesurés et fait toujours son DELETE
-   * dur. C'est la story 4.7, et c'est daté. Ce test dit seulement qu'aucune
-   * surface ne peut plus l'atteindre.
+   * ⛔ **ET IL NE SE CONTENTE PAS D'UNE ERREUR.** `error !== null` passerait aussi
+   * bien si le stack était éteint, si le port était le mauvais, ou si la fonction
+   * s'exécutait et échouait en `23505` après avoir fait son DELETE dur. D'où le
+   * **témoin positif** ci-dessous, qui n'est pas une précaution de style : le
+   * 2026-08-20, faute de témoin, une mesure a conclu « aucun crash » alors
+   * qu'elle interrogeait un AUTRE projet Supabase local, écoutant sur le port
+   * voisin. Sans témoin positif, un `PGRST202` ne distingue pas « la fonction
+   * n'existe plus » de « je parle à la mauvaise base ».
    */
+
+  // TÉMOIN POSITIF, D'ABORD : une RPC accordée doit répondre. S'il tombe, le
+  // PGRST202 attendu plus bas ne prouverait plus rien.
+  const temoin = await a.client.rpc("ajouter_article", {
+    p_nom: "temoin-generation-injoignable",
+    p_quantite: 1,
+    p_unite: "pièce",
+    p_surface: "web",
+  });
+  assert.equal(
+    temoin.error,
+    null,
+    "le témoin positif est tombé : le stack ne répond pas, ou ce n'est pas la bonne base"
+  );
+
+  // LA CIBLE : la fonction ne doit plus exister côté API.
   const { error } = await a.client.rpc("generate_grocery_list_from_menu", {
     p_start_date: "2026-08-01",
     p_end_date: "2026-08-07",
   });
-  assert.notEqual(error, null, "un membre authentifié peut encore appeler la génération");
+  assert.equal(
+    error?.code,
+    "PGRST202",
+    `la génération répond encore à un membre authentifié (code reçu : ${error?.code ?? "aucune erreur"})`
+  );
 
-  // Et un appel anonyme non plus — même mécanisme, mesuré séparément pour qu'un
-  // futur assouplissement de l'un ne passe pas inaperçu derrière l'autre.
+  // ET POUR UN ANONYME — mesuré séparément, parce que c'est CE chemin qui
+  // couchait la base : ni compte, ni session, la seule clé publiable.
   const anonyme = createClient(apiUrl, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -2808,5 +2803,23 @@ test.skip("un membre authentifié ne peut PAS appeler la génération de liste",
     p_start_date: "2026-08-01",
     p_end_date: "2026-08-07",
   });
-  assert.notEqual(sansSession, null, "un appel anonyme peut encore appeler la génération");
+  assert.equal(
+    sansSession?.code,
+    "PGRST202",
+    `un anonyme atteint encore la génération (code reçu : ${sansSession?.code ?? "aucune erreur"})`
+  );
+
+  // ⛔ LA GARDE DE FOND : aucune fonction ne doit rester dans `public` avec son
+  // `EXECUTE` révoqué. C'est l'ÉTAT dangereux, pas cette fonction-ci. Sans cette
+  // assertion, la prochaine révocation réintroduirait le même arrêt de service
+  // sans qu'aucune barrière ne bronche.
+  const { data: revoquees, error: erreurAudit } = await admin
+    .schema("public")
+    .rpc("fonctions_publiques_sans_execute");
+  assert.equal(erreurAudit, null, "la sonde d'audit des ACL n'a pas répondu");
+  assert.deepEqual(
+    revoquees,
+    [],
+    `des fonctions restent dans public avec EXECUTE révoqué — elles permettent un arrêt de service anonyme : ${JSON.stringify(revoquees)}`
+  );
 });
