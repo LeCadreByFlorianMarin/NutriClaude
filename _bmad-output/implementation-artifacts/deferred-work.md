@@ -1799,3 +1799,98 @@ la migration défend le vocabulaire fermé en écrivant « **chacune arrive avec
 
 *Reporté, sans échéance* : sans conséquence tant qu'aucun jeton n'est mal choisi. ⚠️ Mais retirer un
 jeton plus tard suppose de resserrer un `check` sur une table peuplée. Le coût est payé d'avance.
+
+## Story 4.7 — Générer la liste depuis le menu (2026-08-21)
+
+### ⛔ Générer DEUX fois double les quantités — et c'est l'AC1 qui le prescrit
+
+**Mesuré** : la génération relancée sur la même semaine ré-additionne. Trois passes sur une recette
+à 800 g de farine ont donné **3600 g**. L'ancienne génération était idempotente *par son `DELETE`* —
+le même `DELETE` qui détruisait les ajouts manuels, et que cette story supprime.
+
+⚠️ **Ce n'est pas un défaut d'implémentation** : l'AC1 dit « **UPSERT-incrémente sur la clé
+canonique** (AD-6/FR-16) », et AD-6 dit qu'« ajouter n'est **jamais** un INSERT nu ». L'accumulation
+est la conséquence directe des deux. `useSoumission` empêche le double-clic pendant l'écriture, mais
+rien n'empêche un second geste délibéré une heure plus tard.
+
+⛔ **Le membre n'a AUCUN signal** qu'il a déjà généré cette semaine : le compte rendu disparaît au
+changement d'écran, et la liste ne dit pas d'où vient une quantité.
+
+*Reporté, et c'est un ARBITRAGE de Florian, pas une correction* : soit on accepte (générer deux fois
+est un geste rare et volontaire), soit la génération devient idempotente par semaine — ce qui suppose
+de retenir l'intention de la dernière génération par ligne, donc de mordre sur le LWW par champ de la
+**4.10**. Ne pas trancher en silence.
+
+### ⚠️ Le mot-clé de rayon de la recette n'est pas transmis à `ajouter_article`
+
+`resolve_aisle_id(p_household_id, p_product_id, p_ingredient, p_fallback_kw)` a trois branches. La
+génération câble désormais le **produit** (branche 1) et le **nom** (branche 2), mais pas
+`p_fallback_kw` (branche 3, le mot-clé de repli saisi sur l'ingrédient).
+
+**Mesuré le 2026-08-21 : la perte est de ZÉRO aujourd'hui** — `product_aisle_map` est **vide**, donc
+les trois branches rendent `null` quoi qu'on leur passe. Un sixième paramètre pour une branche morte
+aurait été de la généralité spéculative.
+
+*Reporté* : à instruire par la story qui **peuple** `product_aisle_map` (2.3, ou 4.16 qui la câble).
+⛔ **Le jour où elle le fera, l'oubli deviendra visible** sous la forme d'articles « À classer » que
+le membre avait pourtant renseignés — et rien ne le signalera.
+
+### ⚠️ NFR-3 n'a pas pu être vérifié sur toute la page
+
+Le parcours du 2026-08-21 n'a **pas** pu redimensionner la fenêtre de l'onglet : l'outillage rend
+« succès » et la fenêtre d'affichage reste à 1590 px ; l'application refuse par ailleurs d'être
+encadrée dans un `iframe` (en-têtes de sécurité), ce qui ferme la sonde de repli.
+
+**Ce qui EST mesuré** : l'îlot `GenererLaListe` ne déborde à **aucune** largeur jusqu'à 280 px, et
+son bouton fait exactement 44 px. La grille du menu n'a pas été touchée par cette story — son NFR-3
+vient des stories 3.5/3.6.
+
+*Reporté* : à vérifier au premier parcours qui dispose d'un vrai redimensionnement. ⚠️ **Ne pas le
+tenir pour acquis d'ici là** — la 4.4 a payé un défaut de rendu qu'aucune des six portes ne voyait.
+
+### ⚠️ La règle d'arrondi vit en DEUX exemplaires — l'accord est mesuré, pas garanti
+
+`lib/liste/arrondi.ts` et `public.arrondir_pour_achat` énoncent la même règle. C'est délibéré : D7
+disait « jamais dans le SQL », D1(a) mettait la boucle DANS la base, et les deux ne pouvaient pas
+être satisfaits ensemble. Le dépôt emploie déjà ce motif trois fois (unités, surfaces), et l'accord
+est **mesuré** par `contraintes.test.ts` — 8 unités × 16 valeurs, contrôle négatif vérifié.
+
+*Pas une dette à rembourser, une contrainte à respecter* : ⛔ **ne jamais modifier l'une sans
+l'autre.** Le test échouera, et c'est son travail.
+
+### ⛔ L'arbitrage du tombstone ne porte QUE sur `deleted_at` — que la 4.10 ne croie pas le travail fait
+
+`ajouter_article` reçoit `p_intention timestamptz default null`, et le `where` de son `do update`
+n'arbitre que la levée du tombstone. **C'est le minimum que l'AC3 exigeait**, pas le LWW par champ
+qu'AD-3 décrit et que la **4.10** doit généraliser à `quantity`, `status`, `aisle_id`, `surface`.
+
+⚠️ Le défaut `null` du paramètre est ce qui préserve l'ajout manuel : sans lui, la 4.4 et l'écran
+d'ajout se mettraient à refuser silencieusement de rouvrir un article retiré.
+
+### ⛔ Ne JAMAIS révoquer `EXECUTE` sur une fonction de `public` — c'est un arrêt de service
+
+Mesuré le 2026-08-20, avec témoins : sur l'image Postgres 17.6 de Supabase, le chemin d'erreur
+« permission denied for function » **segfaute le serveur**. Une fonction dont le corps tient en
+`return 42` suffit, en `sql` comme en `plpgsql`, en `definer` comme en `invoker`. Une fonction
+réservée aux **membres** couche donc la base dès qu'un anonyme l'appelle — et la clé publiable est
+publique par construction. Le refus sur une **table** est propre ; seul celui sur une **fonction**
+crashe.
+
+**La garde est posée** : `public.fonctions_publiques_sans_execute()` recense l'état dangereux, et un
+test d'isolation exige qu'elle rende zéro ligne. La sonde est elle-même accordée à `anon` — révoquée,
+elle serait exactement l'état qu'elle dénonce.
+
+*Pas reporté — fermé (PR #36).* ⚠️ **Consigné ici parce que la tentation reviendra** : « cette
+fonction ne devrait pas être appelable depuis le web » se répare en la **sortant de `public`** ou en
+la **supprimant**, jamais par un `revoke`. ⛔ **Et ne jamais « vérifier » ce défaut en l'exerçant en
+production** : la seule façon de le constater est de coucher la vraie base.
+
+### ⚠️ La cause racine du segfaut n'est pas remontée à Supabase
+
+Le correctif contourne le défaut ; il ne le corrige pas. La cause probable est un correctif propre à
+l'image Supabase (les messages `HINT: Grant the required privileges…` n'existent pas en PostgreSQL
+amont), mais **ce n'est pas mesuré** — seul le déclencheur l'est.
+
+*Reporté, sans échéance* : un rapport en amont profiterait à tout le monde, et surtout dirait si la
+production hébergée porte le même défaut. ⚠️ **Rien n'a été affirmé sur la production** : son
+exposition était *inférée* de la présence de la migration sur `main`, jamais constatée.

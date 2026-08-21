@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireProfile } from "@/app/_lib/garde";
+import { GenererLaListe } from "./GenererLaListe";
 import { createServerComponentClient } from "@/lib/supabase/server";
 import {
   casesDeLaSemaine,
@@ -162,8 +163,14 @@ function Case({
  * caractères — et le poser dans une piste à 1/7 de largeur ferait déborder la page
  * en largeur, ce que l'AC2 de la story 3.5 interdit. Le sortir de la grille
  * supprime le risque à la source au lieu de le contenir par des classes.
- * **Si un `useSoumission`, un `Notice` ou une région de statut apparaît ici, c'est
- * que le formulaire a glissé dans la grille.**
+ * **Si un `useSoumission`, un `Notice` ou une région de statut apparaît DANS LA
+ * GRILLE, c'est que le formulaire y a glissé.**
+ *
+ * ⚠️ **L'EXCEPTION EST `GenererLaListe`, ET ELLE NE CONTREDIT PAS CET AVERTISSEMENT.**
+ * La story 4.7 pose un îlot client AU-DESSUS de la grille, pleine largeur, dans aucune
+ * piste — donc hors du défaut que l'avertissement vise, qui est un contrôle intrinsèquement
+ * large coincé dans une colonne à 1/7. La page reste un rendu serveur : l'îlot est le seul
+ * `"use client"` de cet écran, et la grille n'en porte toujours aucun.
  *
  * ⚠️ **UN SEUL DOM, à toutes les largeurs (AC2/NFR-3/UX-DR10).** La maquette
  * `mockups/grille-menu.html` rend deux structures et en masque une par media
@@ -256,6 +263,22 @@ export default async function MenuPage({
             </Link>
           ) : null}
         </nav>
+
+        {/*
+          ⛔ **LE GESTE EST ICI, ET `EXPERIENCE.md:69` LE SITUE** — « Menu de la semaine :
+          assigner recettes à la grille jour × repas, générer la liste ». Il vient APRÈS la
+          navigation de semaine, parce qu'il porte sur la semaine affichée : le lire avant
+          de savoir de quelle semaine on parle inverserait la lecture.
+
+          ⚠️ **Les bornes sont celles de la semaine AFFICHÉE**, pas de la semaine courante.
+          Un membre qui a reculé d'une semaine génère cette semaine-là — c'est ce que
+          l'écran montre, donc ce que le bouton doit faire.
+        */}
+        <GenererLaListe
+          debut={jours[0]}
+          fin={jours[6]}
+          libelleSemaine={formaterPlageDeSemaine(lundi)}
+        />
 
         {cases.length === 0 ? (
           <p className="mt-6 text-base">

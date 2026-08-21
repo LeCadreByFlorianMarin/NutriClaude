@@ -13,6 +13,7 @@ import { stackLocal } from "./stack-local.ts";
 import { articlesDuFoyer } from "../../lib/liste/liste.ts";
 import { basculerStatut } from "../../lib/liste/basculer.ts";
 import { ajouterArticle as ajouterArticleDuDepot } from "../../lib/liste/ajout.ts";
+import { genererLaListe } from "../../lib/liste/generation.ts";
 import {
   supprimerArticle,
   archiverLesAchetes,
@@ -2732,90 +2733,373 @@ test("la LECTURE rend la provenance — la vue et la chaîne select suivent (AC2
   assert.equal(vu!.recetteId, null, "une recette est apparue sans recette");
 });
 
-test("la génération de liste est INJOIGNABLE depuis une surface, et ne crashe plus la base", async () => {
+// ── Story 4.7 : générer la liste depuis le menu, sans rien écraser ─────────
+//
+// ⛔ **CHAQUE TEST A SA PROPRE DATE DE MENU, ET CE N'EST PAS DE LA COQUETTERIE.** Le foyer
+// `a` est partagé par tout ce fichier : deux tests qui poseraient leur menu le même jour
+// verraient chacun les recettes de l'autre, et leurs comptes seraient faux sans que rien ne
+// le dise. La génération est bornée à la date du test.
+//
+// ⚠️ **ET LE COMPTE ATTENDU SE MESURE AVANT LE GESTE**, jamais supposé — le préfixe unique
+// isole les NOMS, pas les compteurs du foyer. Deux tests de la 4.5 avaient été écrits sur
+// cette confusion.
+
+/**
+ * Un menu d'un jour : une recette, ses ingrédients, et le nombre de personnes prévues.
+ *
+ * @returns l'identifiant de la recette, dont les tests de provenance ont besoin.
+ */
+async function menuDeService(
+  jour: string,
+  titre: string,
+  portionsRecette: number,
+  personnesPrevues: number,
+  ingredients: { nom: string; quantite: number; unite: string; produitId?: string }[],
+  repas: "breakfast" | "lunch" | "dinner" | "snack" = "dinner",
+): Promise<string> {
+  const { data: recette, error: erreurRecette } = await admin
+    .from("recipes")
+    .insert({ household_id: a.foyerId, title: titre, servings: portionsRecette })
+    .select("id")
+    .single();
+  assert.equal(erreurRecette, null, `création de la recette « ${titre} »`);
+
+  const { error: erreurIngredients } = await admin.from("recipe_ingredients").insert(
+    ingredients.map((ing, rang) => ({
+      recipe_id: recette!.id as string,
+      name: ing.nom,
+      quantity: ing.quantite,
+      unit: ing.unite,
+      product_id: ing.produitId ?? null,
+      optional: false,
+      sort_order: rang,
+    })),
+  );
+  assert.equal(erreurIngredients, null, `ingrédients de « ${titre} »`);
+
+  const { error: erreurMenu } = await admin.from("meal_plan_entries").insert({
+    household_id: a.foyerId,
+    recipe_id: recette!.id as string,
+    meal_date: jour,
+    meal_type: repas,
+    servings: personnesPrevues,
+  });
+  assert.equal(erreurMenu, null, `assignation de « ${titre} » au ${jour}`);
+
+  return recette!.id as string;
+}
+
+test("⛔ un article ajouté À LA MAIN SURVIT à la génération (M4/M5)", async () => {
   /*
-   * ⛔ **CE TEST A REMPLACÉ UN TEST SAUTÉ DEPUIS LE 2026-08-07, ET IL PROUVE
-   * L'INVERSE DE CE QUE LA STORY 4.7 CROYAIT.**
+   * ⛔ **LE DÉFAUT LE PLUS DESTRUCTEUR DE LA STORY, ET IL ÉTAIT MESURÉ.** L'ancienne
+   * génération faisait `delete from grocery_list_items where status = 'pending'` : tout
+   * ajout manuel non encore coché disparaissait à la génération suivante — 2 lignes → 1 —
+   * et **sans tombstone**, donc invisible à la convergence (AD-3). Le membre qui avait
+   * pensé au café le vendredi ne le retrouvait pas le dimanche soir.
    *
-   * L'ancien test était sauté parce que « chaque appel fait tomber PostgreSQL en
-   * `signal 11` ». C'était vrai, mais la cause attribuée était fausse : on
-   * l'imputait à l'agrégation de la génération. Mesuré le 2026-08-20, avec
-   * témoins : **le crash est le chemin d'erreur « permission denied for
-   * function » lui-même**, sur l'image Postgres 17.6 de Supabase. Une fonction
-   * dont le corps tient en `return 42` segfaute pareil dès que son `EXECUTE` est
-   * révoqué et qu'un rôle sans droit l'appelle — `sql` comme `plpgsql`,
-   * `definer` comme `invoker`. Le refus sur une **table**, lui, est propre.
+   * ⚠️ **La liste se lit par `a.client`, jamais par `admin`** (AD-17) : lire en contournant
+   * la RLS ne prouverait rien.
+   */
+  const jour = "2027-01-04";
+  await porteDuDepot(a.client, "zz47man-cafe", 1, "pièce", "web");
+
+  const avant = await lignesNommees("zz47man-cafe");
+  assert.equal(avant.length, 1, "l'ajout manuel est bien posé avant la génération");
+
+  await menuDeService(jour, "zz47 Soupe", 4, 4, [
+    { nom: "zz47man-poireau", quantite: 2, unite: "pièce" },
+  ]);
+  await genererLaListe(a.client, jour, jour);
+
+  const apres = await lignesNommees("zz47man-cafe");
+  assert.equal(apres.length, 1, "la génération a DÉTRUIT l'ajout manuel");
+  assert.equal(apres[0].deleted_at, null, "l'ajout manuel a été tombstoné par la génération");
+  assert.equal(apres[0].status, "pending", "l'ajout manuel a changé de statut");
+  assert.equal(Number(apres[0].quantity), 1, "la quantité de l'ajout manuel a bougé");
+});
+
+test("⛔ un article ACHETÉ de même clé s'incrémente au lieu de rendre 23505 (M6)", async () => {
+  /*
+   * ⛔ **MESURÉ AVANT CORRECTIF : `23505`.** L'article acheté survivait au `delete`
+   * (qui ne visait que `pending`), puis l'`insert` nu heurtait la clé canonique qu'il
+   * occupait — et l'index est TOTAL, donc la ligne était invisible à la lecture. La
+   * génération échouait **entièrement**, en désignant un article que l'écran n'affiche pas.
    *
-   * ⛔ **Donc la mitigation de la revue de la 4.5 ÉTAIT le danger.** Révoquer
-   * `EXECUTE` en laissant la fonction dans `public` a changé « un membre peut
-   * détourner la génération » en « **n'importe qui peut coucher la base** » : un
-   * seul POST anonyme, sans compte ni session, avec la seule clé publiable —
-   * publique par construction dans le bundle navigateur. Reproduit deux fois,
-   * isolément, journal du conteneur à l'appui.
+   * ⚠️ **Un acheté TOUJOURS VIVANT continue de s'additionner**, il ne repart pas de zéro :
+   * il est encore de cette liste-ci. C'est la règle de la 4.5, et elle vaut ici.
+   */
+  const jour = "2027-01-05";
+  await porteDuDepot(a.client, "zz47ach-oignon", 1, "pièce", "web");
+  await a.client
+    .from("grocery_list_items")
+    .update({ status: "bought" })
+    .eq("name", "zz47ach-oignon");
+
+  await menuDeService(jour, "zz47 Tarte", 4, 6, [
+    { nom: "zz47ach-oignon", quantite: 2, unite: "pièce" },
+  ]);
+
+  const ajoutes = await genererLaListe(a.client, jour, jour);
+  assert.equal(ajoutes, 1, "la génération n'a pas rendu compte de son seul article");
+
+  const lignes = await lignesNommees("zz47ach-oignon");
+  assert.equal(lignes.length, 1, "l'article acheté a été dupliqué au lieu d'être incrémenté");
+  /*
+   * 2 pièces pour 4 portions, servies à 6 → 2 × 6/4 = 3, dénombrable donc entier.
+   * Plus la pièce déjà achetée : 4.
+   */
+  assert.equal(Number(lignes[0].quantity), 4, "l'incrément n'a pas eu lieu");
+  assert.equal(lignes[0].status, "pending", "l'acheté n'est pas redevenu à prendre");
+});
+
+test("⛔ deux produits de même nom et unité FUSIONNENT au lieu de rendre 23505 (M7)", async () => {
+  /*
+   * ⛔ **LE `group by` D'AVANT ÉTAIT TROP FIN.** Il portait `product_id`, si bien que deux
+   * ingrédients « Beurre / g » de produits distincts formaient DEUX groupes, donc deux
+   * lignes de même clé canonique — et le second `insert` mourait en `23505`.
    *
-   * ⚠️ **CE TEST N'ASSERTIONNE DONC PAS `42501`**, contrairement à ce que la
-   * story 4.7 prescrivait. Exiger un refus de permission depuis une surface,
-   * c'est exiger le crash : le test ne pourrait jamais être VERT, et chaque
-   * exécution coucherait le stack. Ce qu'il faut prouver n'est pas que l'appel
-   * est REFUSÉ, c'est qu'il est **INJOIGNABLE** — la fonction n'existe plus.
+   * ⚠️ **Aucune quantité ne se perd dans la fusion** : c'est ce qui distingue ce correctif
+   * d'un `distinct on`, qui aurait choisi un produit arbitraire et jeté l'autre quantité.
+   */
+  const jour = "2027-01-06";
+  const { data: p1 } = await admin.from("products").insert({ name: "zz47 Beurre doux" }).select("id").single();
+  const { data: p2 } = await admin.from("products").insert({ name: "zz47 Beurre salé" }).select("id").single();
+
+  await menuDeService(jour, "zz47 Gratin", 4, 4, [
+    { nom: "zz47fus-beurre", quantite: 100, unite: "g", produitId: p1!.id as string },
+    { nom: "zz47fus-beurre", quantite: 50, unite: "g", produitId: p2!.id as string },
+  ]);
+
+  const ajoutes = await genererLaListe(a.client, jour, jour);
+  assert.equal(ajoutes, 1, "deux groupes fusionnés doivent compter pour UN article");
+
+  const lignes = await lignesNommees("zz47fus-beurre");
+  assert.equal(lignes.length, 1, "les deux produits ont fait deux lignes de même clé");
+  assert.equal(Number(lignes[0].quantity), 150, "une quantité s'est perdue dans la fusion");
+});
+
+test("la mise à l'échelle rapporte les personnes prévues aux portions de la recette (M8)", async () => {
+  /*
+   * ⚠️ **`mpe.servings` au NUMÉRATEUR, `r.servings` au dénominateur.** L'inverse est une
+   * faute silencieuse : elle rend un résultat plausible (un nombre, positif) et fausse
+   * toutes les quantités. 800 g pour 4 portions servies à 6 → 1200 g, jamais 533.
    *
-   * ⛔ **ET IL NE SE CONTENTE PAS D'UNE ERREUR.** `error !== null` passerait aussi
-   * bien si le stack était éteint, si le port était le mauvais, ou si la fonction
-   * s'exécutait et échouait en `23505` après avoir fait son DELETE dur. D'où le
-   * **témoin positif** ci-dessous, qui n'est pas une précaution de style : le
-   * 2026-08-20, faute de témoin, une mesure a conclu « aucun crash » alors
-   * qu'elle interrogeait un AUTRE projet Supabase local, écoutant sur le port
-   * voisin. Sans témoin positif, un `PGRST202` ne distingue pas « la fonction
-   * n'existe plus » de « je parle à la mauvaise base ».
+   * ⛔ **ET L'UNITÉ CONTINUE N'EST PAS ARRONDIE** : 1200 g reste 1200 g. C'est le
+   * contre-exemple qui a écarté « arrondir tout au supérieur » — 1,2 kg deviendrait 2 kg.
+   */
+  const jour = "2027-01-07";
+  await menuDeService(jour, "zz47 Pain", 4, 6, [
+    { nom: "zz47ech-farine", quantite: 800, unite: "g" },
+    { nom: "zz47ech-sel", quantite: 1, unite: "cc" },
+  ]);
+
+  await genererLaListe(a.client, jour, jour);
+
+  const farine = await lignesNommees("zz47ech-farine");
+  assert.equal(Number(farine[0].quantity), 1200, "la mise à l'échelle est fausse, ou inversée");
+
+  // 1 cc × 6/4 = 1,5 — déjà un demi, donc inchangé par l'arrondi de cuisine.
+  const sel = await lignesNommees("zz47ech-sel");
+  assert.equal(Number(sel[0].quantity), 1.5, "l'arrondi au demi a déformé une valeur juste");
+});
+
+test("⛔ un tombstone PLUS RÉCENT que la génération n'est PAS ressuscité (AC3)", async () => {
+  /*
+   * ⛔ **SANS CET ARBITRAGE, LA GÉNÉRATION DE DIMANCHE ANNULE LA SUPPRESSION DE SAMEDI.**
+   * `ajouter_article` rouvre INCONDITIONNELLEMENT un tombstone — correct pour un ajout
+   * manuel (le membre qui retape un nom veut l'article), faux pour la génération : elle
+   * retirerait au membre sa décision, sans un mot.
+   *
+   * ⚠️ **La suppression est datée dans le FUTUR**, plutôt que d'attendre entre deux gestes.
+   * Un test qui dormirait mesurerait l'horloge autant que la règle, et serait lent ET
+   * instable. Ici l'ordre des intentions est posé, donc l'assertion porte sur la RÈGLE.
+   */
+  const jour = "2027-01-08";
+  await menuDeService(jour, "zz47 Ragoût", 4, 4, [
+    { nom: "zz47res-carotte", quantite: 3, unite: "pièce" },
+  ]);
+  await genererLaListe(a.client, jour, jour);
+
+  const posee = await lignesNommees("zz47res-carotte");
+  assert.equal(posee.length, 1, "la première génération n'a pas posé l'article");
+
+  // Le membre le retire, et son intention est POSTÉRIEURE à la génération qui suit.
+  await a.client
+    .from("grocery_list_items")
+    .update({ deleted_at: new Date(Date.now() + 3600_000).toISOString() })
+    .eq("name", "zz47res-carotte");
+
+  const ajoutes = await genererLaListe(a.client, jour, jour);
+  assert.equal(ajoutes, 0, "la génération a compté un article qu'elle n'a pas ajouté");
+
+  const apres = await lignesNommees("zz47res-carotte");
+  assert.notEqual(apres[0].deleted_at, null, "⛔ la génération a RESSUSCITÉ un article retiré après elle");
+});
+
+test("un tombstone PLUS ANCIEN que la génération EST ressuscité (AC3, l'autre sens)", async () => {
+  /*
+   * ⛔ **LE CONTRÔLE POSITIF DE L'ARBITRAGE, ET SANS LUI LE TEST VOISIN NE PROUVE RIEN.**
+   * Une génération qui ne ressusciterait JAMAIS rien passerait le test précédent haut la
+   * main. Ce qu'on veut est un arbitrage, pas un refus systématique.
+   */
+  const jour = "2027-01-09";
+  await menuDeService(jour, "zz47 Curry", 4, 4, [
+    { nom: "zz47anc-riz", quantite: 200, unite: "g" },
+  ]);
+  await genererLaListe(a.client, jour, jour);
+
+  await a.client
+    .from("grocery_list_items")
+    .update({ deleted_at: new Date(Date.now() - 3600_000).toISOString() })
+    .eq("name", "zz47anc-riz");
+
+  const ajoutes = await genererLaListe(a.client, jour, jour);
+  assert.equal(ajoutes, 1, "la génération n'a pas rouvert un article retiré AVANT elle");
+
+  const apres = await lignesNommees("zz47anc-riz");
+  assert.equal(apres[0].deleted_at, null, "l'article n'est pas revenu sur la liste");
+  assert.equal(apres[0].status, "pending", "l'article revenu n'est pas à prendre");
+  /*
+   * ⚠️ **Une ligne rouverte repart d'une VIE NEUVE** : 200 g, pas 400. C'est la règle de
+   * la 4.5 — une quantité tombstonée appartient à une vie précédente.
+   */
+  assert.equal(Number(apres[0].quantity), 200, "la quantité d'une vie précédente s'est ajoutée");
+});
+
+test("la provenance porte la recette quand UNE SEULE a contribué, et rien sinon (D5)", async () => {
+  /*
+   * ⛔ **`recipe_id` COMMANDE L'ICÔNE 🍴 DE LA 4.6**, et `provenanceDe` lui donne la
+   * priorité absolue. Désigner « la première » recette affirmerait une origine fausse dans
+   * la moitié des cas, et la ligne mentirait sur son origine.
+   *
+   * ⚠️ **Et c'est le premier chemin du produit qui ÉCRIT `recipe_id`** : mesuré le
+   * 2026-08-21, ni l'ancienne génération ni `ajouter_article` ne l'écrivaient jamais. La
+   * branche « issu d'une recette » de la 4.6 était donc inatteignable jusqu'ici.
+   */
+  const jour = "2027-01-10";
+  const soupe = await menuDeService(jour, "zz47 Velouté", 4, 4, [
+    { nom: "zz47prov-courge", quantite: 1, unite: "pièce" },
+    { nom: "zz47prov-sel", quantite: 1, unite: "cc" },
+  ]);
+  await menuDeService(jour, "zz47 Quiche", 4, 4, [
+    { nom: "zz47prov-sel", quantite: 1, unite: "cc" },
+  ], "lunch");
+
+  await genererLaListe(a.client, jour, jour);
+
+  const courge = await lignesProvenance("zz47prov-courge");
+  assert.equal(courge.length, 1, "l'article mono-recette est absent ou en double");
+  assert.equal(courge[0].recipe_id, soupe, "l'article d'une seule recette ne la porte pas");
+  assert.equal(courge[0].surface, "web", "la surface de la génération n'est pas celle du clic (D4)");
+  assert.equal(courge[0].actor_kind, "profile", "l'acteur n'est pas le membre");
+
+  const sel = await lignesProvenance("zz47prov-sel");
+  assert.equal(sel.length, 1, "les deux recettes ont fait deux lignes");
+  assert.equal(
+    sel[0].recipe_id,
+    null,
+    "⛔ un article venu de DEUX recettes affirme une origine unique",
+  );
+});
+
+test("⛔ un membre d'un AUTRE foyer ne génère rien chez A", async () => {
+  /*
+   * ⛔ **LA GÉNÉRATION EST PASSÉE DE `security definer` À `security invoker`**, et c'est la
+   * condition de D1(a) : elle appelle `ajouter_article`, qui est `invoker`. Une `definer`
+   * aurait fait tourner la RLS sous l'identité du PROPRIÉTAIRE, pas de l'appelant — la
+   * fonction aurait pu écrire dans n'importe quel foyer.
+   *
+   * ⚠️ **Le compte de A se MESURE avant le geste de B**, jamais supposé nul : le foyer `a`
+   * est partagé par tout ce fichier et porte déjà les articles des tests précédents.
+   */
+  const jour = "2027-01-11";
+  await menuDeService(jour, "zz47 Chez A", 4, 4, [
+    { nom: "zz47iso-poivron", quantite: 2, unite: "pièce" },
+  ]);
+
+  const { data: avant, error: erreurAvant } = await a.client
+    .from("grocery_list_items")
+    .select("id");
+  assert.equal(erreurAvant, null, "lecture de la liste de A avant le geste de B");
+  const compteAvant = avant!.length;
+
+  // B génère SA liste, sur la même plage de dates. Son menu est vide.
+  const ajoutesParB = await genererLaListe(b.client, jour, jour);
+  assert.equal(ajoutesParB, 0, "B a généré des articles depuis un menu qui n'est pas le sien");
+
+  const { data: apres } = await a.client.from("grocery_list_items").select("id");
+  assert.equal(
+    apres!.length,
+    compteAvant,
+    "⛔ la génération de B a écrit dans la liste de A",
+  );
+
+  const poivron = await lignesNommees("zz47iso-poivron");
+  assert.equal(poivron.length, 0, "l'article de A a été créé par le geste de B");
+});
+
+test("⛔ la génération refuse PROPREMENT un anonyme — elle ne couche plus la base", async () => {
+  /*
+   * ⛔ **CE TEST A DEUX VIES, ET LA SECONDE EST CELLE-CI.**
+   *
+   * 1er état (jusqu'au 2026-08-07) : sauté, avec pour motif « chaque appel fait tomber
+   *    PostgreSQL en signal 11 ». Le fait était juste, la cause attribuée était fausse.
+   * 2e état (2026-08-21, PR #36) : mesuré avec témoins — le crash était le chemin d'erreur
+   *    « permission denied for function » LUI-MÊME, sur l'image Postgres 17.6 de Supabase.
+   *    Une fonction dont le corps tient en `return 42` segfaute pareil dès que son `EXECUTE`
+   *    est révoqué et qu'un rôle sans droit l'appelle. La mitigation posée en revue de la 4.5
+   *    ÉTAIT donc le danger : elle a changé « un membre peut détourner la génération » en
+   *    « n'importe qui peut coucher la base ». Correctif : supprimer la fonction.
+   * 3e état (celui-ci) : la story 4.7 la RECRÉE, **accordée**, et sa sûreté vient de sa
+   *    propre logique et de la RLS — jamais d'un `revoke`.
+   *
+   * ⛔ **ON N'ASSERTIONNE DONC NI `42501` NI `PGRST202`.** Le premier serait exiger le
+   * crash ; le second était vrai d'un état transitoire — la fonction absente — que cette
+   * story referme. Ce qu'il faut prouver est qu'un anonyme reçoit un refus **applicatif**,
+   * pas une connexion morte.
    */
 
-  // TÉMOIN POSITIF, D'ABORD : une RPC accordée doit répondre. S'il tombe, le
-  // PGRST202 attendu plus bas ne prouverait plus rien.
+  // TÉMOIN POSITIF, D'ABORD : sans lui, un refus ne distinguerait pas « la base refuse »
+  // de « le stack est éteint » ou « ce n'est pas la bonne base ». Le 2026-08-20, faute de
+  // témoin, une mesure a conclu « aucun crash » en interrogeant un AUTRE projet Supabase
+  // local, écoutant sur le port voisin.
   const temoin = await a.client.rpc("ajouter_article", {
-    p_nom: "temoin-generation-injoignable",
+    p_nom: "zz47temoin-atteignable",
     p_quantite: 1,
     p_unite: "pièce",
     p_surface: "web",
   });
-  assert.equal(
-    temoin.error,
-    null,
-    "le témoin positif est tombé : le stack ne répond pas, ou ce n'est pas la bonne base"
-  );
+  assert.equal(temoin.error, null, "le témoin positif est tombé : le stack ne répond pas");
 
-  // LA CIBLE : la fonction ne doit plus exister côté API.
-  const { error } = await a.client.rpc("generate_grocery_list_from_menu", {
-    p_start_date: "2026-08-01",
-    p_end_date: "2026-08-07",
-  });
-  assert.equal(
-    error?.code,
-    "PGRST202",
-    `la génération répond encore à un membre authentifié (code reçu : ${error?.code ?? "aucune erreur"})`
-  );
-
-  // ET POUR UN ANONYME — mesuré séparément, parce que c'est CE chemin qui
-  // couchait la base : ni compte, ni session, la seule clé publiable.
   const anonyme = createClient(apiUrl, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const { error: sansSession } = await anonyme.rpc("generate_grocery_list_from_menu", {
-    p_start_date: "2026-08-01",
-    p_end_date: "2026-08-07",
+  const { error } = await anonyme.rpc("generate_grocery_list_from_menu", {
+    p_start_date: "2027-01-04",
+    p_end_date: "2027-01-04",
   });
+
+  /*
+   * ⛔ **UN REFUS APPLICATIF, PAS UNE CONNEXION MORTE.** `P0001` est le `raise exception`
+   * de la fonction : elle a tourné, constaté que l'appelant n'a pas de foyer, et refusé.
+   * `PGRST000`/`PGRST001` diraient l'inverse — la base est tombée pendant l'appel, et
+   * c'est exactement le défaut qu'on a fermé.
+   */
   assert.equal(
-    sansSession?.code,
-    "PGRST202",
-    `un anonyme atteint encore la génération (code reçu : ${sansSession?.code ?? "aucune erreur"})`
+    error?.code,
+    "P0001",
+    `un anonyme n'obtient pas un refus applicatif (code reçu : ${error?.code ?? "aucune erreur"})`
   );
 
-  // ⛔ LA GARDE DE FOND : aucune fonction ne doit rester dans `public` avec son
-  // `EXECUTE` révoqué. C'est l'ÉTAT dangereux, pas cette fonction-ci. Sans cette
-  // assertion, la prochaine révocation réintroduirait le même arrêt de service
-  // sans qu'aucune barrière ne bronche.
-  const { data: revoquees, error: erreurAudit } = await admin
-    .schema("public")
-    .rpc("fonctions_publiques_sans_execute");
+  /*
+   * ⛔ **LA GARDE DE FOND, ET C'EST ELLE QUI VAUT LE PLUS.** Ce qui est dangereux n'est pas
+   * CETTE fonction, c'est l'ÉTAT « présente dans `public`, injoignable à `anon` » — mesuré :
+   * même une fonction réservée aux MEMBRES couche la base quand un anonyme l'appelle. Un
+   * test qui n'énumérerait que la génération laisserait passer la prochaine révocation.
+   */
+  const { data: revoquees, error: erreurAudit } = await admin.rpc(
+    "fonctions_publiques_sans_execute"
+  );
   assert.equal(erreurAudit, null, "la sonde d'audit des ACL n'a pas répondu");
   assert.deepEqual(
     revoquees,

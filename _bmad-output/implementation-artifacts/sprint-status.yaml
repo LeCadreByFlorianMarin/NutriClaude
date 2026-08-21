@@ -41,7 +41,48 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-25
-last_updated: 2026-08-20  # 2026-08-20 (4) — Story 4.6 REVUE puis FERMÉE (`done`). Revue
+last_updated: 2026-08-20  # 2026-08-20 (5) — Story 4.7 CONTEXTUALISÉE (`backlog` →
+                          # `ready-for-dev`), sur `1eb9669`. Onze mesures exécutées.
+                          # ⛔ LE FAIT QUI CHANGE LA FORME DE LA STORY : LE SEGFAUT NE SE REPRODUIT
+                          # PLUS. deferred-work.md le décrit comme « un crash par appel,
+                          # déterministe » (2026-08-07). Mesuré à nouveau le 2026-08-20 : la
+                          # fonction rend son compte sans erreur, et le journal du conteneur ne
+                          # porte AUCUNE trace de signal 11 — éprouvé sur 1 ingrédient puis sur
+                          # 201, coûts de parallélisme abaissés pour forcer un plan large.
+                          # ⚠️ CAUSE NON ÉTABLIE, ET JE NE L'INVENTE PAS : la version majeure est
+                          # IDENTIQUE aux deux mesures (17.6) ; seul le numéro de build de l'image
+                          # a changé (postgres:17.6.1.111). C'est circonstanciel, pas une preuve.
+                          # ⚠️ CONSÉQUENCE POUR LE DEV : ne pas partir en croyant diagnostiquer un
+                          # crash. Re-mesurer, re-dater, et surtout RESSERRER le test qui
+                          # l'observait — il assertionne encore « une erreur, n'importe laquelle »,
+                          # donc il repasserait vert sur un crash.
+                          # ⛔ LES TROIS DÉFAUTS RÉELS SONT, EUX, REPRODUITS :
+                          #  1. le DELETE dur DÉTRUIT les ajouts du membre — 2 articles avant
+                          #     génération, 1 après, et AUCUN TOMBSTONE (0 ligne) : irrécupérable ;
+                          #  2. 23505 sur un acheté survivant (le delete épargne les `bought`, qui
+                          #     occupent la clé canonique) ;
+                          #  3. 23505 sur un `group by` plus fin que la clé canonique (deux
+                          #     product_id pour un même nom+unité).
+                          # ✅ ET LA MOITIÉ DU TRAVAIL EXISTE DÉJÀ : ajouter_article fait
+                          # l'UPSERT-incrémente, rouvre les tombstones, résout le rayon et
+                          # estampille la provenance. D'où D1, la décision la plus structurante —
+                          # la génération BOUCLE dessus plutôt que de réécrire une seconde
+                          # agrégation (deux copies de l'expression d'index à garder d'accord).
+                          # ⛔ CE QU'ajouter_article NE FAIT PAS ET QUE L'AC3 EXIGE : elle rouvre un
+                          # tombstone INCONDITIONNELLEMENT — correct pour un ajout manuel, faux pour
+                          # la génération, qui ressusciterait dimanche ce que le membre a retiré
+                          # samedi. D'où D2, un paramètre d'intention.
+                          # ⚠️ TROIS REPORTS DATÉS CONVERGENT ICI ET SONT TRANCHÉS : added_by (D6,
+                          # retrait dans la migration, son unique écrivain étant cette fonction) ·
+                          # la question N-recettes (D5, recipe_id seulement si UNE seule recette a
+                          # contribué) · l'arrondi (D7, entier supérieur pour les unités
+                          # dénombrables seulement — jamais 2 kg de farine pour 1,2).
+                          # ⚠️ La génération n'écrit AUCUNE provenance aujourd'hui (mesuré :
+                          # surface, actor_kind et recipe_id tous nuls).
+                          # Portes au départ : npm test 279/279 · isolation 131, 130 pass, 0 fail,
+                          # 1 skipped · check:migrations 21/19/2/0.
+                          #
+                          # 2026-08-20 (4) — Story 4.6 REVUE puis FERMÉE (`done`). Revue
                           # adversariale à QUATRE couches (les 3 BMad + Clean Code / Clean
                           # Architecture). Notes : Clean Code 7/10, Clean Architecture 7/10.
                           # Bilan : 2 décisions, 19 correctifs, 5 reports.
@@ -1250,7 +1291,7 @@ development_status:
   4-4-ajouter-un-article-avec-agregation-et-unites-fermees: done
   4-5-supprimer-archiver-les-achetes-vider-la-liste: done
   4-6-provenance-de-chaque-article: done
-  4-7-generer-la-liste-depuis-le-menu-sans-rien-ecraser: backlog
+  4-7-generer-la-liste-depuis-le-menu-sans-rien-ecraser: review
   4-8-consulter-la-liste-hors-ligne: backlog
   4-9-ecrire-hors-ligne-via-une-outbox-rejouee: backlog
   4-10-convergence-lww-par-champ-entre-appareils: backlog

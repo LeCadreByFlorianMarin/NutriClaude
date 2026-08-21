@@ -6,6 +6,7 @@ import { stackLocal } from "./stack-local.ts";
 import { normaliserNomRayon } from "../../lib/rayons/saisie.ts";
 import { normaliserEntier, normaliserQuantite, normaliserTitre } from "../../lib/recettes/saisie.ts";
 import { UNITES, estUniteConnue } from "../../lib/recettes/unites.ts";
+import { arrondirPourAchat } from "../../lib/liste/arrondi.ts";
 import { SURFACES, estSurfaceConnue } from "../../lib/liste/surfaces.ts";
 import { normaliserTexte } from "../../lib/texte.ts";
 import { ingredientsDeRecette } from "../../lib/recettes/ingredients.ts";
@@ -415,6 +416,51 @@ test("chaque jeton de UNITES est accepté par la base, et rien d'autre", async (
       .select("id");
     assert.equal(error, null, `la base a refusé le jeton « ${unite} » que le code publie`);
     await admin.from("recipe_ingredients").delete().eq("id", data![0].id);
+  }
+});
+
+test("⛔ l'arrondi d'achat dit la MÊME chose en TypeScript et en base", async () => {
+  /*
+   * ⛔ **L'INVARIANT DE LA STORY 4.7, ET IL EXISTE PARCE QUE DEUX DÉCISIONS SE
+   * CONTREDISAIENT.** D7 prescrivait « la règle d'arrondi ne vit jamais dans le SQL » ;
+   * D1(a) mettait la boucle de génération DANS la base — donc c'est la base qui écrit la
+   * quantité, donc c'est elle qui doit l'arrondir. Un arrondi qui ne vivrait que dans
+   * `lib/` n'arrondirait rien de ce qui est stocké.
+   *
+   * ⚠️ **La règle vit donc en DEUX exemplaires**, et ce fichier porte déjà trois
+   * précédents du même genre (les unités, deux fois, puis les surfaces). La règle §4 est
+   * explicite : « un invariant entre deux fichiers se MESURE, il ne s'affirme pas ». Un
+   * commentaire qui promettrait l'accord serait faux un jour sans que rien ne le dise, et
+   * la conséquence se lirait sur une liste de courses — 2 kg de farine au lieu de 1,2.
+   *
+   * ⛔ **Les entrées ne sont pas décoratives.** Chacune vise un désaccord possible :
+   * l'arrondi au supérieur (1,2), le demi (1,67), le PLANCHER du demi (0,1 — la pincée
+   * qui disparaissait), le zéro qui doit rester zéro, et l'entier déjà achetable.
+   */
+  const entrees = [0, 0.1, 0.2, 0.5, 1, 1.2, 1.5, 1.67, 2, 2.5, 3, 12, 250, 1200, 0.75, 333.33];
+
+  for (const unite of UNITES) {
+    for (const valeur of entrees) {
+      const { data, error } = await admin.rpc("arrondir_pour_achat", {
+        p_quantite: valeur,
+        p_unite: unite,
+      });
+      assert.equal(error, null, `la base a refusé d'arrondir ${valeur} ${unite}`);
+
+      const attendu = arrondirPourAchat(valeur, unite);
+
+      /*
+       * ⚠️ **La base rend un `numeric`, que PostgREST sérialise en chaîne ou en nombre
+       * selon l'échelle.** On compare des NOMBRES, pas des représentations : « 1.50 » et
+       * 1.5 sont la même quantité, et faire échouer le test là-dessus masquerait les vrais
+       * désaccords derrière du bruit de formatage.
+       */
+      assert.equal(
+        Number(data),
+        attendu,
+        `désaccord sur ${valeur} « ${unite} » : la base rend ${data}, le code rend ${attendu}`
+      );
+    }
   }
 });
 

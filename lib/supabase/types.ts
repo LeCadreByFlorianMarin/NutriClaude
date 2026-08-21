@@ -48,7 +48,6 @@ export type Database = {
         Row: {
           actor_id: string | null
           actor_kind: string | null
-          added_by: string | null
           aisle_id: string | null
           created_at: string
           deleted_at: string | null
@@ -68,7 +67,6 @@ export type Database = {
         Insert: {
           actor_id?: string | null
           actor_kind?: string | null
-          added_by?: string | null
           aisle_id?: string | null
           created_at?: string
           deleted_at?: string | null
@@ -88,7 +86,6 @@ export type Database = {
         Update: {
           actor_id?: string | null
           actor_kind?: string | null
-          added_by?: string | null
           aisle_id?: string | null
           created_at?: string
           deleted_at?: string | null
@@ -536,7 +533,6 @@ export type Database = {
         Row: {
           actor_id: string | null
           actor_kind: string | null
-          added_by: string | null
           aisle_icon: string | null
           aisle_id: string | null
           aisle_name: string | null
@@ -623,20 +619,31 @@ export type Database = {
     Functions: {
       ajouter_article: {
         Args: {
+          p_intention?: string
           p_nom: string
+          p_produit_id?: string
           p_quantite?: number
+          p_recette_id?: string
           p_surface?: string
           p_unite?: string
         }
         Returns: string
       }
       archiver_les_achetes: { Args: never; Returns: number }
+      arrondir_pour_achat: {
+        Args: { p_quantite: number; p_unite: string }
+        Returns: number
+      }
       create_household_with_profile: {
         Args: { p_display_name: string; p_household_name: string }
         Returns: string
       }
       current_household_id: { Args: never; Returns: string }
       fonctions_publiques_sans_execute: { Args: never; Returns: string[] }
+      generate_grocery_list_from_menu: {
+        Args: { p_end_date: string; p_start_date: string }
+        Returns: number
+      }
       generate_household_invite: { Args: never; Returns: string }
       redeem_household_invite: {
         Args: { p_code: string; p_display_name: string }
