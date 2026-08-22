@@ -43,6 +43,18 @@
 generated: 2026-07-25
 last_updated: 2026-08-20  # 2026-08-20 (5) — Story 4.7 CONTEXTUALISÉE (`backlog` →
                           # `ready-for-dev`), sur `1eb9669`. Onze mesures exécutées.
+                          # ⛔⛔ CE QUI SUIT A ÉTÉ DÉMENTI LE 2026-08-21 — LE CONSTAT EST FAUX.
+                          # Il avait été pris par le SEUL chemin qui ne crashe pas (`psql` en rôle
+                          # `postgres`). Le segfaut SE REPRODUIT : 6 fois sur 6 via PostgREST, en
+                          # `sql` comme en `plpgsql`. Et sa cause n'est pas la génération — c'est
+                          # un appel de fonction refusé pour permission, quel que soit son corps.
+                          # Un POST ANONYME couchait donc la base de PRODUCTION ; fermé par la
+                          # PR #36 le 2026-08-21.
+                          # ⚠️ Le constat n'est PAS effacé, il est RE-DATÉ : la règle §1 demande de
+                          # corriger une mesure en place, pas de réécrire l'histoire. Ce qu'il
+                          # enseigne reste vrai — « ne pas partir en croyant diagnostiquer », et
+                          # une mesure prise par un seul chemin ne dit rien des autres.
+                          #
                           # ⛔ LE FAIT QUI CHANGE LA FORME DE LA STORY : LE SEGFAUT NE SE REPRODUIT
                           # PLUS. deferred-work.md le décrit comme « un crash par appel,
                           # déterministe » (2026-08-07). Mesuré à nouveau le 2026-08-20 : la

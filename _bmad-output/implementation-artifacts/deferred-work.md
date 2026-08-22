@@ -1869,8 +1869,17 @@ d'ajout se mettraient à refuser silencieusement de rouvrir un article retiré.
 
 ### ⛔ Ne JAMAIS révoquer `EXECUTE` sur une fonction de `public` — c'est un arrêt de service
 
-Mesuré le 2026-08-20, avec témoins : sur l'image Postgres 17.6 de Supabase, le chemin d'erreur
-« permission denied for function » **segfaute le serveur**. Une fonction dont le corps tient en
+Mesuré le 2026-08-20, avec témoins : sur l'image Postgres 17.6 de Supabase, un appel refusé pour
+permission sur une **fonction** **segfaute le serveur**.
+
+⚠️ **CORRECTION DU 2026-08-22, ET ELLE PORTE SUR LA FERMETÉ DE L'ÉNONCÉ, PAS SUR LE FAIT.** Une
+couche de revue a relevé que le journal du conteneur contient, le même jour, des
+`ERROR: permission denied for function` rendus **proprement, sans crash**. Le refus de permission
+est donc **corrélé** au crash, pas suffisant : quelque chose de l'état de la connexion compte
+(piste offerte, non éprouvée : une connexion du pool ayant déjà exécuté du plpgsql). ⛔ **Ce qui est
+établi** : le déclencheur, reproduit 6 fois sur 6 via PostgREST, en `sql` comme en `plpgsql`. **Ce
+qui ne l'est pas** : le mécanisme. Écrire « c'est ce chemin d'erreur qui crashe » était plus ferme
+que la mesure. Une fonction dont le corps tient en
 `return 42` suffit, en `sql` comme en `plpgsql`, en `definer` comme en `invoker`. Une fonction
 réservée aux **membres** couche donc la base dès qu'un anonyme l'appelle — et la clé publiable est
 publique par construction. Le refus sur une **table** est propre ; seul celui sur une **fonction**
@@ -1894,3 +1903,72 @@ amont), mais **ce n'est pas mesuré** — seul le déclencheur l'est.
 *Reporté, sans échéance* : un rapport en amont profiterait à tout le monde, et surtout dirait si la
 production hébergée porte le même défaut. ⚠️ **Rien n'a été affirmé sur la production** : son
 exposition était *inférée* de la présence de la migration sur `main`, jamais constatée.
+
+## Reportés depuis : revue de code de la story 4.7 (2026-08-21)
+
+Quatre couches en parallèle, sur `1eb9669..a451d86` — donc la 4.7 **et** le correctif #36. Chaque
+point ci-dessous a été remesuré avant d'être écrit.
+
+### ⚠️ `p_start_date` / `p_end_date` n'ont aucune borne
+
+`between p_start_date and p_end_date`, sans contrôle d'ordre ni de largeur. Mesuré :
+`{"p_start_date":"-infinity","p_end_date":"infinity"}` déverse **tout** l'historique de menu du foyer
+dans la liste en un appel, et `0001-01-01 → 9999-12-31` fait de même. La RPC est accordée à
+`authenticated` et la clé publiable est publique par construction.
+
+⚠️ **Aucune escalade inter-foyer** — la RLS tient, mesuré. Le défaut est un déversement dans **sa
+propre** liste, et il s'aggrave du fait que la génération accumule.
+
+*Reporté* : à borner par la story qui reprendra la génération, ou par la 4.12 (contrat de liste).
+
+### ⚠️ La génération écrit `ri.name` BRUT, sans normalisation
+
+L'index canonique neutralise les invisibles Unicode pour la **clé**, jamais pour le `name` affiché.
+Mesuré : un `U+200B` dans un nom d'ingrédient se retrouve tel quel dans `grocery_list_items.name`.
+
+Les deux surfaces actuelles protègent — `normaliserNomArticle` pour l'ajout manuel,
+`normaliserTitre` pour les ingrédients. ⛔ **Mais AD-1/AD-2 disent que la règle ne doit pas vivre
+« dans la vigilance d'une surface »** : tout autre écrivain de `recipe_ingredients` (MCP en Epic 7,
+un import) fait tomber la protection.
+
+*Reporté* : à instruire par le premier écrivain non-écran de `recipe_ingredients`.
+
+### ⚠️ `aisle_id` est le seul champ du `do update` sans son cas tombstone
+
+Six champs portent `case when deleted_at is not null then excluded.… end` ; `aisle_id` fait un
+`coalesce` nu. Une ligne rouverte repart d'une vie neuve sur six champs et garde son ancien rayon sur
+le septième.
+
+**Non reproductible aujourd'hui** : `product_aisle_map` est vide, donc `resolve_aisle_id` rend `null`
+sur ses trois branches et l'asymétrie est inobservable.
+
+*Reporté* : deviendra visible le jour où la 2.3 peuplera la table — en même temps que le mot-clé de
+repli déjà consigné plus haut. Les deux se traitent ensemble.
+
+### ⚠️ La sonde anti-arrêt-de-service ne regarde qu'un schéma sur deux
+
+`PGRST_DB_SCHEMAS=public,graphql_public` (mesuré par `docker inspect`), et le prédicat de
+`fonctions_publiques_sans_execute()` filtre `nspname = 'public'`. C'est la règle §3 — « une
+énumération ne peut pas gagner contre une catégorie » — appliquée aux **schémas** au lieu des
+fonctions.
+
+**Aucun contrevenant en base aujourd'hui**, et le défaut de fond est structurellement couvert : les
+`alter default privileges … grant all on functions to anon` rendent toute fonction neuve exécutable
+par `anon`, donc l'état dangereux exige un `revoke` explicite.
+
+*Reporté* : à élargir quand la sonde sera retouchée pour l'une des deux autres raisons consignées.
+
+### ⛔ Le `drop column added_by` est parti sans sa condition — et la condition était INAPPLICABLE
+
+L'en-tête de la migration écrit : « Si elle rend autre chose que 0, **ne pas appliquer le volet 4** ».
+Le volet 4 vit dans le **même fichier** que les volets 1 à 3, dont la story a besoin, et
+`scripts/migrer-au-deploiement.mjs` applique tout le lot en attente au déploiement de production.
+« Ne pas appliquer le volet 4 » n'était réalisable par **aucun geste** une fois la PR fusionnée.
+
+⚠️ La requête de contrôle n'a pas été exécutée ; le volet est parti sur la seule autorisation de
+Florian, le 2026-08-21. C'est une **décision**, pas une mesure — et rien dans le dépôt ne doit
+laisser croire le contraire. La colonne est retirée en production ; c'est irréversible.
+
+*Pas reportable — la leçon l'est.* ⛔ **Un volet conditionnel doit vivre dans SA PROPRE migration.**
+Sinon la condition est décorative : elle décrit un choix que la chaîne de déploiement ne sait pas
+faire. À appliquer à toute future migration portant un `drop`.

@@ -274,17 +274,25 @@ export default async function MenuPage({
           Un membre qui a reculé d'une semaine génère cette semaine-là — c'est ce que
           l'écran montre, donc ce que le bouton doit faire.
         */}
-        <GenererLaListe
-          debut={jours[0]}
-          fin={jours[6]}
-          libelleSemaine={formaterPlageDeSemaine(lundi)}
-        />
-
+        {/*
+          ⛔ **LE BOUTON NE SE MONTE QUE S'IL A UNE CIBLE — correctif de la revue du 2026-08-22.**
+          Il était rendu AVANT ce test, donc offert sur une semaine sans menu : le membre cliquait
+          et s'entendait répondre que sa liste était complète, alors que c'est le MENU qui était
+          vide et que la liste n'avait même pas été consultée. C'est le motif de `GestesDeListe`
+          (« chacun ne se monte que s'il a une cible ») : un bouton qui ne peut rien faire est un
+          bouton qui ment, et le membre qui l'actionne sans effet en conclut que l'écran est cassé.
+        */}
         {cases.length === 0 ? (
           <p className="mt-6 text-base">
             Tu n&apos;as encore rien prévu cette semaine.
           </p>
-        ) : null}
+        ) : (
+          <GenererLaListe
+            debut={jours[0]}
+            fin={jours[6]}
+            libelleSemaine={formaterPlageDeSemaine(lundi)}
+          />
+        )}
 
         <div className="mt-8 grid gap-gutter lg:grid-cols-7 lg:grid-rows-[repeat(5,auto)]">
           {jours.map((jour) => {

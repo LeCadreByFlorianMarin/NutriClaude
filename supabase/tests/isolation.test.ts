@@ -2754,7 +2754,7 @@ async function menuDeService(
   titre: string,
   portionsRecette: number,
   personnesPrevues: number,
-  ingredients: { nom: string; quantite: number; unite: string; produitId?: string }[],
+  ingredients: { nom: string; quantite: number | null; unite: string; produitId?: string }[],
   repas: "breakfast" | "lunch" | "dinner" | "snack" = "dinner",
 ): Promise<string> {
   const { data: recette, error: erreurRecette } = await admin
@@ -2818,15 +2818,18 @@ test("⛔ un article ajouté À LA MAIN SURVIT à la génération (M4/M5)", asyn
   assert.equal(Number(apres[0].quantity), 1, "la quantité de l'ajout manuel a bougé");
 });
 
-test("⛔ un article ACHETÉ de même clé s'incrémente au lieu de rendre 23505 (M6)", async () => {
+test("⛔ un article ACHETÉ n'est ni décoché ni incrémenté par la génération (AC2)", async () => {
   /*
-   * ⛔ **MESURÉ AVANT CORRECTIF : `23505`.** L'article acheté survivait au `delete`
-   * (qui ne visait que `pending`), puis l'`insert` nu heurtait la clé canonique qu'il
-   * occupait — et l'index est TOTAL, donc la ligne était invisible à la lecture. La
-   * génération échouait **entièrement**, en désignant un article que l'écran n'affiche pas.
+   * ⛔ **CE TEST A CHANGÉ DE SENS EN REVUE, ET C'EST UNE DÉCISION DE FLORIAN (2026-08-22).**
+   * Il figeait auparavant l'inverse — « l'acheté n'est pas redevenu à prendre » assertionnait
+   * `status === "pending"` — donc la barrière PROTÉGEAIT la violation de l'AC2. Les quatre
+   * couches de revue l'ont relevé indépendamment.
    *
-   * ⚠️ **Un acheté TOUJOURS VIVANT continue de s'additionner**, il ne repart pas de zéro :
-   * il est encore de cette liste-ci. C'est la règle de la 4.5, et elle vaut ici.
+   * ⛔ **L'AC2 nomme les achetés à côté des ajouts manuels** : « des articles ajoutés à la main
+   * **ou déjà achetés** … elle ne les **écrase jamais** ». Et l'écran l'affirme au membre.
+   *
+   * ⚠️ **Ce que M6 figeait reste vrai et vaut toujours** : plus aucun `23505`. La génération ne
+   * heurte plus la clé occupée par un acheté — elle la laisse simplement tranquille.
    */
   const jour = "2027-01-05";
   await porteDuDepot(a.client, "zz47ach-oignon", 1, "pièce", "web");
@@ -2839,17 +2842,36 @@ test("⛔ un article ACHETÉ de même clé s'incrémente au lieu de rendre 23505
     { nom: "zz47ach-oignon", quantite: 2, unite: "pièce" },
   ]);
 
-  const ajoutes = await genererLaListe(a.client, jour, jour);
-  assert.equal(ajoutes, 1, "la génération n'a pas rendu compte de son seul article");
+  const { ajoutes, echoues } = await genererLaListe(a.client, jour, jour);
+  assert.equal(echoues, 0, "la génération a signalé un échec là où elle devait s'abstenir");
+  assert.equal(ajoutes, 0, "la génération a COMPTÉ un article auquel elle n'a pas touché");
 
   const lignes = await lignesNommees("zz47ach-oignon");
-  assert.equal(lignes.length, 1, "l'article acheté a été dupliqué au lieu d'être incrémenté");
+  assert.equal(lignes.length, 1, "l'article acheté a été dupliqué");
+  assert.equal(lignes[0].status, "bought", "⛔ la génération a DÉCOCHÉ un article déjà pris");
+  assert.equal(Number(lignes[0].quantity), 1, "⛔ la génération a gonflé la quantité d'un acheté");
+});
+
+test("⛔ mais un ajout MANUEL, lui, ramène un acheté à prendre et s'additionne (4.5)", async () => {
   /*
-   * 2 pièces pour 4 portions, servies à 6 → 2 × 6/4 = 3, dénombrable donc entier.
-   * Plus la pièce déjà achetée : 4.
+   * ⛔ **LE CONTRÔLE POSITIF DU TEST VOISIN, ET SANS LUI IL NE PROUVE RIEN.** Une fonction qui
+   * refuserait TOUJOURS d'écrire sur un acheté passerait le test précédent haut la main — et
+   * casserait la règle mesurée en 4.5 : « ajouter, c'est vouloir acheter ».
+   *
+   * ⚠️ **C'est `p_intention` qui distingue les deux**, et rien d'autre : la génération le
+   * fournit, l'ajout manuel jamais.
    */
-  assert.equal(Number(lignes[0].quantity), 4, "l'incrément n'a pas eu lieu");
-  assert.equal(lignes[0].status, "pending", "l'acheté n'est pas redevenu à prendre");
+  await porteDuDepot(a.client, "zz47man-achete", 6, "pièce", "web");
+  await a.client
+    .from("grocery_list_items")
+    .update({ status: "bought" })
+    .eq("name", "zz47man-achete");
+
+  await porteDuDepot(a.client, "zz47man-achete", 4, "pièce", "web");
+
+  const lignes = await lignesNommees("zz47man-achete");
+  assert.equal(lignes[0].status, "pending", "un ajout manuel doit ramener l'acheté à prendre");
+  assert.equal(Number(lignes[0].quantity), 10, "un ajout manuel doit s'additionner (6 + 4)");
 });
 
 test("⛔ deux produits de même nom et unité FUSIONNENT au lieu de rendre 23505 (M7)", async () => {
@@ -2870,7 +2892,7 @@ test("⛔ deux produits de même nom et unité FUSIONNENT au lieu de rendre 2350
     { nom: "zz47fus-beurre", quantite: 50, unite: "g", produitId: p2!.id as string },
   ]);
 
-  const ajoutes = await genererLaListe(a.client, jour, jour);
+  const { ajoutes } = await genererLaListe(a.client, jour, jour);
   assert.equal(ajoutes, 1, "deux groupes fusionnés doivent compter pour UN article");
 
   const lignes = await lignesNommees("zz47fus-beurre");
@@ -2903,16 +2925,22 @@ test("la mise à l'échelle rapporte les personnes prévues aux portions de la r
   assert.equal(Number(sel[0].quantity), 1.5, "l'arrondi au demi a déformé une valeur juste");
 });
 
-test("⛔ un tombstone PLUS RÉCENT que la génération n'est PAS ressuscité (AC3)", async () => {
+test("⛔ la génération ne ressuscite JAMAIS un article retiré — par la porte du produit", async () => {
   /*
-   * ⛔ **SANS CET ARBITRAGE, LA GÉNÉRATION DE DIMANCHE ANNULE LA SUPPRESSION DE SAMEDI.**
-   * `ajouter_article` rouvre INCONDITIONNELLEMENT un tombstone — correct pour un ajout
-   * manuel (le membre qui retape un nom veut l'article), faux pour la génération : elle
-   * retirerait au membre sa décision, sans un mot.
+   * ⛔ **CE TEST REMPLACE DEUX TESTS QUI MESURAIENT UN SCÉNARIO IMPOSSIBLE.** Ils fabriquaient
+   * un tombstone daté dans le FUTUR (`Date.now() + 3600_000`) — une ligne que le produit ne
+   * sait pas produire. Deux couches de revue l'ont relevé, et je l'ai remesuré : tous les
+   * chemins de suppression posent `deleted_at = now()`, donc l'ancienne garde
+   * `p_intention > deleted_at` était **toujours vraie** et l'article revenait TOUJOURS.
    *
-   * ⚠️ **La suppression est datée dans le FUTUR**, plutôt que d'attendre entre deux gestes.
-   * Un test qui dormirait mesurerait l'horloge autant que la règle, et serait lent ET
-   * instable. Ici l'ordre des intentions est posé, donc l'assertion porte sur la RÈGLE.
+   * ⛔ **DÉCISION DE FLORIAN (2026-08-22) : LA LETTRE DE L'AC3 A CHANGÉ.** Elle demandait un LWW
+   * sur `deleted_at`. Mais le LWW arbitre des écritures CONCURRENTES entre appareils ; ici la
+   * génération est postérieure **par construction**, donc l'appliquer donnait à la machine une
+   * victoire garantie sur une décision humaine. Désormais : seul un geste HUMAIN rouvre.
+   *
+   * ⚠️ **La suppression passe par `supprimerArticle`, la porte du produit** — jamais par un
+   * `update` forgé. C'est la leçon de la 4.6 : un test qui recopie la requête mesure l'accord
+   * de la base avec sa propre copie.
    */
   const jour = "2027-01-08";
   await menuDeService(jour, "zz47 Ragoût", 4, 4, [
@@ -2923,47 +2951,127 @@ test("⛔ un tombstone PLUS RÉCENT que la génération n'est PAS ressuscité (A
   const posee = await lignesNommees("zz47res-carotte");
   assert.equal(posee.length, 1, "la première génération n'a pas posé l'article");
 
-  // Le membre le retire, et son intention est POSTÉRIEURE à la génération qui suit.
-  await a.client
-    .from("grocery_list_items")
-    .update({ deleted_at: new Date(Date.now() + 3600_000).toISOString() })
-    .eq("name", "zz47res-carotte");
+  // Le membre le retire, par le geste que l'écran lui offre.
+  await supprimerArticle(a.client, await idDe("zz47res-carotte"));
+  const retiree = await lignesNommees("zz47res-carotte");
+  assert.notEqual(retiree[0].deleted_at, null, "la suppression n'a pas posé de tombstone");
 
-  const ajoutes = await genererLaListe(a.client, jour, jour);
-  assert.equal(ajoutes, 0, "la génération a compté un article qu'elle n'a pas ajouté");
+  // Et la génération suivante — celle de dimanche, sur la suppression de samedi.
+  const { ajoutes, echoues } = await genererLaListe(a.client, jour, jour);
+  assert.equal(echoues, 0, "la génération a signalé un échec là où elle devait s'abstenir");
+  assert.equal(ajoutes, 0, "la génération a compté un article qu'elle n'a pas posé");
 
   const apres = await lignesNommees("zz47res-carotte");
-  assert.notEqual(apres[0].deleted_at, null, "⛔ la génération a RESSUSCITÉ un article retiré après elle");
+  assert.notEqual(
+    apres[0].deleted_at,
+    null,
+    "⛔ la génération a RESSUSCITÉ un article que le membre avait retiré"
+  );
 });
 
-test("un tombstone PLUS ANCIEN que la génération EST ressuscité (AC3, l'autre sens)", async () => {
+test("mais un ajout MANUEL rouvre le tombstone — c'est le contrôle positif", async () => {
   /*
-   * ⛔ **LE CONTRÔLE POSITIF DE L'ARBITRAGE, ET SANS LUI LE TEST VOISIN NE PROUVE RIEN.**
-   * Une génération qui ne ressusciterait JAMAIS rien passerait le test précédent haut la
-   * main. Ce qu'on veut est un arbitrage, pas un refus systématique.
+   * ⛔ **SANS CE TEST, LE VOISIN NE PROUVE RIEN.** Une `ajouter_article` qui ne rouvrirait
+   * JAMAIS un tombstone le passerait haut la main, et casserait la 4.5 : retaper un nom, c'est
+   * vouloir l'article. La distinction tient au seul `p_intention`.
    */
-  const jour = "2027-01-09";
-  await menuDeService(jour, "zz47 Curry", 4, 4, [
-    { nom: "zz47anc-riz", quantite: 200, unite: "g" },
+  await porteDuDepot(a.client, "zz47res-thym", 2, "pièce", "web");
+  await supprimerArticle(a.client, await idDe("zz47res-thym"));
+
+  await porteDuDepot(a.client, "zz47res-thym", 5, "pièce", "web");
+
+  const lignes = await lignesNommees("zz47res-thym");
+  assert.equal(lignes[0].deleted_at, null, "un ajout manuel doit rouvrir le tombstone");
+  assert.equal(lignes[0].status, "pending", "l'article rouvert n'est pas à prendre");
+  // ⚠️ Vie neuve : 5, pas 7 — une quantité tombstonée appartient à une vie précédente (4.5).
+  assert.equal(Number(lignes[0].quantity), 5, "la quantité d'une vie précédente s'est ajoutée");
+});
+
+test("⛔ deux GRAPHIES de même clé canonique fusionnent, arrondissent UNE fois, et n'inventent aucune recette", async () => {
+  /*
+   * ⛔ **LA COUTURE QUE MES DEUX TESTS D'ORIGINE N'EXERÇAIENT PAS** — ils employaient des
+   * graphies identiques. Trois couches de revue ont trouvé le défaut par ce chemin :
+   *
+   *   - le `group by` portait sur le nom BRUT, la fusion sur la clé CANONIQUE
+   *   - donc l'arrondi tombait DEUX fois : ⌈1,5⌉ + ⌈1,5⌉ = 4 au lieu de ⌈3⌉ = 3, soit +33 %
+   *   - et `recipe_id` prenait celui du premier groupe, donc l'icône 🍴 nommait UNE recette
+   *     sur DEUX contributrices — exactement ce que D5 interdit
+   *
+   * ⚠️ Fermé par une fonction `cle_canonique_nom` PARTAGÉE entre l'index et le groupement :
+   * D3(a) interdisait de recopier l'expression, pas de la partager.
+   */
+  const jour = "2027-01-12";
+  await menuDeService(jour, "zz47 Graphie A", 4, 6, [
+    { nom: "zz47gra-Échalote", quantite: 1, unite: "pièce" },
   ]);
+  await menuDeService(jour, "zz47 Graphie B", 4, 6, [
+    { nom: "zz47gra-echalote", quantite: 1, unite: "pièce" },
+  ], "lunch");
+
+  const { ajoutes } = await genererLaListe(a.client, jour, jour);
+  assert.equal(ajoutes, 1, "deux graphies de même clé doivent compter pour UN article");
+
+  const { data, error } = await a.client
+    .from("grocery_list_items")
+    .select("name, quantity, recipe_id")
+    .ilike("name", "zz47gra-%");
+  assert.equal(error, null, "la lecture a échoué");
+  assert.equal(data?.length, 1, "les deux graphies ont fait deux lignes");
+  /*
+   * ⛔ **3, ET SURTOUT PAS 4.** 1 × 6/4 = 1,5 par recette ; groupées d'abord, arrondies
+   * ensuite → ⌈3⌉ = 3. C'est le +33 % que la revue a mesuré.
+   */
+  assert.equal(Number(data![0].quantity), 3, "l'arrondi est tombé deux fois au lieu d'une");
+  assert.equal(
+    data![0].recipe_id,
+    null,
+    "⛔ un article venu de DEUX recettes affirme une origine unique"
+  );
+});
+
+test("⛔ un article qui déborde n'emporte pas les autres, et l'échec se compte", async () => {
+  /*
+   * ⛔ **AVANT LA REVUE, UN SEUL ARTICLE PERDAIT TOUTE LA SEMAINE.** `quantity` est
+   * `numeric(8,2)`, l'écran autorise 999 999,99 par ingrédient, et la boucle n'isolait rien :
+   * l'ordre entier était annulé, l'écran disait « On n'a pas réussi à générer ta liste » sans
+   * nommer le fautif, et l'état n'était pas transitoire — le membre était bloqué.
+   *
+   * ⚠️ **Ce n'est pas un cas tordu** : l'accumulation y menait seule, vers la onzième
+   * régénération.
+   */
+  const jour = "2027-01-13";
+  await menuDeService(jour, "zz47 Débordement", 2, 4, [
+    { nom: "zz47deb-enorme", quantite: 900000, unite: "g" },
+    { nom: "zz47deb-normal", quantite: 250, unite: "g" },
+  ]);
+
+  const { ajoutes, echoues } = await genererLaListe(a.client, jour, jour);
+  assert.equal(echoues, 1, "le débordement n'a pas été compté comme un échec");
+  assert.equal(ajoutes, 1, "l'article sain n'a pas été posé — l'échec a emporté la semaine");
+
+  const sain = await lignesNommees("zz47deb-normal");
+  assert.equal(sain.length, 1, "⛔ l'article sain a été perdu avec le fautif");
+  assert.equal(Number(sain[0].quantity), 500, "l'article sain n'a pas la bonne quantité");
+});
+
+test("⛔ un ingrédient SANS quantité arrive sans quantité — pas à « 0 »", async () => {
+  /*
+   * ⛔ **RÉGRESSION SUR L'IMPLÉMENTATION REMPLACÉE, trouvée par trois couches.** L'ancienne
+   * génération faisait `nullif(p.total_qty, 0)` ; la 4.7 l'avait perdu, donc
+   * `coalesce(ri.quantity, 0)` transformait « on ne sait pas » en « zéro » et l'écran affichait
+   * « 0 pincée ». L'ajout manuel, lui, écrit `null` et n'affiche rien : les deux chemins doivent
+   * dire la même chose de la même absence.
+   */
+  const jour = "2027-01-14";
+  await menuDeService(jour, "zz47 Sans quantité", 4, 4, [
+    { nom: "zz47sq-poivre", quantite: null, unite: "pincée" },
+  ]);
+
   await genererLaListe(a.client, jour, jour);
 
-  await a.client
-    .from("grocery_list_items")
-    .update({ deleted_at: new Date(Date.now() - 3600_000).toISOString() })
-    .eq("name", "zz47anc-riz");
-
-  const ajoutes = await genererLaListe(a.client, jour, jour);
-  assert.equal(ajoutes, 1, "la génération n'a pas rouvert un article retiré AVANT elle");
-
-  const apres = await lignesNommees("zz47anc-riz");
-  assert.equal(apres[0].deleted_at, null, "l'article n'est pas revenu sur la liste");
-  assert.equal(apres[0].status, "pending", "l'article revenu n'est pas à prendre");
-  /*
-   * ⚠️ **Une ligne rouverte repart d'une VIE NEUVE** : 200 g, pas 400. C'est la règle de
-   * la 4.5 — une quantité tombstonée appartient à une vie précédente.
-   */
-  assert.equal(Number(apres[0].quantity), 200, "la quantité d'une vie précédente s'est ajoutée");
+  const lignes = await lignesNommees("zz47sq-poivre");
+  assert.equal(lignes.length, 1, "l'ingrédient sans quantité n'a pas été posé");
+  assert.equal(lignes[0].quantity, null, "⛔ « on ne sait pas » est devenu « zéro »");
 });
 
 test("la provenance porte la recette quand UNE SEULE a contribué, et rien sinon (D5)", async () => {
@@ -3024,8 +3132,9 @@ test("⛔ un membre d'un AUTRE foyer ne génère rien chez A", async () => {
   const compteAvant = avant!.length;
 
   // B génère SA liste, sur la même plage de dates. Son menu est vide.
-  const ajoutesParB = await genererLaListe(b.client, jour, jour);
+  const { ajoutes: ajoutesParB, echoues: echouesParB } = await genererLaListe(b.client, jour, jour);
   assert.equal(ajoutesParB, 0, "B a généré des articles depuis un menu qui n'est pas le sien");
+  assert.equal(echouesParB, 0, "la génération de B a échoué au lieu de ne rien trouver");
 
   const { data: apres } = await a.client.from("grocery_list_items").select("id");
   assert.equal(
@@ -3097,13 +3206,27 @@ test("⛔ la génération refuse PROPREMENT un anonyme — elle ne couche plus l
    * même une fonction réservée aux MEMBRES couche la base quand un anonyme l'appelle. Un
    * test qui n'énumérerait que la génération laisserait passer la prochaine révocation.
    */
-  const { data: revoquees, error: erreurAudit } = await admin.rpc(
-    "fonctions_publiques_sans_execute"
+  /*
+   * ⛔ **LA GARDE DE FOND, ET ELLE REND UN COMPTE — PLUS DES NOMS.** Remesuré en revue le
+   * 2026-08-22 : l'OpenAPI de PostgREST est **filtré par privilège**, donc l'ancienne sonde
+   * rendait à un anonyme exactement ce que l'API lui cache — noms, signatures, et la liste des
+   * cibles à couper. Ma justification écrite (« elle ne divulgue rien de neuf ») était fausse,
+   * et je ne l'avais pas mesurée avant de l'écrire.
+   *
+   * ⛔ **ET LE PRÉDICAT REGARDE DÉSORMAIS LES DEUX RÔLES.** Il ne voyait qu'`anon` ; une
+   * fonction accordée à `anon` mais révoquée à `authenticated` fait tomber la base sur un
+   * MEMBRE connecté.
+   *
+   * ⚠️ **Ce qui est dangereux n'est pas CETTE fonction, c'est l'ÉTAT.** Un test qui n'énumérerait
+   * que la génération laisserait passer la prochaine révocation.
+   */
+  const { data: injoignables, error: erreurAudit } = await admin.rpc(
+    "compte_fonctions_injoignables"
   );
   assert.equal(erreurAudit, null, "la sonde d'audit des ACL n'a pas répondu");
-  assert.deepEqual(
-    revoquees,
-    [],
-    `des fonctions restent dans public avec EXECUTE révoqué — elles permettent un arrêt de service anonyme : ${JSON.stringify(revoquees)}`
+  assert.equal(
+    injoignables,
+    0,
+    `${injoignables} fonction(s) de public sont injoignables à anon ou à authenticated — cet état permet un arrêt de service. Interroge pg_proc pour les nommer.`
   );
 });

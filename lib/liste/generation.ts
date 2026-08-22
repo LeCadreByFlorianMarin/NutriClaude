@@ -30,11 +30,21 @@ import type { Database } from "../supabase/types";
  * `throw`** : `app/error.tsx` est une frontière d'erreur de *rendu*, qu'un rejet de
  * promesse dans un callback `async` ne traverse pas. L'appelant doit l'envelopper.
  */
+/**
+ * Ce qu'une génération a fait — deux nombres, parce qu'un seul mentirait.
+ *
+ * ⛔ **`echoues` EXISTE PARCE QU'UN ARTICLE PEUT ÉCHOUER SEUL.** Avant la revue, un
+ * débordement de quantité annulait l'ordre entier et faisait perdre toute la semaine ;
+ * la génération isole désormais chaque article. Taire les échecs rendrait le compte
+ * rendu faux dans le seul cas où il compte.
+ */
+export type CompteRenduGeneration = { ajoutes: number; echoues: number };
+
 export async function genererLaListe(
   supabase: SupabaseClient<Database>,
   debut: string,
   fin: string
-): Promise<number> {
+): Promise<CompteRenduGeneration> {
   const { data, error } = await supabase.rpc("generate_grocery_list_from_menu", {
     p_start_date: debut,
     p_end_date: fin,
@@ -45,12 +55,13 @@ export async function genererLaListe(
   }
 
   /*
-   * ⚠️ **`?? 0` PLUTÔT QU'UN `!`.** La signature générée rend le compte nullable ;
-   * un menu vide rend `0` et non `null`, mais l'affirmer par `!` ferait dépendre le
-   * compte rendu d'une promesse non tenue par le type. Zéro est une réponse valide,
-   * et elle a sa propre phrase.
+   * ⚠️ **LA RPC REND UNE TABLE, DONC UN TABLEAU D'UNE LIGNE.** `returns table(...)` côté
+   * SQL se sérialise en `[{ajoutes, echoues}]`. Un `data![0]` nu casserait sur un tableau
+   * vide — que la fonction ne produit pas aujourd'hui (elle fait toujours `return next`),
+   * mais l'affirmer par `!` ferait dépendre l'écran d'une promesse non tenue par le type.
    */
-  return data ?? 0;
+  const ligne = data?.[0];
+  return { ajoutes: ligne?.ajoutes ?? 0, echoues: ligne?.echoues ?? 0 };
 }
 
 /**
@@ -65,8 +76,34 @@ export async function genererLaListe(
  * alors que c'est un succès sans objet : le menu est vide, ou tout y était déjà. La
  * leçon écrite en revue de la 4.2 était « un état vide se mérite ».
  */
-export function compteRenduGeneration(ajoutes: number): string {
-  if (ajoutes === 0) return "Ta liste avait déjà tout ce qu'il faut.";
-  if (ajoutes === 1) return "1 article ajouté à ta liste.";
-  return `${ajoutes} articles ajoutés à ta liste.`;
+export function compteRenduGeneration({ ajoutes, echoues }: CompteRenduGeneration): string {
+  /*
+   * ⛔ **LES ÉCHECS SE DISENT EN PREMIER, ET ILS SE DISENT TOUJOURS.** Un article qui n'a
+   * pas pu être posé est ce que le membre doit savoir : il croira sinon sa liste complète.
+   * La revue a mesuré qu'un débordement de quantité faisait perdre la semaine entière sans
+   * que rien ne le dise — c'est le défaut que cette phrase ferme côté écran.
+   *
+   * ⚠️ **On ne nomme pas l'article fautif**, parce que la base ne le remonte pas : elle rend
+   * un compte. Le dire serait inventer. La phrase reste donc vraie et incomplète, plutôt que
+   * précise et fausse.
+   */
+  if (echoues > 0) {
+    const echec =
+      echoues === 1
+        ? "1 article n'a pas pu être ajouté"
+        : `${echoues} articles n'ont pas pu être ajoutés`;
+    if (ajoutes === 0) return `${echec}. Regarde les quantités de tes recettes.`;
+    const pose = ajoutes === 1 ? "1 article ajouté" : `${ajoutes} articles ajoutés`;
+    return `${pose}, mais ${echec}.`;
+  }
+
+  /*
+   * ⚠️ **« posé » ET NON « ajouté », ET C'EST UNE CORRECTION DE LA REVUE.** Le compte est
+   * celui des articles TOUCHÉS — une ligne existante dont la quantité monte est comptée, et
+   * elle n'a pas été « ajoutée ». Les quatre couches l'ont relevé : au second appel, l'écran
+   * annonçait « N articles ajoutés » alors que zéro l'avait été.
+   */
+  if (ajoutes === 0) return "Rien de neuf pour ta liste.";
+  if (ajoutes === 1) return "1 article posé sur ta liste.";
+  return `${ajoutes} articles posés sur ta liste.`;
 }
