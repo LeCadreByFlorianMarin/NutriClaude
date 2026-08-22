@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Notice } from "@/app/_lib/Notice";
 import { useSoumission } from "@/app/_lib/useSoumission";
 import { createNavigateurClient } from "@/lib/supabase/client";
+import Link from "next/link";
 import { compteRenduGeneration, genererLaListe } from "@/lib/liste/generation";
 
 /**
@@ -68,21 +69,20 @@ export function GenererLaListe({
   libelleSemaine: string;
 }) {
   const { occupe, cle, effacer, soumettre } = useSoumission<Cle>();
-  /*
-   * ⚠️ **Le compte rendu est un état À PART de `cle`, et il le faut.** `useSoumission`
-   * porte des clés d'un dictionnaire fixe ; le succès porte un NOMBRE, donc une phrase
-   * construite. Les faire passer par le même canal obligerait à mettre une phrase
-   * variable dans un dictionnaire de constantes, ou un compte dans une clé.
-   */
   const [compteRendu, setCompteRendu] = useState<string | null>(null);
+  /*
+   * ⚠️ **UN LIEN VERS LA LISTE, ET SEULEMENT APRÈS COUP.** La revue a mesuré qu'aucun
+   * `<Link>` de cet écran ne menait à `/courses` : le membre s'entendait dire « 3 articles
+   * posés sur ta liste » et n'avait aucun chemin vers elle. Il n'apparaît qu'après une
+   * génération, parce qu'avant il n'y a rien de neuf à aller voir.
+   */
+  const [aGenere, setAGenere] = useState(false);
 
   async function generer() {
     /*
-     * ⛔ **LE COMPTE RENDU PRÉCÉDENT S'EFFACE AVANT LE NOUVEAU GESTE.** Sans cela,
-     * « 12 articles ajoutés à ta liste. » resterait affiché pendant la génération
-     * suivante, et se lirait comme son résultat. Un compte rendu parle du passé ; dès
-     * qu'un geste repart, il ment. C'est le défaut trouvé au parcours du 2026-08-17
-     * sur `GestesDeListe`, transposé.
+     * ⛔ **LE COMPTE RENDU PRÉCÉDENT S'EFFACE AVANT LE NOUVEAU GESTE.** Sans cela, la phrase
+     * d'avant resterait affichée pendant la génération suivante et se lirait comme son
+     * résultat. Un compte rendu parle du passé ; dès qu'un geste repart, il ment.
      */
     setCompteRendu(null);
     effacer();
@@ -90,8 +90,9 @@ export function GenererLaListe({
     await soumettre(async () => {
       try {
         const supabase = createNavigateurClient();
-        const ajoutes = await genererLaListe(supabase, debut, fin);
-        setCompteRendu(compteRenduGeneration(ajoutes));
+        const resultat = await genererLaListe(supabase, debut, fin);
+        setCompteRendu(compteRenduGeneration(resultat));
+        setAGenere(true);
         return undefined;
       } catch {
         return "echec";
@@ -105,13 +106,6 @@ export function GenererLaListe({
     <div className="mt-6">
       <Notice reserve>{message}</Notice>
 
-      {/*
-        ⚠️ **Le nom accessible NOMME la semaine visée.** Le libellé visible dit
-        « Générer ma liste », mais l'écran permet de naviguer de semaine en semaine :
-        sans la semaine dans le nom, un lecteur d'écran annonce un bouton dont on ne
-        peut pas savoir sur quoi il porte — et le membre qui a reculé d'une semaine
-        générerait la mauvaise sans s'en apercevoir.
-      */}
       <button
         type="button"
         onClick={generer}
@@ -123,13 +117,28 @@ export function GenererLaListe({
       </button>
 
       {/*
-        ⚠️ **La phrase dit ce que le geste NE fait PAS**, parce que c'est précisément
-        ce qui inquiète : le membre qui a déjà coché des articles ou ajouté un truc à
-        la main veut savoir qu'il ne va pas les perdre. C'est l'AC2 énoncé à l'écran.
+        ⚠️ **La phrase dit ce que le geste NE fait PAS**, parce que c'est précisément ce qui
+        inquiète. ⛔ **Elle était FAUSSE sur sa seconde moitié avant la revue** : la génération
+        décochait les articles déjà pris et gonflait leur quantité. Elle ne les touche plus.
       */}
       <p className="hint mt-2">
         Tes ajouts à la main et ce que tu as déjà pris restent en place.
       </p>
+
+      {aGenere ? (
+        <Link
+          href="/courses"
+          /*
+            ⚠️ **`inline-flex`, PAS `flex` — défaut vu au parcours du 2026-08-22.** `btn-quiet`
+            centre son contenu ; posé en `flex`, le lien occupait toute la largeur et se
+            retrouvait CENTRÉ sous un bloc entièrement aligné à gauche. Une seule classe de
+            différence, invisible à toutes les portes.
+          */
+          className="btn-quiet mt-2 inline-flex min-h-touch items-center px-0 underline underline-offset-4"
+        >
+          Voir ma liste →
+        </Link>
+      ) : null}
     </div>
   );
 }

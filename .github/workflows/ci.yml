@@ -165,20 +165,22 @@ jobs:
 
       # Le compte de FICHIERS plus haut ne voit pas un test SAUTÉ : `node --test`
       # sort à 0 en présence de `skipped`, donc tout le fichier pourrait passer en
-      # `test.skip` sans que ce job rougisse. La story 4.2 est la première à
-      # employer `skip` ici — le test de génération, qui observait un segfault au
-      # lieu d'un refus de permission (deferred-work.md, à rétablir en 4.7).
+      # `test.skip` sans que ce job rougisse.
       #
-      # `skipped == 0` est exclu : il échouerait immédiatement sur ce saut-là. On
-      # tolère EXACTEMENT le saut attendu, nommé en dur. Tout saut neuf rougit —
-      # et le jour où la 4.7 rétablira celui-ci sans toucher cette garde, elle
-      # rougira aussi. C'est voulu : une garde se fait relire quand son objet
-      # change.
-      - name: Contrôler qu'aucun test d'isolation n'est sauté hors celui attendu
+      # ⛔ **CETTE GARDE A ÉTÉ MUETTE EXACTEMENT QUAND ELLE PROMETTAIT DE PARLER.**
+      # Sa version précédente tolérait UN saut, nommé en dur, et son commentaire
+      # annonçait : « le jour où la 4.7 rétablira celui-ci sans toucher cette
+      # garde, elle rougira aussi ». La 4.7 l'a rétabli, la garde est restée
+      # verte — ses branches couvraient `n > 1` et `n == 1`, jamais `n == 0`.
+      # Mesuré en revue le 2026-08-22. Elle a donc laissé passer sa propre
+      # obsolescence, et `SAUT_ATTENDU` désignait un test qui n'existait plus.
+      #
+      # ⚠️ **Plus aucune exception nommée.** Le dépôt n'a plus un seul test sauté ;
+      # le seuil est donc ZÉRO, et il n'a pas de cas particulier à connaître. Une
+      # garde sans exception ne peut plus se périmer en silence.
+      - name: Contrôler qu'aucun test d'isolation n'est sauté
         shell: bash
         run: |
-          SAUT_ATTENDU="un membre authentifié ne peut PAS appeler la génération de liste"
-
           # Le rapporteur `spec` écrit « ℹ skipped N » et colore la ligne ; le
           # rapporteur `tap` écrit « # skipped N ». On retire les séquences ANSI
           # et on accepte les deux.
@@ -197,19 +199,11 @@ jobs:
 
           echo "tests d'isolation sautés : $n"
 
-          if [ "$n" -gt 1 ]; then
-            echo "::error::$n tests d'isolation sautés, 1 seul est attendu. Un test sauté ne prouve rien, et node --test sort à 0 : NFR-5 n'est plus démontré d'autant. Rétablis-le, ou déclare-le ici avec sa raison datée."
+          if [ "$n" -gt 0 ]; then
+            echo "::error::$n test(s) d'isolation sauté(s), zéro est attendu. Un test sauté ne prouve rien, et node --test sort à 0 : NFR-5 n'est plus démontré d'autant. Rétablis-le, ou déclare-le ici avec sa raison datée — et alors cette garde doit être relue en même temps."
             exit 1
           fi
 
-          if [ "$n" -eq 1 ] && ! grep -qF "$SAUT_ATTENDU" /tmp/isolation.log; then
-            echo "::error::Un test d'isolation est sauté, mais ce n'est pas celui attendu (« $SAUT_ATTENDU »). Un saut non déclaré retire une preuve d'isolation sans le dire."
-            exit 1
-          fi
-
-      # Sans `if: always()`, un test rouge laisserait les conteneurs debout et
-      # le runner serait recyclé sans les arrêter — sans conséquence ici, mais
-      # la sortie de `stop` dit parfois pourquoi un test a échoué.
       - name: Arrêter le stack local
         if: always()
         run: supabase stop

@@ -439,8 +439,29 @@ test("⛔ l'arrondi d'achat dit la MÊME chose en TypeScript et en base", async 
    */
   const entrees = [0, 0.1, 0.2, 0.5, 1, 1.2, 1.5, 1.67, 2, 2.5, 3, 12, 250, 1200, 0.75, 333.33];
 
-  for (const unite of UNITES) {
-    for (const valeur of entrees) {
+  /**
+   * Compare une réponse de la base à une réponse du code, en distinguant `null` de zéro.
+   *
+   * ⛔ **`Number(null) === 0`, ET C'EST LE PIÈGE QUI AVAIT LAISSÉ LE TROU.** La première
+   * rédaction de cet invariant comparait `Number(data)` à `attendu` : elle ne pouvait donc pas
+   * comparer le cas `null` sans échouer, et ce cas avait simplement été retiré du domaine. Une
+   * couche de revue l'a mesuré — la branche `when p_quantite is null then null` du SQL n'était
+   * gardée par rien.
+   */
+  const memeQuantite = (deLaBase: unknown, duCode: number | null) =>
+    deLaBase === null || duCode === null
+      ? deLaBase === null && duCode === null
+      : Number(deLaBase) === duCode;
+
+  /*
+   * ⛔ **LE DOMAINE COUVRE DÉSORMAIS LES TROIS CAS QUE LE TEST TS REVENDIQUE** : la quantité
+   * absente, l'unité absente, et l'unité hors vocabulaire. Ce sont exactement ceux que
+   * `arrondi.test.ts` présente comme des garde-fous et que la base n'exerçait pas.
+   */
+  const unites: (string | null)[] = [...UNITES, null, "gallon"];
+
+  for (const unite of unites) {
+    for (const valeur of [...entrees, null]) {
       const { data, error } = await admin.rpc("arrondir_pour_achat", {
         p_quantite: valeur,
         p_unite: unite,
@@ -449,15 +470,8 @@ test("⛔ l'arrondi d'achat dit la MÊME chose en TypeScript et en base", async 
 
       const attendu = arrondirPourAchat(valeur, unite);
 
-      /*
-       * ⚠️ **La base rend un `numeric`, que PostgREST sérialise en chaîne ou en nombre
-       * selon l'échelle.** On compare des NOMBRES, pas des représentations : « 1.50 » et
-       * 1.5 sont la même quantité, et faire échouer le test là-dessus masquerait les vrais
-       * désaccords derrière du bruit de formatage.
-       */
-      assert.equal(
-        Number(data),
-        attendu,
+      assert.ok(
+        memeQuantite(data, attendu),
         `désaccord sur ${valeur} « ${unite} » : la base rend ${data}, le code rend ${attendu}`
       );
     }

@@ -3,7 +3,22 @@ import { type Unite } from "../recettes/unites.ts";
 /**
  * Arrondir une quantité mise à l'échelle à une valeur **achetable** (D7, FR-52).
  *
- * ⛔ **CETTE RÈGLE EXISTE EN DEUX EXEMPLAIRES, ET C'EST DÉLIBÉRÉ.** La contrepartie
+ * ⛔ **CETTE FONCTION NE S'EXÉCUTE PAS EN PRODUCTION, ET IL FAUT LE SAVOIR EN LA LISANT.**
+ * Mesuré en revue le 2026-08-21 : elle n'est importée que par ses propres tests et par
+ * l'invariant. **La règle qui tourne est la SQL** — `public.arrondir_pour_achat`, appelée
+ * par la génération, parce que D1(a) met la boucle dans la base et que c'est donc la base
+ * qui écrit la quantité.
+ *
+ * ⛔ **Conséquence à ne pas se cacher** : le banc de mutations de ce module mesure les dents
+ * des tests de CETTE copie, pas celles de la règle qui s'exécute. La story 4.7 revendiquait
+ * « 8 mutations sur 8 tuées » sans le dire — c'est corrigé partout, et un banc distinct porte
+ * désormais sur le SQL.
+ *
+ * ⚠️ **Elle reste, et elle sert à deux choses réelles** : elle énonce la règle en français
+ * lisible, et elle est l'**oracle indépendant** de l'invariant — sans elle, le test comparerait
+ * le SQL à lui-même, ce qui ne prouverait rien.
+ *
+ * ⛔ **CETTE RÈGLE EXISTE DONC EN DEUX EXEMPLAIRES, ET C'EST DÉLIBÉRÉ.** La contrepartie
  * est `public.arrondir_pour_achat(numeric, text)`, posée par la migration
  * `20260821110000`. Deux défauts prescrits de la story 4.7 se contredisaient :
  * D7 disait « jamais dans le SQL », D1(a) mettait la boucle de génération DANS la

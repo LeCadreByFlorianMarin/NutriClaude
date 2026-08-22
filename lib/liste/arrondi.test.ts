@@ -116,31 +116,51 @@ test("une unité INCONNUE laisse la quantité intacte, sans lever", () => {
   assert.equal(arrondirPourAchat(1.67, null), 1.67);
 });
 
-test("le compte rendu de génération accorde, et son zéro a sa propre phrase", () => {
+test("le compte rendu accorde, et « posé » remplace « ajouté »", () => {
   /*
-   * ⚠️ **C'est le défaut « 2 pièce » de la story 4.2**, transposé — il n'avait été
-   * trouvé qu'à l'œil parce que la règle vivait dans le JSX.
+   * ⛔ **« POSÉ » ET NON « AJOUTÉ » — CORRECTION DE LA REVUE.** Le compte est celui des
+   * articles TOUCHÉS : une ligne existante dont la quantité monte y figure, et elle n'a pas
+   * été « ajoutée ». Les quatre couches ont mesuré qu'au second appel l'écran annonçait
+   * « N articles ajoutés » alors que zéro l'avait été.
    */
-  assert.equal(compteRenduGeneration(1), "1 article ajouté à ta liste.");
-  assert.equal(compteRenduGeneration(2), "2 articles ajoutés à ta liste.");
-  assert.equal(compteRenduGeneration(12), "12 articles ajoutés à ta liste.");
+  assert.equal(compteRenduGeneration({ ajoutes: 1, echoues: 0 }), "1 article posé sur ta liste.");
+  assert.equal(compteRenduGeneration({ ajoutes: 2, echoues: 0 }), "2 articles posés sur ta liste.");
+  assert.equal(compteRenduGeneration({ ajoutes: 12, echoues: 0 }), "12 articles posés sur ta liste.");
 });
 
-test("⛔ zéro article ajouté n'est pas une panne, et ne se dit pas comme un compte", () => {
+test("⛔ un échec se dit TOUJOURS — le membre croirait sinon sa liste complète", () => {
   /*
-   * ⛔ « 0 article ajouté. » se lit comme un échec alors que c'est un succès sans objet :
-   * le menu est vide, ou la liste avait déjà tout. La leçon écrite en revue de la 4.2
-   * était « un état vide se mérite ».
+   * ⛔ **NÉ D'UN DÉFAUT MESURÉ EN REVUE** : un débordement de quantité annulait l'ordre entier
+   * et faisait perdre toute la semaine, sans que rien ne le dise. La génération isole désormais
+   * chaque article — encore faut-il que l'écran rende compte des échecs.
    */
-  const phrase = compteRenduGeneration(0);
+  assert.match(compteRenduGeneration({ ajoutes: 3, echoues: 1 }), /n'a pas pu être ajouté/);
+  assert.match(compteRenduGeneration({ ajoutes: 3, echoues: 2 }), /2 articles n'ont pas pu/);
+  // Tout a échoué : la phrase ne doit pas annoncer un succès partiel qui n'existe pas.
+  assert.ok(!compteRenduGeneration({ ajoutes: 0, echoues: 1 }).includes("posé"));
+  assert.match(compteRenduGeneration({ ajoutes: 0, echoues: 1 }), /1 article n'a pas pu être ajouté/);
+});
+
+test("⛔ zéro posé n'est pas une panne, et ne se dit pas comme un compte", () => {
+  /*
+   * ⛔ « 0 article posé. » se lit comme un échec alors que c'est un succès sans objet.
+   * ⚠️ **Et la phrase ne parle plus de la LISTE — correction de la revue.** « Ta liste avait
+   * déjà tout ce qu'il faut » affirmait quelque chose de la liste alors que zéro a trois
+   * causes, dont « le menu est vide », et que la liste n'est pas consultée.
+   */
+  const phrase = compteRenduGeneration({ ajoutes: 0, echoues: 0 });
   assert.ok(!phrase.startsWith("0"), `« ${phrase} » annonce un compte nul comme un compte`);
-  assert.equal(phrase, "Ta liste avait déjà tout ce qu'il faut.");
+  assert.equal(phrase, "Rien de neuf pour ta liste.");
 });
 
 test("aucune phrase de génération n'emploie de mot technique banni (NFR-9)", () => {
   const bannis = ["synchronis", "token", "jeton", " api", "mcp", "supabase", "rls", "cache", "upsert"];
-  for (const n of [0, 1, 4]) {
-    const phrase = compteRenduGeneration(n).toLowerCase();
+  const cas = [
+    { ajoutes: 0, echoues: 0 }, { ajoutes: 1, echoues: 0 }, { ajoutes: 4, echoues: 0 },
+    { ajoutes: 0, echoues: 1 }, { ajoutes: 4, echoues: 2 },
+  ];
+  for (const c of cas) {
+    const phrase = compteRenduGeneration(c).toLowerCase();
     for (const mot of bannis) {
       assert.ok(!phrase.includes(mot), `« ${phrase} » emploie « ${mot} », banni de toute chaîne rendue`);
     }
